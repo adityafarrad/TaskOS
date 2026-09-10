@@ -40,6 +40,7 @@ final class ComposerViewModel {
     private var lastSavedID: AutomationID?
     private var lastDefinition: AutomationDefinition?
     private var applicationsLoaded = false
+    private var autosaveTask: Task<Void, Never>?
 
     var currentRevision: WorkflowRevision {
         WorkflowRevision(startingRevision.value + document.revision.value - 1)
@@ -98,6 +99,7 @@ final class ComposerViewModel {
             self.applications = loaded
             self.refreshSuggestions()
             self.autoResolveApplications()
+            self.restoreDraftIfNeeded()
         }
     }
 
@@ -271,6 +273,8 @@ final class ComposerViewModel {
             guard let self else { return }
             do {
                 try await self.composition.repository.save(workflow)
+                self.autosaveTask?.cancel()
+                try? await self.composition.drafts.clearDraft()
                 self.editingWorkflowID = nil
                 self.lastSavedSignature = signature
                 self.lastSavedID = targetID
@@ -342,6 +346,10 @@ final class ComposerViewModel {
         draftName = "Untitled"
         document = ComposerDocument()
         suggestions = []
+        autosaveTask?.cancel()
+        Task { [weak self] in
+            try? await self?.composition.drafts.clearDraft()
+        }
         resetPreview()
         notice = "Started a new workflow."
     }
@@ -369,6 +377,7 @@ final class ComposerViewModel {
     func updateName(_ value: String) {
         draftName = value
         resetPreview()
+        scheduleDraftAutosave()
     }
 
     func loadForEditing(_ workflow: SavedWorkflow) {
@@ -482,6 +491,39 @@ final class ComposerViewModel {
         autoResolveApplications()
         refreshSuggestions()
         resetPreview()
+        scheduleDraftAutosave()
+    }
+
+    private var currentID: AutomationID {
+        editingWorkflowID ?? draftID
+    }
+
+    private func scheduleDraftAutosave() {
+        let draft = ComposerDraft(id: currentID, name: draftName, text: document.text)
+        autosaveTask?.cancel()
+        autosaveTask = Task { [weak self] in
+            try? await Task.sleep(for: .milliseconds(400))
+            guard !Task.isCancelled else { return }
+            try? await self?.composition.drafts.saveDraft(draft)
+        }
+    }
+
+    private func restoreDraftIfNeeded() {
+        guard document.text.isEmpty, document.actions.isEmpty else { return }
+        Task { [weak self] in
+            guard let self else { return }
+            guard let draft = try? await self.composition.drafts.loadDraft(),
+                  !draft.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+                return
+            }
+            self.draftID = draft.id
+            self.draftName = draft.name
+            self.document = ComposerDocument(text: draft.text)
+            self.autoResolveApplications()
+            self.refreshSuggestions()
+            self.resetPreview()
+            self.notice = "Recovered your unsaved draft."
+        }
     }
 
     private func refreshSuggestions() {

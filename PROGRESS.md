@@ -23,7 +23,7 @@ compressed into implementation plus per-increment physical smoke checks.
 | ID | Work package | Status | Evidence | Notes |
 |---|---|---|---|---|
 | 1.1 | Build the typed domain and registry | done | Increments B1 + D1 | 4-capability catalog, validation, versioned coding, and persistence scaffolding complete; remaining capabilities continue in 2.2 |
-| 1.2 | Build the shared composer | in progress | Increments C1-C4 | Parser, suggestions, document, and composer UI done; templates, autosave persistence, keyboard/VoiceOver sign-off pending |
+| 1.2 | Build the shared composer | in progress | C1-C4 + G1 | Parser, suggestions, document, UI, and draft autosave done; keyboard/VoiceOver pending; templates scheduled for Phase 2.5 |
 | 1.3 | Build preparation, preview, and execution | done | Increments B2 + B3 | Effect-free preview, resource resolution, permissions, revision-bound approval, sequential execution with timeouts and cancellation |
 | 1.4 | Prove the first complete workflow | done | Increments E1-E3 | Canonical journey verified end to end in Release; Open Website + Arrange Window + Accessibility + history + edit/reuse |
 | 1.5 | Complete the basic product shell | done | D1 + F1-F5 | Library, menu-bar runtime, settings, interrupted-run recovery, onboarding; global hotkey deferred to Phase 2 by user decision |
@@ -688,3 +688,27 @@ compressed into implementation plus per-increment physical smoke checks.
   triggers).
 - Next eligible work package: the plan 1.2 remainder (draft autosave, keyboard/
   VoiceOver). Templates are scheduled for Phase 2 (2.5).
+
+### Increment G1 — Draft autosave and recovery (plan 1.2, partial; plan 2.11)
+
+- Status: done
+- Behavior delivered: the current composer draft is autosaved while editing and
+  restored on the next launch; saving removes the draft, and New clears it.
+- Interfaces changed: added `ComposerDraft` and the `DraftRepository` protocol
+  (Core), `InMemoryDraftRepository` (test fixture), `SwiftDataDraftRepository`
+  + `DraftRecord` (app); `AppComposition` exposes `drafts`; `ComposerViewModel`
+  restores on launch and debounces autosave, clearing on save/New.
+- Tests performed:
+  - `swift test --package-path Packages/TaskOSCore` — 106 tests, 20 suites, pass
+    (draft round-trip and single-draft replacement).
+  - App tests (`xcodebuild ... test -only-testing:TaskOSTests`) — PASS
+    (SwiftData draft repository).
+  - Debug build — BUILD SUCCEEDED.
+  - Release build — BUILD SUCCEEDED.
+- Physical checks (on this Mac, macOS 26 / Apple silicon): unsaved command and
+  name were restored after quit/reopen with a recovery notice; saving cleared
+  the draft. User-confirmed.
+- Remaining in plan 1.2: keyboard navigation of suggestions and VoiceOver.
+  Templates are scheduled for Phase 2.5.
+- Next eligible work package: G2 — keyboard navigation + VoiceOver for the
+  composer suggestions.

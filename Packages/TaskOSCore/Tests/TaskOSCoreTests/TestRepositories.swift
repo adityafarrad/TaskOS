@@ -65,8 +65,7 @@ actor InMemoryAutomationRepository: AutomationRepository {
     }
 }
 
-actor InMemoryRunHistoryRepository: RunHistoryRepository {
-    private var storage: [RunRecord] = []
+actor InMemoryRunHistoryRepository: RunHistoryRepository {    private var storage: [RunRecord] = []
 
     init() {}
 
@@ -97,5 +96,23 @@ actor InMemoryRunHistoryRepository: RunHistoryRepository {
 
     func clear() async throws {
         storage.removeAll()
+    }
+}
+
+actor InMemoryDraftRepository: DraftRepository {
+    private var draft: ComposerDraft?
+
+    init() {}
+
+    func loadDraft() async throws -> ComposerDraft? {
+        draft
+    }
+
+    func saveDraft(_ draft: ComposerDraft) async throws {
+        self.draft = draft
+    }
+
+    func clearDraft() async throws {
+        draft = nil
     }
 }
