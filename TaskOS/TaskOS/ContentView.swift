@@ -2,126 +2,294 @@ import SwiftUI
 import TaskOSCore
 
 struct ContentView: View {
-    @State private var model = ReviewViewModel()
+    @State private var model = ComposerViewModel()
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(TaskOSInfo.displayName)
-                        .font(.title2)
-                    Text("Review the exact steps before anything runs.")
-                        .foregroundStyle(.secondary)
-                }
-
-                workflowCard
-                controls
-
-                if let preview = model.preview {
-                    PreviewView(preview: preview)
-                }
-
-                switch model.stage {
-                case .running:
-                    ProgressView()
-                case .finished(let record):
-                    GroupBox("Run result") {
-                        RunResultView(record: record)
-                    }
-                default:
-                    EmptyView()
-                }
+                header
+                commandField
+                suggestionsSection
+                unresolvedNotice
+                stepsSection
+                addMenu
+                reviewSection
+                resultSection
             }
             .padding()
         }
-        .frame(minWidth: 620, minHeight: 560, alignment: .topLeading)
+        .frame(minWidth: 700, minHeight: 660, alignment: .topLeading)
+        .onAppear { model.loadApplicationsIfNeeded() }
     }
 
-    private var workflowCard: some View {
-        GroupBox("Workflow") {
-            VStack(alignment: .leading, spacing: 8) {
+    private var header: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(TaskOSInfo.displayName)
+                .font(.title2)
+            Text("Type what you want your Mac to do, then review and test it.")
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    private var commandField: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            TextField(
+                "Start typing, for example: open Safari and wait 2 seconds",
+                text: Binding(get: { model.text }, set: { model.setText($0) }),
+                axis: .vertical
+            )
+            .textFieldStyle(.roundedBorder)
+            .lineLimit(2...4)
+
+            HStack(spacing: 8) {
+                Button("Undo") { model.undo() }
+                    .disabled(!model.canUndo)
+                Button("Redo") { model.redo() }
+                    .disabled(!model.canRedo)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var suggestionsSection: some View {
+        if !model.suggestions.isEmpty {
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Suggestions")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+
+                ForEach(model.suggestions, id: \.id) { suggestion in
+                    Button {
+                        model.accept(suggestion)
+                    } label: {
+                        HStack {
+                            Text(suggestion.title)
+                            Spacer()
+                            if suggestion.requiresParameter {
+                                Text("needs input")
+                                    .font(.caption2)
+                                    .foregroundStyle(.orange)
+                            }
+                            Text(suggestion.category.rawValue)
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.vertical, 2)
+                }
+            }
+            .padding(8)
+            .background(RoundedRectangle(cornerRadius: 6).fill(Color.gray.opacity(0.08)))
+        }
+    }
+
+    @ViewBuilder
+    private var unresolvedNotice: some View {
+        if !model.unresolvedTexts.isEmpty {
+            Label(
+                "Unresolved: \(model.unresolvedTexts.joined(separator: " / "))",
+                systemImage: "exclamationmark.triangle"
+            )
+            .font(.callout)
+            .foregroundStyle(.orange)
+        }
+    }
+
+    private var stepsSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Steps")
+                .font(.headline)
+
+            if model.actions.isEmpty {
+                Text("No steps yet. Type a command or add an action.")
+                    .foregroundStyle(.secondary)
+            }
+
+            ForEach(Array(model.actions.enumerated()), id: \.element.id) { index, action in
+                ActionCard(index: index, action: action, model: model)
+            }
+        }
+    }
+
+    private var addMenu: some View {
+        Menu("Add action") {
+            Button("Wait 1 second") { model.add(.wait(1)) }
+            Button("Wait 5 seconds") { model.add(.wait(5)) }
+            Button("Show a notification") {
+                model.add(.showNotification(title: "TaskOS", message: ""))
+            }
+        }
+        .frame(maxWidth: 160)
+    }
+
+    private var reviewSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 12) {
+                Button(model.isBusy ? "Previewing..." : "Preview") { model.prepare() }
+                    .disabled(!model.canPrepare || model.isBusy)
+
+                Button("Test now") { model.test() }
+                    .disabled(!model.canTest)
+
+                Text("Test runs for real.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            if let notice = model.notice {
+                Text(notice)
+                    .font(.caption)
+                    .foregroundStyle(.orange)
+            }
+
+            if let preview = model.preview {
+                PreviewBox(preview: preview)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var resultSection: some View {
+        switch model.stage {
+        case .running:
+            ProgressView()
+        case .finished(let record):
+            GroupBox("Run result") {
+                RunResultView(record: record)
+            }
+        default:
+            EmptyView()
+        }
+    }
+}
+
+private struct ActionCard: View {
+    let index: Int
+    let action: ComposerAction
+    let model: ComposerViewModel
+
+    var body: some View {
+        GroupBox {
+            VStack(alignment: .leading, spacing: 6) {
                 HStack {
-                    Text("Trigger: \(model.definition.trigger.id == .manual ? "Manual" : model.definition.trigger.id.stableID)")
+                    Text("\(index + 1).")
+                        .monospacedDigit()
+                    Text(title)
+                        .font(.headline)
                     Spacer()
-                    Text("Revision \(model.definition.revision.value)")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                    Button { model.moveUp(id: action.id) } label: { Image(systemName: "arrow.up") }
+                        .disabled(index == 0)
+                    Button { model.moveDown(id: action.id) } label: { Image(systemName: "arrow.down") }
+                    Button { model.remove(id: action.id) } label: { Image(systemName: "trash") }
                 }
 
-                ForEach(Array(model.definition.actions.enumerated()), id: \.offset) { index, action in
-                    Text("\(index + 1). \(Self.description(for: action))")
-                }
+                detail
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 
-    private var controls: some View {
-        HStack(spacing: 12) {
-            Button(model.isBusy ? "Previewing..." : "Preview") {
-                model.prepare()
-            }
-            .disabled(model.isBusy)
-
-            Picker("Wait", selection: waitBinding) {
-                Text("1s wait").tag(1.0)
-                Text("3s wait").tag(3.0)
-            }
-            .pickerStyle(.segmented)
-            .frame(width: 200)
-
-            Spacer()
-
-            Button("Test now") {
-                model.test()
-            }
-            .disabled(!model.canTest)
-
-            Text("This runs for real.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+    private var title: String {
+        switch action.draft {
+        case .openApplication: return "Open Application"
+        case .wait: return "Wait"
+        case .showNotification: return "Show Notification"
         }
     }
 
-    private var waitBinding: Binding<Double> {
-        Binding(
-            get: {
-                for action in model.definition.actions {
-                    if case .wait(let wait) = action {
-                        return wait.duration
+    @ViewBuilder
+    private var detail: some View {
+        switch action.draft {
+        case .openApplication(let name, let resolved):
+            HStack(spacing: 8) {
+                if let resolved {
+                    Label(resolved.label, systemImage: "checkmark.circle.fill")
+                        .foregroundStyle(.green)
+                } else {
+                    Label("Unresolved: \(name)", systemImage: "exclamationmark.triangle")
+                        .foregroundStyle(.orange)
+                }
+                Spacer()
+                Picker("Application", selection: applicationSelection) {
+                    Text("Select...").tag("")
+                    ForEach(model.applications, id: \.bundleIdentifier) { application in
+                        Text(application.displayName).tag(application.bundleIdentifier)
                     }
                 }
-                return 1
-            },
-            set: { model.setWaitDuration($0) }
-        )
+                .labelsHidden()
+                .frame(width: 220)
+            }
+
+        case .wait(let duration):
+            HStack(spacing: 8) {
+                Text("Duration")
+                Slider(
+                    value: Binding(
+                        get: { duration },
+                        set: { model.updateWait(id: action.id, duration: $0) }
+                    ),
+                    in: 0.1...30,
+                    step: 0.1
+                )
+                Text(String(format: "%.1fs", duration))
+                    .monospacedDigit()
+                    .frame(width: 48, alignment: .trailing)
+            }
+
+        case .showNotification(let notificationTitle, let message):
+            VStack(alignment: .leading, spacing: 4) {
+                TextField(
+                    "Title",
+                    text: Binding(
+                        get: { notificationTitle },
+                        set: { model.updateNotification(id: action.id, title: $0, message: message) }
+                    )
+                )
+                TextField(
+                    "Message",
+                    text: Binding(
+                        get: { message },
+                        set: { model.updateNotification(id: action.id, title: notificationTitle, message: $0) }
+                    )
+                )
+            }
+        }
     }
 
-    private static func description(for action: ActionConfiguration) -> String {
-        switch action {
-        case .openApplication(let configuration):
-            return "Open \(configuration.application.label)"
-        case .wait(let wait):
-            return "Wait \(String(format: "%.1f", wait.duration))s"
-        case .showNotification:
-            return "Show a notification"
-        }
+    private var applicationSelection: Binding<String> {
+        Binding(
+            get: {
+                if case .openApplication(_, let resolved) = action.draft {
+                    return resolved?.identifier ?? ""
+                }
+                return ""
+            },
+            set: { newValue in
+                guard let application = model.applications.first(where: { $0.bundleIdentifier == newValue }) else {
+                    return
+                }
+                model.resolve(id: action.id, application: application)
+            }
+        )
     }
 }
 
-private struct PreviewView: View {
+private struct PreviewBox: View {
     let preview: WorkflowPreview
 
     var body: some View {
         GroupBox("Preview") {
-            VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: 6) {
                 HStack {
-                    Text("Reviewed revision \(preview.revision.value)")
-                        .font(.headline)
-                    Spacer()
                     Text(preview.isRunnable ? "Ready to test" : "Needs attention")
-                        .font(.caption)
+                        .font(.headline)
                         .foregroundStyle(preview.isRunnable ? Color.green : Color.orange)
+                    Spacer()
+                    Text("Revision \(preview.revision.value)")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
 
                 Text("When: \(preview.triggerTitle)")
@@ -132,14 +300,11 @@ private struct PreviewView: View {
                             .foregroundStyle(color(for: action.status))
                         Text("\(action.index + 1). \(action.title)")
                         if let target = action.targetLabel {
-                            Text("(\(target))")
-                                .foregroundStyle(.secondary)
+                            Text("(\(target))").foregroundStyle(.secondary)
                         }
                         Spacer()
                         if let detail = action.detail {
-                            Text(detail)
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
+                            Text(detail).font(.caption).foregroundStyle(.secondary)
                         }
                     }
                 }
@@ -150,14 +315,13 @@ private struct PreviewView: View {
                 }
 
                 ForEach(Array(preview.issues.enumerated()), id: \.offset) { _, issue in
-                    Label(issue.message, systemImage: issue.severity == .error ? "exclamationmark.triangle" : "info.circle")
-                        .font(.caption)
-                        .foregroundStyle(issue.severity == .error ? Color.red : Color.secondary)
-                }
-
-                Text("Will run automatically: \(preview.willRunAutomatically ? "Yes" : "No")")
+                    Label(
+                        issue.message,
+                        systemImage: issue.severity == .error ? "exclamationmark.triangle" : "info.circle"
+                    )
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(issue.severity == .error ? Color.red : Color.secondary)
+                }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }
@@ -193,8 +357,7 @@ private struct RunResultView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Text(statusTitle)
-                    .font(.headline)
+                Text(statusTitle).font(.headline)
                 Spacer()
                 Text(String(format: "%.2fs", record.duration))
                     .font(.caption)

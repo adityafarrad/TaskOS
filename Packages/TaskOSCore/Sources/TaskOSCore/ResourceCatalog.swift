@@ -12,4 +12,11 @@ public struct ApplicationResource: Hashable, Sendable {
 
 public protocol ResourceCatalog: Sendable {
     func application(bundleIdentifier: String) async -> ApplicationResource?
+    func installedApplications() async -> [ApplicationResource]
+}
+
+public extension ResourceCatalog {
+    func installedApplications() async -> [ApplicationResource] {
+        []
+    }
 }

@@ -23,7 +23,7 @@ compressed into implementation plus per-increment physical smoke checks.
 | ID | Work package | Status | Evidence | Notes |
 |---|---|---|---|---|
 | 1.1 | Build the typed domain and registry | in progress | Increment B1 | Typed domain + registry + coding for 4 capabilities; persistence layer pending |
-| 1.2 | Build the shared composer | in progress | Increments C1-C3 | Grammar, parser, spans, canonical phrases, suggestions, composer document done; UI pending |
+| 1.2 | Build the shared composer | in progress | Increments C1-C4 | Parser, suggestions, document, and composer UI done; templates, autosave persistence, keyboard/VoiceOver sign-off pending |
 | 1.3 | Build preparation, preview, and execution | done | Increments B2 + B3 | Effect-free preview, resource resolution, permissions, revision-bound approval, sequential execution with timeouts and cancellation |
 | 1.4 | Prove the first complete workflow | not started | — | First reforecast milestone |
 | 1.5 | Complete the basic product shell | not started | — | |
@@ -282,3 +282,43 @@ compressed into implementation plus per-increment physical smoke checks.
 - Next eligible work package: wire the composer document into a UI (text field,
   live suggestions, cards, resource picker, undo/redo) and connect to the
   existing review/test flow.
+
+### Increment C4 — Composer UI and review/test integration (plan 1.2, partial)
+
+- Status: done
+- Behavior delivered: a working autocomplete-guided composer. The user types a
+  command, sees contextual suggestions and accepts them, sees live action cards
+  that resolve installed applications, edits steps through their cards (wait
+  slider, notification fields, application picker), reorders and deletes steps,
+  and uses undo/redo. Unresolved wording stays visible and blocks review. The
+  composer feeds the existing effect-free preview and revision-bound test flow.
+- Interfaces changed: `ResourceCatalog` gained `installedApplications()`
+  (default empty; `WorkspaceResourceCatalog` enumerates standard app folders);
+  `AppComposition` now exposes the suggestion engine and an application loader;
+  replaced the review-only view model with `ComposerViewModel`; `ContentView`
+  is now the composer, cards, preview, and run result.
+- Tests performed:
+  - `swift test --package-path Packages/TaskOSCore` — 67 tests, 13 suites,
+    pass.
+  - `xcodebuild ... Debug build` — BUILD SUCCEEDED.
+  - `xcodebuild ... Release build` — BUILD SUCCEEDED.
+- Physical checks (on this Mac, macOS 26 / Apple silicon):
+  - Typing `open Safari and wait 2 seconds` produced an Open Safari card and a
+    2.0s Wait card.
+  - Adding `and email Bob` produced an Unresolved notice and disabled Preview.
+  - Typing `open No` offered Notes; accepting it replaced the fragment.
+  - Adding and slider-editing a Wait updated the command text; undo/redo worked.
+  - Adding a notification, previewing, and testing opened Safari and delivered
+    the notification. User-confirmed.
+- Remaining defects / gaps:
+  - No templates and no draft autosave persistence yet (plan 1.2 remainder).
+  - Keyboard navigation and VoiceOver were not formally verified; suggestions
+    are currently mouse-clickable buttons.
+  - Suggestion computation is synchronous, so the stale-async-result rule is
+    trivially satisfied but not exercised by a real async refresh.
+  - Reconciliation preserves action identity by order (inserting ahead can
+    reset card ids).
+- Next eligible work package: plan 1.4 (canonical workflow end to end) or the
+  plan 1.2 remainder (templates, autosave, keyboard/VoiceOver). Recommended
+  next: plan 1.4 to prove the full saved-and-reopened journey, then return for
+  templates/autosave.

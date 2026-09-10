@@ -9,13 +9,20 @@ final class AppComposition {
     let runner: WorkflowRunner
     let preparer: CreationPreparer
     let approvals: ApprovalRegistry
+    let suggestions: SuggestionEngine
+
+    private let catalog: WorkspaceResourceCatalog
 
     init() {
         let clock = SystemClock()
+        let catalog = WorkspaceResourceCatalog()
+
         self.clock = clock
+        self.catalog = catalog
         self.approvals = ApprovalRegistry()
+        self.suggestions = SuggestionEngine()
         self.preparer = CreationPreparer(
-            catalog: WorkspaceResourceCatalog(),
+            catalog: catalog,
             permissions: SystemPermissionStatusProvider()
         )
         self.runner = WorkflowRunner(
@@ -27,22 +34,7 @@ final class AppComposition {
         )
     }
 
-    func initialDefinition() -> AutomationDefinition {
-        AutomationDefinition(
-            name: "Walking slice",
-            revision: WorkflowRevision(1),
-            trigger: .manual(ManualTrigger()),
-            actions: [
-                .openApplication(
-                    OpenApplicationAction(
-                        application: .application(bundleIdentifier: "com.apple.Safari", label: "Safari")
-                    )
-                ),
-                .wait(WaitAction(duration: 1)),
-                .showNotification(
-                    ShowNotificationAction(title: "TaskOS", message: "Safari is open.")
-                ),
-            ]
-        )
+    func loadApplications() async -> [ApplicationResource] {
+        await catalog.installedApplications()
     }
 }
