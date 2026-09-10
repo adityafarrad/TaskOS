@@ -394,11 +394,29 @@ compressed into implementation plus per-increment physical smoke checks.
   - Debug build — BUILD SUCCEEDED.
   - Release build — BUILD SUCCEEDED (run for safety; not strictly required
     mid-phase).
-- Physical checks: the SwiftData save/relaunch/run/delete physical confirmation
-  requested previously is still pending explicit user confirmation; not repeated
-  here per the instructed scope.
+- Physical checks: SwiftData save/relaunch/run/delete confirmed working on this
+  Mac by the user.
 - Remaining notes: old JSON files under Application Support/TaskOS/Workflows are
   no longer read; a one-time import can be added if desired.
 - Next eligible work package: per user direction, plan 1.4 canonical journey,
   then the remaining plan 1.5 library management and menu-bar runtime. Do not
   start automatically.
+
+### Fix F1 — Suggestion acceptance spacing (plan 1.2)
+
+- Status: done
+- Defect: accepting a suggestion after a connector produced concatenated text
+  such as `open Safari andOpen Notes`, which then parsed as one malformed
+  application name. Affected any suggestion accepted after `and`, `then`,
+  `also`, or a comma.
+- Fix: `ComposerDocument.accept(_:)` now inserts a single separating space
+  between the preserved prefix and the accepted phrase when the prefix is
+  non-empty and does not already end in whitespace.
+- Tests performed:
+  - `swift test --package-path Packages/TaskOSCore` — 76 tests, 15 suites, pass.
+    Added regression tests for acceptance after `and` and after `then`, asserting
+    the space is present and the result parses into two actions.
+  - `xcodebuild ... Debug build` — BUILD SUCCEEDED.
+- Physical checks: user-reported defect fixed; verified in app per user's report
+  flow (accept suggestion after `and`).
+- Next eligible work package: unchanged — plan 1.4 canonical journey.

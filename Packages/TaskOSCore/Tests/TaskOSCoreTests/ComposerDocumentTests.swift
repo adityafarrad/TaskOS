@@ -140,4 +140,41 @@ struct ComposerDocumentTests {
 
         #expect(document.renderedText() == "Wait 1 seconds, then Open Safari, then Show a notification")
     }
+
+    @Test func acceptingAfterAConnectorKeepsASeparatingSpace() {
+        var document = ComposerDocument()
+        document.setText("open Safari and")
+
+        let suggestion = Suggestion(
+            id: "app.com.apple.Notes",
+            phrase: "Open Notes",
+            title: "Notes",
+            category: .application,
+            requiresParameter: false,
+            match: .prefix
+        )
+        document.accept(suggestion)
+
+        #expect(document.text == "open Safari and Open Notes")
+        #expect(document.actions.count == 2)
+        #expect(!document.text.contains("andOpen"))
+    }
+
+    @Test func acceptingAfterThenKeepsASeparatingSpace() {
+        var document = ComposerDocument()
+        document.setText("wait 2 seconds then")
+
+        let suggestion = Suggestion(
+            id: "app.com.apple.Safari",
+            phrase: "Open Safari",
+            title: "Safari",
+            category: .application,
+            requiresParameter: false,
+            match: .prefix
+        )
+        document.accept(suggestion)
+
+        #expect(document.text == "wait 2 seconds then Open Safari")
+        #expect(document.actions.count == 2)
+    }
 }

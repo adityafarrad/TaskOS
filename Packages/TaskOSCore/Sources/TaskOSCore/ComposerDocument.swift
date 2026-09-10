@@ -94,7 +94,10 @@ public struct ComposerDocument: Sendable {
 
     public mutating func accept(_ suggestion: Suggestion) {
         let start = trailingFragmentStart()
-        let prefix = String(text.prefix(start))
+        var prefix = String(text.prefix(start))
+        if !prefix.isEmpty, let last = prefix.last, !last.isWhitespace {
+            prefix.append(" ")
+        }
         setText(prefix + suggestion.phrase)
     }
 
