@@ -33,6 +33,16 @@ Never run without explicit authorization:
 `git push` is ask-first. Normal local status/diff/add/commit may proceed
 without repeated approval.
 
+## Milestones and named history
+
+`main` is the integration branch. Each completed work package gets an annotated
+tag so history is understandable later:
+
+- Format: `wp-<plan-id>-<short-slug>` (e.g. `wp-0.4-foundation`,
+  `wp-1.1-domain-registry`).
+- Tag is created after the work package's commit passes its focused tests.
+- Push tags explicitly: `git push origin <tag>` (`git push` is ask-first).
+
 ## Build and test
 
 - Core tests: `swift test --package-path Packages/TaskOSCore`

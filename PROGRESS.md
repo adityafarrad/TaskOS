@@ -22,7 +22,7 @@ compressed into implementation plus per-increment physical smoke checks.
 
 | ID | Work package | Status | Evidence | Notes |
 |---|---|---|---|---|
-| 1.1 | Build the typed domain and registry | not started | — | Thin slice of this lands in Increment B (4 capabilities) |
+| 1.1 | Build the typed domain and registry | in progress | Increment B1 | Typed domain + registry + coding for 4 capabilities; persistence layer pending |
 | 1.2 | Build the shared composer | not started | — | |
 | 1.3 | Build preparation, preview, and execution | not started | — | Thin slice of this lands in Increment B |
 | 1.4 | Prove the first complete workflow | not started | — | First reforecast milestone |
@@ -78,3 +78,36 @@ compressed into implementation plus per-increment physical smoke checks.
   yet (avoiding speculative abstraction). Clock fake delivered.
 - Next eligible work package: B1 (typed domain + registry for
   Manual / Open Application / Wait / Show Notification).
+
+### Increment B1 — Typed domain and registry (plan 1.1, partial)
+
+- Status: done
+- Scope: stable capability IDs; typed trigger/action configurations for the
+  walking-slice catalog (Manual, Open Application, Wait, Show Notification);
+  typed `ResourceReference`; parameter validation; workflow revisions;
+  `CapabilityRegistry` with consistency checks; versioned Codable envelope
+  that rejects unknown future schemas and unknown capabilities.
+- Interfaces changed: added `TriggerID`, `ActionID`, `ResourceReference`,
+  `ManualTrigger`, `TriggerConfiguration`, `OpenApplicationAction`,
+  `WaitAction`, `ShowNotificationAction`, `ActionConfiguration`,
+  `ValidationIssue`, `ValidationResult`, `AutomationID`, `WorkflowRevision`,
+  `AutomationDefinition`, `AutomationDraft`, `CapabilityDescriptor`,
+  `CapabilityRegistry`, `PersistenceError`, `AutomationCoding`.
+- Tests performed:
+  - `swift test --package-path Packages/TaskOSCore` — 19 tests, 6 suites, pass.
+    Covers registry consistency, validation bounds, draft-to-manual default,
+    12-action limit, Codable round-trip preserving order, rejection of future
+    schema versions, unknown capabilities, and malformed payloads.
+  - `xcodebuild -project TaskOS/TaskOS.xcodeproj -scheme TaskOS -configuration
+    Debug build` — BUILD SUCCEEDED.
+- Physical checks: none (pure Core; no platform adapters or UI yet).
+- Remaining defects / gaps:
+  - Catalog is intentionally limited to 4 capabilities; Open Website and
+    Arrange Window (plan 1.1) deferred to later increments.
+  - Persistence is the pure-Core coding envelope only; the SwiftData
+    repository behind an interface lands later in Phase 1.
+  - No executor or adapter bindings yet (Increment B3).
+- Next eligible work package: execution slice — `ActionExecutor` + platform
+  adapters (plan 1.3 start), then sequential execution with timeouts and
+  `RunRecord`, then the minimal Run UI. Registry surface (B2) and domain
+  types (B1) are complete.
