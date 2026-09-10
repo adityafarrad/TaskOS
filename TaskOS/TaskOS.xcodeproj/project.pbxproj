@@ -1,0 +1,601 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		5DC542B23052B7D30040BFCE /* TaskOSCore in Frameworks */ = {isa = PBXBuildFile; productRef = 5DC542B13052B7D30040BFCE /* TaskOSCore */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		5DC542883052B7D30040BFCE /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 5DC542723052B7D20040BFCE /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 5DC542793052B7D20040BFCE;
+			remoteInfo = TaskOS;
+		};
+		5DC542923052B7D30040BFCE /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 5DC542723052B7D20040BFCE /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 5DC542793052B7D20040BFCE;
+			remoteInfo = TaskOS;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXFileReference section */
+		5DC5427A3052B7D20040BFCE /* TaskOS.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = TaskOS.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		5DC542873052B7D30040BFCE /* TaskOSTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = TaskOSTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		5DC542913052B7D30040BFCE /* TaskOSUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = TaskOSUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+/* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedRootGroup section */
+		5DC5427C3052B7D20040BFCE /* TaskOS */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = TaskOS;
+			sourceTree = "<group>";
+		};
+		5DC5428A3052B7D30040BFCE /* TaskOSTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = TaskOSTests;
+			sourceTree = "<group>";
+		};
+		5DC542943052B7D30040BFCE /* TaskOSUITests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = TaskOSUITests;
+			sourceTree = "<group>";
+		};
+/* End PBXFileSystemSynchronizedRootGroup section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		5DC542773052B7D20040BFCE /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				5DC542B23052B7D30040BFCE /* TaskOSCore in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		5DC542843052B7D30040BFCE /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		5DC5428E3052B7D30040BFCE /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		5DC542713052B7D20040BFCE = {
+			isa = PBXGroup;
+			children = (
+				5DC5427C3052B7D20040BFCE /* TaskOS */,
+				5DC5428A3052B7D30040BFCE /* TaskOSTests */,
+				5DC542943052B7D30040BFCE /* TaskOSUITests */,
+				5DC5427B3052B7D20040BFCE /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		5DC5427B3052B7D20040BFCE /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				5DC5427A3052B7D20040BFCE /* TaskOS.app */,
+				5DC542873052B7D30040BFCE /* TaskOSTests.xctest */,
+				5DC542913052B7D30040BFCE /* TaskOSUITests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		5DC542793052B7D20040BFCE /* TaskOS */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 5DC5429B3052B7D30040BFCE /* Build configuration list for PBXNativeTarget "TaskOS" */;
+			buildPhases = (
+				5DC542763052B7D20040BFCE /* Sources */,
+				5DC542773052B7D20040BFCE /* Frameworks */,
+				5DC542783052B7D20040BFCE /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				5DC5427C3052B7D20040BFCE /* TaskOS */,
+			);
+			name = TaskOS;
+			packageProductDependencies = (
+				5DC542B13052B7D30040BFCE /* TaskOSCore */,
+			);
+			productName = TaskOS;
+			productReference = 5DC5427A3052B7D20040BFCE /* TaskOS.app */;
+			productType = "com.apple.product-type.application";
+		};
+		5DC542863052B7D30040BFCE /* TaskOSTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 5DC5429E3052B7D30040BFCE /* Build configuration list for PBXNativeTarget "TaskOSTests" */;
+			buildPhases = (
+				5DC542833052B7D30040BFCE /* Sources */,
+				5DC542843052B7D30040BFCE /* Frameworks */,
+				5DC542853052B7D30040BFCE /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				5DC542893052B7D30040BFCE /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				5DC5428A3052B7D30040BFCE /* TaskOSTests */,
+			);
+			name = TaskOSTests;
+			packageProductDependencies = (
+			);
+			productName = TaskOSTests;
+			productReference = 5DC542873052B7D30040BFCE /* TaskOSTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+		5DC542903052B7D30040BFCE /* TaskOSUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 5DC542A13052B7D30040BFCE /* Build configuration list for PBXNativeTarget "TaskOSUITests" */;
+			buildPhases = (
+				5DC5428D3052B7D30040BFCE /* Sources */,
+				5DC5428E3052B7D30040BFCE /* Frameworks */,
+				5DC5428F3052B7D30040BFCE /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				5DC542933052B7D30040BFCE /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				5DC542943052B7D30040BFCE /* TaskOSUITests */,
+			);
+			name = TaskOSUITests;
+			packageProductDependencies = (
+			);
+			productName = TaskOSUITests;
+			productReference = 5DC542913052B7D30040BFCE /* TaskOSUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		5DC542723052B7D20040BFCE /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 2660;
+				LastUpgradeCheck = 2660;
+				TargetAttributes = {
+					5DC542793052B7D20040BFCE = {
+						CreatedOnToolsVersion = 26.6;
+					};
+					5DC542863052B7D30040BFCE = {
+						CreatedOnToolsVersion = 26.6;
+						TestTargetID = 5DC542793052B7D20040BFCE;
+					};
+					5DC542903052B7D30040BFCE = {
+						CreatedOnToolsVersion = 26.6;
+						TestTargetID = 5DC542793052B7D20040BFCE;
+					};
+				};
+			};
+			buildConfigurationList = 5DC542753052B7D20040BFCE /* Build configuration list for PBXProject "TaskOS" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = 5DC542713052B7D20040BFCE;
+			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				5DC542B03052B7D30040BFCE /* XCLocalSwiftPackageReference "Packages/TaskOSCore" */,
+			);
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 5DC5427B3052B7D20040BFCE /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				5DC542793052B7D20040BFCE /* TaskOS */,
+				5DC542863052B7D30040BFCE /* TaskOSTests */,
+				5DC542903052B7D30040BFCE /* TaskOSUITests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		5DC542783052B7D20040BFCE /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		5DC542853052B7D30040BFCE /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		5DC5428F3052B7D30040BFCE /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		5DC542763052B7D20040BFCE /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		5DC542833052B7D30040BFCE /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		5DC5428D3052B7D30040BFCE /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		5DC542893052B7D30040BFCE /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 5DC542793052B7D20040BFCE /* TaskOS */;
+			targetProxy = 5DC542883052B7D30040BFCE /* PBXContainerItemProxy */;
+		};
+		5DC542933052B7D30040BFCE /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 5DC542793052B7D20040BFCE /* TaskOS */;
+			targetProxy = 5DC542923052B7D30040BFCE /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		5DC542B03052B7D30040BFCE /* XCLocalSwiftPackageReference "Packages/TaskOSCore" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = ../Packages/TaskOSCore;
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		5DC542B13052B7D30040BFCE /* TaskOSCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = TaskOSCore;
+		};
+/* End XCSwiftPackageProductDependency section */
+
+/* Begin XCBuildConfiguration section */
+		5DC542993052B7D30040BFCE /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = Y89P3A9ULV;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = macosx;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Debug;
+		};
+		5DC5429A3052B7D30040BFCE /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = Y89P3A9ULV;
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				SDKROOT = macosx;
+				SWIFT_COMPILATION_MODE = wholemodule;
+			};
+			name = Release;
+		};
+		5DC5429C3052B7D30040BFCE /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = Y89P3A9ULV;
+				ENABLE_APP_SANDBOX = YES;
+				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_PREVIEWS = YES;
+				ENABLE_USER_SELECTED_FILES = readonly;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = usuals.com.TaskOS;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 6.0;
+			};
+			name = Debug;
+		};
+		5DC5429D3052B7D30040BFCE /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = Y89P3A9ULV;
+				ENABLE_APP_SANDBOX = YES;
+				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_PREVIEWS = YES;
+				ENABLE_USER_SELECTED_FILES = readonly;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = usuals.com.TaskOS;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 6.0;
+			};
+			name = Release;
+		};
+		5DC5429F3052B7D30040BFCE /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = Y89P3A9ULV;
+				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = usuals.com.TaskOSTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 6.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/TaskOS.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/TaskOS";
+			};
+			name = Debug;
+		};
+		5DC542A03052B7D30040BFCE /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = Y89P3A9ULV;
+				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = usuals.com.TaskOSTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 6.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/TaskOS.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/TaskOS";
+			};
+			name = Release;
+		};
+		5DC542A23052B7D30040BFCE /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = Y89P3A9ULV;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = usuals.com.TaskOSUITests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 6.0;
+				TEST_TARGET_NAME = TaskOS;
+			};
+			name = Debug;
+		};
+		5DC542A33052B7D30040BFCE /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = Y89P3A9ULV;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = usuals.com.TaskOSUITests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 6.0;
+				TEST_TARGET_NAME = TaskOS;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		5DC542753052B7D20040BFCE /* Build configuration list for PBXProject "TaskOS" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				5DC542993052B7D30040BFCE /* Debug */,
+				5DC5429A3052B7D30040BFCE /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		5DC5429B3052B7D30040BFCE /* Build configuration list for PBXNativeTarget "TaskOS" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				5DC5429C3052B7D30040BFCE /* Debug */,
+				5DC5429D3052B7D30040BFCE /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		5DC5429E3052B7D30040BFCE /* Build configuration list for PBXNativeTarget "TaskOSTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				5DC5429F3052B7D30040BFCE /* Debug */,
+				5DC542A03052B7D30040BFCE /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		5DC542A13052B7D30040BFCE /* Build configuration list for PBXNativeTarget "TaskOSUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				5DC542A23052B7D30040BFCE /* Debug */,
+				5DC542A33052B7D30040BFCE /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 5DC542723052B7D20040BFCE /* Project object */;
+}
