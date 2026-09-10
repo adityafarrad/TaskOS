@@ -34,8 +34,10 @@ final class MenuBarViewModel {
 
         runTask = Task { [weak self] in
             guard let self else { return }
-            let record = await self.composition.runner.run(workflow.definition)
-            try? await self.composition.runHistory.append(record)
+            let runID = UUID()
+            try? await self.composition.runHistory.append(RunRecord.starting(workflow.definition, id: runID))
+            let record = await self.composition.runner.run(workflow.definition, id: runID)
+            try? await self.composition.runHistory.update(record)
             self.status = "\(workflow.name): \(record.status.rawValue)"
             self.isRunning = false
             self.runTask = nil

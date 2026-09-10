@@ -217,7 +217,9 @@ final class ComposerViewModel {
 
         Task { [weak self] in
             guard let self else { return }
-            let record = await self.composition.runner.run(definition)
+            let runID = UUID()
+            try? await self.composition.runHistory.append(self.runningRecord(for: definition, id: runID))
+            let record = await self.composition.runner.run(definition, id: runID)
             self.stage = .finished(record)
             await self.record(record)
         }
@@ -346,7 +348,9 @@ final class ComposerViewModel {
         stage = .running
         Task { [weak self] in
             guard let self else { return }
-            let record = await self.composition.runner.run(workflow.definition)
+            let runID = UUID()
+            try? await self.composition.runHistory.append(self.runningRecord(for: workflow.definition, id: runID))
+            let record = await self.composition.runner.run(workflow.definition, id: runID)
             self.stage = .finished(record)
             await self.record(record)
         }
@@ -375,6 +379,7 @@ final class ComposerViewModel {
         Task { [weak self] in
             guard let self else { return }
             do {
+                try await self.composition.runHistory.markRunningAsInterrupted()
                 self.history = try await self.composition.runHistory.recentRuns(limit: 50)
             } catch {
                 self.libraryError = "Could not load run history: \(error.localizedDescription)"
@@ -382,9 +387,13 @@ final class ComposerViewModel {
         }
     }
 
+    private func runningRecord(for definition: AutomationDefinition, id: UUID) -> RunRecord {
+        RunRecord.starting(definition, id: id)
+    }
+
     private func record(_ run: RunRecord) async {
         do {
-            try await composition.runHistory.append(run)
+            try await composition.runHistory.update(run)
             history = try await composition.runHistory.recentRuns(limit: 50)
         } catch {
             libraryError = "Could not save run history: \(error.localizedDescription)"

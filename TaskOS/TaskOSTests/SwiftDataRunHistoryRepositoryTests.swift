@@ -44,4 +44,42 @@ struct SwiftDataRunHistoryRepositoryTests {
         let runs = try await repository.recentRuns(limit: 10)
         #expect(runs.isEmpty)
     }
+
+    @Test func updateAndInterruptedRecovery() async throws {
+        let repository: any RunHistoryRepository = try makeRepository()
+
+        let finishedID = UUID()
+        var running = RunRecord(
+            id: finishedID,
+            automationID: AutomationID(),
+            revision: WorkflowRevision(1),
+            automationName: "Finished",
+            status: .running,
+            startedAt: Date(timeIntervalSince1970: 1),
+            finishedAt: Date(timeIntervalSince1970: 1),
+            actions: []
+        )
+        try await repository.append(running)
+        running.status = .succeeded
+        running.finishedAt = Date(timeIntervalSince1970: 2)
+        try await repository.update(running)
+
+        let unfinished = RunRecord(
+            id: UUID(),
+            automationID: AutomationID(),
+            revision: WorkflowRevision(1),
+            automationName: "Unfinished",
+            status: .running,
+            startedAt: Date(timeIntervalSince1970: 3),
+            finishedAt: Date(timeIntervalSince1970: 3),
+            actions: []
+        )
+        try await repository.append(unfinished)
+
+        try await repository.markRunningAsInterrupted()
+
+        let runs = try await repository.recentRuns(limit: 10)
+        #expect(runs.first { $0.automationName == "Unfinished" }?.status == .interrupted)
+        #expect(runs.first { $0.automationName == "Finished" }?.status == .succeeded)
+    }
 }

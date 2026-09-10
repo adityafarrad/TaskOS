@@ -26,7 +26,7 @@ compressed into implementation plus per-increment physical smoke checks.
 | 1.2 | Build the shared composer | in progress | Increments C1-C4 | Parser, suggestions, document, and composer UI done; templates, autosave persistence, keyboard/VoiceOver sign-off pending |
 | 1.3 | Build preparation, preview, and execution | done | Increments B2 + B3 | Effect-free preview, resource resolution, permissions, revision-bound approval, sequential execution with timeouts and cancellation |
 | 1.4 | Prove the first complete workflow | done | Increments E1-E3 | Canonical journey verified end to end in Release; Open Website + Arrange Window + Accessibility + history + edit/reuse |
-| 1.5 | Complete the basic product shell | in progress | D1 + F1-F3 | Library, menu-bar runtime, and settings (permissions, launch at login, data controls); hotkey/onboarding/recovery pending |
+| 1.5 | Complete the basic product shell | in progress | D1 + F1-F4 | Library, menu-bar runtime, settings, interrupted-run recovery; onboarding pending and global hotkey deferred to Phase 2 |
 
 ### Phase 2 — Complete everyday workflows and automatic execution
 
@@ -633,3 +633,33 @@ compressed into implementation plus per-increment physical smoke checks.
   - No settings for update checks yet (Phase 3 / Sparkle).
 - Next eligible work package: F4 — interrupted-run recovery (persist an
   in-progress run; on startup mark unfinished prior runs interrupted).
+
+### Increment F4 — Interrupted-run recovery (plan 1.5, partial; plan 2.11)
+
+- Status: done
+- Behavior delivered: a run is recorded as running when it starts, updated with
+  its final result on completion, and any run left running by a quit or crash is
+  marked interrupted on the next launch (and never replayed).
+- Interfaces changed: `RunStatus` gained `running` and `interrupted`;
+  `RunRecord` gained an `id` (Identifiable) and a mutable `status`/`finishedAt`,
+  plus `RunRecord.starting(_:id:at:)`; `WorkflowRunner.run(_:id:)` accepts an
+  identity; `RunHistoryRepository` gained `update(_:)` and
+  `markRunningAsInterrupted()`; both repositories implemented them; the composer
+  and menu-bar view models record the running placeholder then update it.
+- Tests performed:
+  - `swift test --package-path Packages/TaskOSCore` — 104 tests, 19 suites,
+    pass. New coverage: update replaces an existing run, and startup marks
+    running runs interrupted while leaving completed runs alone.
+  - App tests (`xcodebuild ... test -only-testing:TaskOSTests`) — PASS
+    (SwiftData update + interrupted recovery).
+  - Debug build — BUILD SUCCEEDED.
+  - Release build — BUILD SUCCEEDED.
+- Physical checks (on this Mac, macOS 26 / Apple silicon):
+  - Started a 30s run and quit mid-run; after relaunch the History showed the
+    run as "interrupted". User-confirmed.
+- Scope decision (user): global hotkey recording (plan 2.10 KeyboardShortcuts) is
+  deferred to Phase 2; it adds a third-party package and belongs with the
+  automatic-trigger work.
+- Remaining in plan 1.5: basic onboarding. Global hotkey deferred.
+- Next eligible work package: plan 1.5 onboarding, or the plan 1.2 remainder
+  (templates, draft autosave, keyboard/VoiceOver).

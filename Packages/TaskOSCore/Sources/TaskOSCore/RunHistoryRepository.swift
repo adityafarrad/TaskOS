@@ -3,6 +3,8 @@ import Foundation
 public protocol RunHistoryRepository: Sendable {
     func recentRuns(limit: Int) async throws -> [RunRecord]
     func append(_ record: RunRecord) async throws
+    func update(_ record: RunRecord) async throws
+    func markRunningAsInterrupted() async throws
     func clear() async throws
 }
 

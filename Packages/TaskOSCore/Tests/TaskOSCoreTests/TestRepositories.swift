@@ -78,6 +78,23 @@ actor InMemoryRunHistoryRepository: RunHistoryRepository {
         storage.append(record)
     }
 
+    func update(_ record: RunRecord) async throws {
+        if let index = storage.firstIndex(where: { $0.id == record.id }) {
+            storage[index] = record
+        } else {
+            storage.append(record)
+        }
+    }
+
+    func markRunningAsInterrupted() async throws {
+        storage = storage.map { record in
+            guard record.status == .running else { return record }
+            var updated = record
+            updated.status = .interrupted
+            return updated
+        }
+    }
+
     func clear() async throws {
         storage.removeAll()
     }

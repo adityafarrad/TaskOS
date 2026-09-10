@@ -51,4 +51,45 @@ struct RunHistoryTests {
         let decoded = try RunRecordSerialization.decode(data)
         #expect(decoded == record)
     }
+
+    private func runningRecord(id: UUID) -> RunRecord {
+        RunRecord(
+            id: id,
+            automationID: AutomationID(),
+            revision: WorkflowRevision(1),
+            automationName: "Job",
+            status: .running,
+            startedAt: Date(timeIntervalSince1970: 1),
+            finishedAt: Date(timeIntervalSince1970: 1),
+            actions: []
+        )
+    }
+
+    @Test func updateReplacesExistingRecord() async throws {
+        let repository: any RunHistoryRepository = InMemoryRunHistoryRepository()
+        let id = UUID()
+        let running = runningRecord(id: id)
+        try await repository.append(running)
+
+        var finished = running
+        finished.status = .succeeded
+        finished.finishedAt = Date(timeIntervalSince1970: 2)
+        try await repository.update(finished)
+
+        let runs = try await repository.recentRuns(limit: 10)
+        #expect(runs.count == 1)
+        #expect(runs.first?.status == .succeeded)
+    }
+
+    @Test func startupMarksUnfinishedRunsInterrupted() async throws {
+        let repository: any RunHistoryRepository = InMemoryRunHistoryRepository()
+        try await repository.append(runningRecord(id: UUID()))
+        try await repository.append(makeRecord(name: "Done", startedAt: Date(timeIntervalSince1970: 2), status: .succeeded))
+
+        try await repository.markRunningAsInterrupted()
+
+        let runs = try await repository.recentRuns(limit: 10)
+        #expect(runs.contains { $0.status == .interrupted })
+        #expect(runs.contains { $0.status == .succeeded })
+    }
 }

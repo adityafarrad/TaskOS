@@ -53,7 +53,7 @@ public actor WorkflowRunner {
         self.timeouts = timeouts
     }
 
-    public func run(_ definition: AutomationDefinition) async -> RunRecord {
+    public func run(_ definition: AutomationDefinition, id: UUID = UUID()) async -> RunRecord {
         let startedAt = clock.now()
         var records: [ActionRunRecord] = []
         var status: RunStatus = .succeeded
@@ -104,6 +104,7 @@ public actor WorkflowRunner {
         }
 
         return RunRecord(
+            id: id,
             automationID: definition.id,
             revision: definition.revision,
             automationName: definition.name,

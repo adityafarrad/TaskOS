@@ -263,10 +263,12 @@ struct ContentView: View {
 
     private func runStatusColor(_ status: RunStatus) -> Color {
         switch status {
+        case .running: return .blue
         case .succeeded: return .green
         case .failed: return .red
         case .timedOut: return .orange
         case .cancelled: return .gray
+        case .interrupted: return .orange
         }
     }
 
@@ -660,10 +662,12 @@ private struct RunResultView: View {
 
     private var statusTitle: String {
         switch record.status {
+        case .running: return "Running"
         case .succeeded: return "Succeeded"
         case .failed: return "Failed"
         case .timedOut: return "Timed out"
         case .cancelled: return "Cancelled"
+        case .interrupted: return "Interrupted"
         }
     }
 
