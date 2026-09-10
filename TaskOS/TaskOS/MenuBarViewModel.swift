@@ -49,8 +49,10 @@ final class MenuBarViewModel {
             let outcome = await self.composition.coordinator.submit(workflow.definition, source: .manual)
             switch outcome {
             case .started:
+                self.isRunning = true
                 self.status = "Running \(workflow.name)..."
             case .queued:
+                self.isRunning = true
                 self.status = "Queued \(workflow.name)"
             case .queueFull:
                 self.status = "Queue is full"
@@ -61,16 +63,27 @@ final class MenuBarViewModel {
                 self.status = "Not started"
             }
 
-            await self.composition.coordinator.waitUntilIdle()
-            await self.updateStatus()
+            await self.monitorRun()
+        }
+    }
+
+    private func monitorRun() async {
+        while true {
+            let snapshot = await composition.coordinator.status()
+            apply(snapshot)
+            if !snapshot.isRunning, snapshot.queuedCount == 0 {
+                return
+            }
+            try? await Task.sleep(for: .milliseconds(400))
         }
     }
 
     func cancel() {
         Task { [weak self] in
             guard let self else { return }
+            self.status = "Cancelling..."
             await self.composition.coordinator.cancelAll()
-            await self.updateStatus()
+            await self.monitorRun()
         }
     }
 
@@ -93,7 +106,10 @@ final class MenuBarViewModel {
     }
 
     private func updateStatus() async {
-        let snapshot = await composition.coordinator.status()
+        apply(await composition.coordinator.status())
+    }
+
+    private func apply(_ snapshot: RunCoordinatorStatus) {
         isRunning = snapshot.isRunning
         queuedCount = snapshot.queuedCount
         automaticTriggersPaused = snapshot.isPaused

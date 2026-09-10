@@ -891,3 +891,25 @@ Next eligible work package: 2.1 — scheduling and runtime admission.
 - Physical checks: pending re-check of the menu-bar run/pause/cancel flow after
   relaunch with the shared runtime.
 - Next eligible work package: 2.1 UI half (Increment H3).
+
+### Fix H2-b — Cancel enabled during a run (menu-bar status)
+
+- Status: done
+- Defect (reported during manual check): the menu-bar Status showed
+  `Running ...` live, but **Cancel current run** stayed greyed out.
+- Root cause: `MenuBarViewModel.run` set the status text optimistically but
+  never set `isRunning = true`, then awaited `waitUntilIdle()` and only read the
+  coordinator again after the run finished. `isRunning` therefore stayed false
+  for the entire run, disabling Cancel.
+- Fix: `run` sets `isRunning = true` for started/queued admissions and drives
+  the menu from a 400 ms `monitorRun` loop that continuously applies the
+  coordinator snapshot until idle. `Cancel` also monitors until idle, so the
+  menu reflects the cancelled state. Status/queue/pause values are now applied
+  through a single `apply(_:)` path.
+- Tests performed:
+  - App tests (`xcodebuild ... test -only-testing:TaskOSTests`) — TEST
+    SUCCEEDED.
+  - Release build — BUILD SUCCEEDED.
+- Physical checks: pending re-check (start a run; Cancel should enable within a
+  second and stop the run and clear the queue).
+- Next eligible work package: 2.1 UI half (Increment H3).
