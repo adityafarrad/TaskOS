@@ -7,20 +7,30 @@ final class AppComposition {
 
     let clock: any CoreClock
     let runner: WorkflowRunner
+    let preparer: CreationPreparer
+    let approvals: ApprovalRegistry
 
     init() {
         let clock = SystemClock()
-        let executors: [any ActionExecutor] = [
-            OpenApplicationExecutor(),
-            NotificationExecutor(),
-        ]
         self.clock = clock
-        self.runner = WorkflowRunner(clock: clock, executors: executors)
+        self.approvals = ApprovalRegistry()
+        self.preparer = CreationPreparer(
+            catalog: WorkspaceResourceCatalog(),
+            permissions: SystemPermissionStatusProvider()
+        )
+        self.runner = WorkflowRunner(
+            clock: clock,
+            executors: [
+                OpenApplicationExecutor(),
+                NotificationExecutor(),
+            ]
+        )
     }
 
-    func walkingSliceDefinition() -> AutomationDefinition {
+    func initialDefinition() -> AutomationDefinition {
         AutomationDefinition(
             name: "Walking slice",
+            revision: WorkflowRevision(1),
             trigger: .manual(ManualTrigger()),
             actions: [
                 .openApplication(

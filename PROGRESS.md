@@ -24,7 +24,7 @@ compressed into implementation plus per-increment physical smoke checks.
 |---|---|---|---|---|
 | 1.1 | Build the typed domain and registry | in progress | Increment B1 | Typed domain + registry + coding for 4 capabilities; persistence layer pending |
 | 1.2 | Build the shared composer | not started | — | |
-| 1.3 | Build preparation, preview, and execution | in progress | Increment B2 | Sequential runner + timeouts + cancellation + run record; preview/resolution pending |
+| 1.3 | Build preparation, preview, and execution | done | Increments B2 + B3 | Effect-free preview, resource resolution, permissions, revision-bound approval, sequential execution with timeouts and cancellation |
 | 1.4 | Prove the first complete workflow | not started | — | First reforecast milestone |
 | 1.5 | Complete the basic product shell | not started | — | |
 
@@ -145,3 +145,43 @@ compressed into implementation plus per-increment physical smoke checks.
 - Next eligible work package: plan 1.2 shared composer, or finish 1.3
   (preview + resolution + approval). Recommended next: preview/approval
   (1.3 remainder) to complete the reviewed, deliberate test path.
+
+### Increment B3 — Preview, resolution, and approval (plan 1.3 completion)
+
+- Status: done
+- Behavior delivered: the app now reviews before it runs. Pressing "Preview"
+  produces an effect-free plan showing each resolved step, the resolved
+  application target, required permissions, and blocking issues. Testing is
+  enabled only for a runnable revision that has been reviewed; changing the
+  wait duration bumps the workflow revision, clears the preview, and disables
+  testing until it is reviewed again.
+- Interfaces changed: added `ApplicationResource`, `ResourceCatalog`,
+  `PermissionKind`, `PermissionState`, `PermissionStatusProvider`,
+  `ActionConfiguration.requiredPermissions`, `PreviewActionStatus`,
+  `ActionPreview`, `WorkflowPreview`, `CreationPreparer`, and `ApprovalRegistry`.
+  App target added `WorkspaceResourceCatalog`, `SystemPermissionStatusProvider`,
+  and `ReviewViewModel`; `AppComposition` now owns the preparer and approvals;
+  `ContentView` became the review/test UI.
+- Tests performed:
+  - `swift test --package-path Packages/TaskOSCore` — 31 tests, 9 suites, pass.
+    New coverage: installed vs missing application resolution, undetermined vs
+    denied notification permission, non-runnable previews, preview identity and
+    revision, and approval being invalidated by a revision change.
+  - `xcodebuild ... Debug build` — BUILD SUCCEEDED.
+  - `xcodebuild ... Release build` — BUILD SUCCEEDED.
+- Physical checks (on this Mac, macOS 26 / Apple silicon):
+  - Preview produced the plan with no external effect (Safari did not open).
+  - Test was disabled until a runnable revision had been previewed.
+  - Changing the wait duration invalidated the preview and disabled testing.
+  - Re-preview then Test opened Safari and delivered the notification; the run
+    reported success. (User-confirmed; attached screenshots not machine-readable
+    by the agent.)
+- Remaining defects / gaps:
+  - Preview is computed for the hardcoded walking-slice definition; it is not
+    yet driven by a composer draft.
+  - No persisted preview/approval or run history yet (in-memory only).
+  - Accessibility permission plumbing exists in the model but no action
+    requires it yet (window arrangement arrives in Phase 2).
+- Next eligible work package: plan 1.2 (shared composer: grammar, text/cards,
+  contextual suggestions) or plan 1.4 (canonical workflow end to end).
+  Recommended next: plan 1.2 composer, since 1.3 is now complete.

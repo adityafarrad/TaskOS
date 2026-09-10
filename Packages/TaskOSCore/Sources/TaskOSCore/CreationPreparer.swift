@@ -1,0 +1,126 @@
+import Foundation
+
+public struct CreationPreparer: Sendable {
+    private let registry: CapabilityRegistry
+    private let catalog: any ResourceCatalog
+    private let permissions: any PermissionStatusProvider
+
+    public init(
+        registry: CapabilityRegistry = .standard,
+        catalog: any ResourceCatalog,
+        permissions: any PermissionStatusProvider
+    ) {
+        self.registry = registry
+        self.catalog = catalog
+        self.permissions = permissions
+    }
+
+    public func prepare(_ definition: AutomationDefinition) async -> WorkflowPreview {
+        var issues = definition.validate().issues
+        var actionPreviews: [ActionPreview] = []
+        var requiredPermissions: Set<PermissionKind> = []
+
+        for (index, action) in definition.actions.enumerated() {
+            requiredPermissions.formUnion(action.requiredPermissions)
+
+            switch action {
+            case .openApplication(let configuration):
+                let label = configuration.application.label
+                if let application = await catalog.application(bundleIdentifier: configuration.application.identifier) {
+                    actionPreviews.append(
+                        ActionPreview(
+                            index: index,
+                            actionID: .openApplication,
+                            title: title(for: .openApplication),
+                            targetLabel: application.displayName,
+                            status: .ready,
+                            detail: nil
+                        )
+                    )
+                } else {
+                    actionPreviews.append(
+                        ActionPreview(
+                            index: index,
+                            actionID: .openApplication,
+                            title: title(for: .openApplication),
+                            targetLabel: label,
+                            status: .missingResource,
+                            detail: "Not installed or unavailable."
+                        )
+                    )
+                    issues.append(.error("Action \(index + 1): \(label) is not available on this Mac."))
+                }
+
+            case .wait(let wait):
+                actionPreviews.append(
+                    ActionPreview(
+                        index: index,
+                        actionID: .wait,
+                        title: title(for: .wait),
+                        targetLabel: String(format: "%.1fs", wait.duration),
+                        status: .ready,
+                        detail: nil
+                    )
+                )
+
+            case .showNotification:
+                let state = await permissions.state(for: .notifications)
+                switch state {
+                case .granted:
+                    actionPreviews.append(
+                        ActionPreview(
+                            index: index,
+                            actionID: .showNotification,
+                            title: title(for: .showNotification),
+                            targetLabel: nil,
+                            status: .ready,
+                            detail: nil
+                        )
+                    )
+                case .notDetermined:
+                    actionPreviews.append(
+                        ActionPreview(
+                            index: index,
+                            actionID: .showNotification,
+                            title: title(for: .showNotification),
+                            targetLabel: nil,
+                            status: .needsPermission,
+                            detail: "Permission will be requested when you test."
+                        )
+                    )
+                case .denied:
+                    actionPreviews.append(
+                        ActionPreview(
+                            index: index,
+                            actionID: .showNotification,
+                            title: title(for: .showNotification),
+                            targetLabel: nil,
+                            status: .needsPermission,
+                            detail: "Notifications are off for TaskOS."
+                        )
+                    )
+                    issues.append(.error("Action \(index + 1): Notification permission is denied. Enable it in System Settings > Notifications > TaskOS."))
+                }
+            }
+        }
+
+        return WorkflowPreview(
+            automationID: definition.id,
+            revision: definition.revision,
+            name: definition.name,
+            triggerTitle: title(for: definition.trigger.id),
+            actions: actionPreviews,
+            requiredPermissions: requiredPermissions,
+            issues: issues,
+            willRunAutomatically: false
+        )
+    }
+
+    private func title(for id: ActionID) -> String {
+        registry.descriptor(for: id)?.title ?? id.stableID
+    }
+
+    private func title(for id: TriggerID) -> String {
+        registry.descriptor(for: id)?.title ?? id.stableID
+    }
+}
