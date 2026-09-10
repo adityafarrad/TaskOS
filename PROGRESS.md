@@ -32,7 +32,7 @@ compressed into implementation plus per-increment physical smoke checks.
 
 | ID | Work package | Status | Evidence | Notes |
 |---|---|---|---|---|
-| 2.1 | Add scheduling and runtime admission | in progress | Increment H1 | Schedule model + next-occurrence calculations in Core; runtime admission + UI pending |
+| 2.1 | Add scheduling and runtime admission | in progress | Increments H1 + H2 | Schedule model + occurrence calculations in Core; run admission/queue/pause/cancel wired into menu-bar runtime; schedule UI, registration, and enable toggle pending |
 | 2.2 | Finish app, window, and utility actions | not started | — | |
 | 2.3 | Add selected files and portable workflows | not started | — | |
 | 2.4 | Add event-triggered workflows | not started | — | |
@@ -809,3 +809,56 @@ Next eligible work package: 2.1 — scheduling and runtime admission.
 - Next eligible work package: 2.1 runtime half (Increment H2) — admission,
   queue limits and expiration, duplicate suppression, cooldown, pause/resume,
   cancellation, launch at login, and sleep/session readiness.
+
+### Increment H2 — Runtime admission and menu-bar runtime (plan 2.1, partial; plan 2.9)
+
+- Status: done
+- Behavior delivered: a single admission path that runs workflows one at a time
+  and enforces the plan 2.9 runtime rules, plus a live menu-bar runtime built on
+  it. Running a workflow from the menu bar now goes through the coordinator;
+  the menu shows the current run, the queued count, and the paused state, and
+  Pause/Resume and Cancel drive the coordinator. Queued automatic events expire
+  instead of running stale; rapid automatic repeats are cooled down and
+  deduplicated; at most ten runs queue; pausing clears pending automatic runs
+  while the current run finishes; cancelling stops the current run and clears
+  the queue; sleep marks the session inactive, interrupts the current run, and
+  suppresses new automatic admissions until wake.
+- Interfaces changed: added `RunCoordinator` (actor) with `RunRequestSource`,
+  `AdmissionOutcome`, `AdmissionEvent`/`AdmissionEventKind`,
+  `RunCoordinatorStatus`, `RunCoordinator.Limits`, and `RunExecution`; methods
+  `submit`, `pauseAutomaticTriggers`, `resumeAutomaticTriggers`,
+  `updateSessionReadiness`, `cancelAll`, `status`, and `waitUntilIdle`.
+  App: `AppComposition` now owns the coordinator and persists start/update
+  around each coordinated run; `MenuBarViewModel` submits through the
+  coordinator and reports its status; `MenuBarContent` shows queue/pause state;
+  added `SystemSessionObserver` (NSWorkspace sleep/wake -> session readiness).
+- Tests performed:
+  - `swift test --package-path Packages/TaskOSCore` — 142 tests, 22 suites, pass
+    (was 124/21; +18). New coverage: manual/automatic admission, duplicate
+    suppression while running and while queued, ten-second cooldown with
+    clock advance, distinct workflows unaffected, ten-run queue cap and
+    overflow, queued-automatic expiration, manual-run non-expiration, pause
+    clearing pending automatic runs while the current finishes, pause
+    suppressing automatic but allowing manual, resume, session-not-ready
+    suppression plus interruption, cancel clearing the queue, in-order
+    one-at-a-time execution, invalid-definition rejection, bounded event log,
+    and status reporting.
+  - App tests (`xcodebuild ... test -only-testing:TaskOSTests`) — TEST
+    SUCCEEDED.
+  - Debug build — BUILD SUCCEEDED.
+  - Release build — BUILD SUCCEEDED.
+- Physical checks: not yet re-walked in the app after the menu-bar change. The
+  coordinator's behavior is covered by deterministic tests; a menu-bar
+  run/pause/cancel smoke check is pending.
+- Remaining defects / gaps:
+  - No schedule registration or next-occurrence UI yet, so no automatic
+    schedule can actually fire; automatic admission is tested but not reachable
+    from the app. `WorkflowPreview.willRunAutomatically` is still false.
+  - Composer "Test now" and Library "Run" still call `WorkflowRunner` directly
+    and bypass the coordinator, so one-at-a-time admission is not yet universal.
+  - Duplicate suppression keys on the workflow id for automatic runs; hotkey
+    key-repeat suppression is not implemented (hotkey deferred).
+  - Launch at login already existed (F3); no change here.
+- Next eligible work package: 2.1 UI half (Increment H3) — schedule parser
+  grammar, composer trigger card, next-three-occurrence preview, automatic-run
+  enablement, and wiring the composer/library run paths through the coordinator.

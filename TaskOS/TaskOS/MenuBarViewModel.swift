@@ -9,14 +9,15 @@ final class MenuBarViewModel {
     private(set) var workflows: [SavedWorkflow] = []
     private(set) var status = "Idle"
     private(set) var isRunning = false
-    var automaticTriggersPaused = false
+    private(set) var queuedCount = 0
+    private(set) var automaticTriggersPaused = false
 
     private let composition: AppComposition
-    private var runTask: Task<Void, Never>?
 
     init(composition: AppComposition = .shared) {
         self.composition = composition
         load()
+        refreshStatus()
     }
 
     func load() {
@@ -28,30 +29,67 @@ final class MenuBarViewModel {
     }
 
     func run(_ workflow: SavedWorkflow) {
-        guard !isRunning else { return }
-        isRunning = true
-        status = "Running \(workflow.name)..."
-
-        runTask = Task { [weak self] in
+        Task { [weak self] in
             guard let self else { return }
-            let runID = UUID()
-            try? await self.composition.runHistory.append(RunRecord.starting(workflow.definition, id: runID))
-            let record = await self.composition.runner.run(workflow.definition, id: runID)
-            try? await self.composition.runHistory.update(record)
-            self.status = "\(workflow.name): \(record.status.rawValue)"
-            self.isRunning = false
-            self.runTask = nil
+            let outcome = await self.composition.coordinator.submit(workflow.definition, source: .manual)
+            switch outcome {
+            case .started:
+                self.status = "Running \(workflow.name)..."
+            case .queued:
+                self.status = "Queued \(workflow.name)"
+            case .queueFull:
+                self.status = "Queue is full"
+            case .rejected(let message):
+                self.status = "Cannot run: \(message)"
+            case .suppressedDuplicate, .suppressedCooldown,
+                 .suppressedPaused, .suppressedSessionNotReady:
+                self.status = "Not started"
+            }
+
+            await self.composition.coordinator.waitUntilIdle()
+            await self.updateStatus()
         }
     }
 
     func cancel() {
-        guard isRunning else { return }
-        runTask?.cancel()
-        status = "Cancelling..."
+        Task { [weak self] in
+            guard let self else { return }
+            await self.composition.coordinator.cancelAll()
+            await self.updateStatus()
+        }
     }
 
     func toggleAutomaticTriggers() {
-        automaticTriggersPaused.toggle()
+        Task { [weak self] in
+            guard let self else { return }
+            if self.automaticTriggersPaused {
+                await self.composition.coordinator.resumeAutomaticTriggers()
+            } else {
+                await self.composition.coordinator.pauseAutomaticTriggers()
+            }
+            await self.updateStatus()
+        }
+    }
+
+    func refreshStatus() {
+        Task { [weak self] in
+            await self?.updateStatus()
+        }
+    }
+
+    private func updateStatus() async {
+        let snapshot = await composition.coordinator.status()
+        isRunning = snapshot.isRunning
+        queuedCount = snapshot.queuedCount
+        automaticTriggersPaused = snapshot.isPaused
+
+        if let name = snapshot.currentName {
+            status = "Running \(name)..."
+        } else if snapshot.queuedCount > 0 {
+            status = "Queued \(snapshot.queuedCount)"
+        } else {
+            status = "Idle"
+        }
     }
 
     func quit() {

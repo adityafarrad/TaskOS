@@ -8,6 +8,7 @@ final class AppComposition {
 
     let clock: any CoreClock
     let runner: WorkflowRunner
+    let coordinator: RunCoordinator
     let preparer: CreationPreparer
     let approvals: ApprovalRegistry
     let suggestions: SuggestionEngine
@@ -17,6 +18,7 @@ final class AppComposition {
     let permissions: any PermissionStatusProvider
 
     private let catalog: WorkspaceResourceCatalog
+    private let sessionObserver: SystemSessionObserver
 
     init() {
         let clock = SystemClock()
@@ -34,20 +36,8 @@ final class AppComposition {
             )
         }
 
-        self.clock = clock
-        self.catalog = catalog
-        self.approvals = ApprovalRegistry()
-        self.suggestions = SuggestionEngine()
-        self.repository = SwiftDataAutomationRepository(modelContainer: container)
-        self.runHistory = SwiftDataRunHistoryRepository(modelContainer: container)
-        self.drafts = SwiftDataDraftRepository(modelContainer: container)
-        let permissions = SystemPermissionStatusProvider()
-        self.permissions = permissions
-        self.preparer = CreationPreparer(
-            catalog: catalog,
-            permissions: permissions
-        )
-        self.runner = WorkflowRunner(
+        let runHistory = SwiftDataRunHistoryRepository(modelContainer: container)
+        let runner = WorkflowRunner(
             clock: clock,
             executors: [
                 OpenApplicationExecutor(),
@@ -56,6 +46,29 @@ final class AppComposition {
                 NotificationExecutor(),
             ]
         )
+
+        self.clock = clock
+        self.catalog = catalog
+        self.approvals = ApprovalRegistry()
+        self.suggestions = SuggestionEngine()
+        self.repository = SwiftDataAutomationRepository(modelContainer: container)
+        self.runHistory = runHistory
+        self.drafts = SwiftDataDraftRepository(modelContainer: container)
+        let permissions = SystemPermissionStatusProvider()
+        self.permissions = permissions
+        self.preparer = CreationPreparer(
+            catalog: catalog,
+            permissions: permissions
+        )
+        self.runner = runner
+        let coordinator = RunCoordinator(clock: clock) { definition, id in
+            try? await runHistory.append(RunRecord.starting(definition, id: id))
+            let record = await runner.run(definition, id: id)
+            try? await runHistory.update(record)
+            return record
+        }
+        self.coordinator = coordinator
+        self.sessionObserver = SystemSessionObserver(coordinator: coordinator)
     }
 
     func loadApplications() async -> [ApplicationResource] {

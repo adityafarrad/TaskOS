@@ -11,7 +11,10 @@ struct MenuBarContent: View {
             openWindow(id: "main")
             NSApplication.shared.activate(ignoringOtherApps: true)
         }
-        .onAppear { model.load() }
+        .onAppear {
+            model.load()
+            model.refreshStatus()
+        }
 
         Divider()
 
@@ -29,6 +32,14 @@ struct MenuBarContent: View {
         .disabled(model.workflows.isEmpty)
 
         Text("Status: \(model.status)")
+
+        if model.queuedCount > 0 {
+            Text("Queued runs: \(model.queuedCount)")
+        }
+
+        if model.automaticTriggersPaused {
+            Text("Automatic triggers paused")
+        }
 
         Button(model.automaticTriggersPaused ? "Resume automatic triggers" : "Pause automatic triggers") {
             model.toggleAutomaticTriggers()
