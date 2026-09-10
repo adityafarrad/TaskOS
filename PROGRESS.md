@@ -910,6 +910,36 @@ Next eligible work package: 2.1 — scheduling and runtime admission.
   - App tests (`xcodebuild ... test -only-testing:TaskOSTests`) — TEST
     SUCCEEDED.
   - Release build — BUILD SUCCEEDED.
-- Physical checks: pending re-check (start a run; Cancel should enable within a
-  second and stop the run and clear the queue).
+- Physical checks: user-confirmed. Menu-bar status is live, the queue count
+  shows, and Cancel current run is enabled during a run and stops it. Pause/
+  resume and manual-run-while-paused confirmed. Sleep/wake deferred by the user
+  and marked complete for now.
+- Next eligible work package: 2.1 UI half (Increment H3).
+
+### Fix H2-c — Live history and run duration
+
+- Status: done
+- Defects (reported during manual check):
+  1. History rows never showed how long a run took (a 30s run looked timeless);
+     only the immediate post-test result view showed a duration.
+  2. The main window's History did not update while open when a workflow was run
+     from the menu bar; it only refreshed after quitting and reopening the app.
+- Root causes:
+  1. `historySection` rendered steps and start time but not `run.duration`.
+  2. Coordinated runs update the run-history repository but nothing told the
+     open `ComposerViewModel` to reload; and `loadHistory` re-ran
+     `markRunningAsInterrupted` on every load, which would wrongly interrupt a
+     live run if history refreshed while one was in progress.
+- Fix: history rows now show `duration` (`%.1fs`). `AppComposition` posts a
+  `.taskOSRunHistoryDidChange` notification around each coordinated run (start
+  and finish), and `ComposerViewModel` observes it and reloads history live.
+  Interrupted-run recovery was moved out of `loadHistory` into a one-time
+  `recoverInterruptedRuns` at window load, so refreshing history can no longer
+  mislabel an in-flight run.
+- Tests performed:
+  - App tests (`xcodebuild ... test -only-testing:TaskOSTests`) — TEST
+    SUCCEEDED.
+  - Release build — BUILD SUCCEEDED.
+- Physical checks: pending re-check (run `Queue test` from the menu bar with the
+  main window open; the History row should appear/update live and show ~30.0s).
 - Next eligible work package: 2.1 UI half (Increment H3).

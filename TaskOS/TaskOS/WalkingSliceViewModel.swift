@@ -50,6 +50,15 @@ final class ComposerViewModel {
 
     init(composition: AppComposition = .shared) {
         self.composition = composition
+        NotificationCenter.default.addObserver(
+            forName: .taskOSRunHistoryDidChange,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in
+                self?.loadHistory()
+            }
+        }
     }
 
     var text: String { document.text }
@@ -92,6 +101,7 @@ final class ComposerViewModel {
     func loadApplicationsIfNeeded() {
         guard !applicationsLoaded else { return }
         applicationsLoaded = true
+        recoverInterruptedRuns()
         loadLibrary()
         loadHistory()
         refreshPermissions()
@@ -396,11 +406,16 @@ final class ComposerViewModel {
         notice = "Editing \"\(workflow.name)\" (revision \(workflow.definition.revision.value))."
     }
 
+    private func recoverInterruptedRuns() {
+        Task { [composition] in
+            try? await composition.runHistory.markRunningAsInterrupted()
+        }
+    }
+
     func loadHistory() {
         Task { [weak self] in
             guard let self else { return }
             do {
-                try await self.composition.runHistory.markRunningAsInterrupted()
                 self.history = try await self.composition.runHistory.recentRuns(limit: 50)
             } catch {
                 self.libraryError = "Could not load run history: \(error.localizedDescription)"

@@ -63,8 +63,14 @@ final class AppComposition {
         self.runner = runner
         let coordinator = RunCoordinator(clock: clock) { definition, id in
             try? await runHistory.append(RunRecord.starting(definition, id: id))
+            await MainActor.run {
+                NotificationCenter.default.post(name: .taskOSRunHistoryDidChange, object: nil)
+            }
             let record = await runner.run(definition, id: id)
             try? await runHistory.update(record)
+            await MainActor.run {
+                NotificationCenter.default.post(name: .taskOSRunHistoryDidChange, object: nil)
+            }
             return record
         }
         self.coordinator = coordinator
@@ -74,4 +80,8 @@ final class AppComposition {
     func loadApplications() async -> [ApplicationResource] {
         await catalog.installedApplications()
     }
+}
+
+extension Notification.Name {
+    static let taskOSRunHistoryDidChange = Notification.Name("taskOSRunHistoryDidChange")
 }
