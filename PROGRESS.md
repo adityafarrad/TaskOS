@@ -23,7 +23,7 @@ compressed into implementation plus per-increment physical smoke checks.
 | ID | Work package | Status | Evidence | Notes |
 |---|---|---|---|---|
 | 1.1 | Build the typed domain and registry | in progress | Increment B1 | Typed domain + registry + coding for 4 capabilities; persistence layer pending |
-| 1.2 | Build the shared composer | in progress | Increments C1-C2 | Grammar, parser, spans, canonical phrases, contextual suggestion engine done; document/UI pending |
+| 1.2 | Build the shared composer | in progress | Increments C1-C3 | Grammar, parser, spans, canonical phrases, suggestions, composer document done; UI pending |
 | 1.3 | Build preparation, preview, and execution | done | Increments B2 + B3 | Effect-free preview, resource resolution, permissions, revision-bound approval, sequential execution with timeouts and cancellation |
 | 1.4 | Prove the first complete workflow | not started | — | First reforecast milestone |
 | 1.5 | Complete the basic product shell | not started | — | |
@@ -254,3 +254,31 @@ compressed into implementation plus per-increment physical smoke checks.
     lands with the composer UI.
 - Next eligible work package: plan 1.2 composer document with text/card sync,
   native text editing, resource selection, undo/redo, and draft autosave.
+
+### Increment C3 — Composer document (plan 1.2, partial)
+
+- Status: done
+- Behavior delivered: one editing document holding command text, parsed clauses,
+  ordered action drafts, and unresolved text spans. Typing reparses and rebuilds
+  actions while preserving unresolved text; card edits regenerate only their
+  clause via canonical phrasing; actions can be added, removed, moved, edited,
+  and resolved; undo/redo cover typing and card edits; a definition is produced
+  only when no unresolved text remains and every application is resolved.
+- Interfaces changed: added `ComposerActionDraft`, `ComposerAction`,
+  `ComposerElement`, and `ComposerDocument`.
+- Tests performed:
+  - `swift test --package-path Packages/TaskOSCore` — 67 tests, 13 suites,
+    pass. New coverage: empty document, typing to actions, unsupported suffix
+    retained and blocking definition, card edit preserving unresolved text,
+    application resolution, action removal, undo/redo across typing and card
+    edits, suggestion acceptance, and action reordering.
+  - `xcodebuild ... Debug build` — BUILD SUCCEEDED (Core-only change).
+- Physical checks: none (no UI yet).
+- Remaining defects / gaps:
+  - Reconciliation preserves action identity by order; inserting an action
+    ahead of existing ones can reset stable card ids.
+  - No persistence of drafts yet (in-memory document only).
+  - No notification title/message fields in the UI yet.
+- Next eligible work package: wire the composer document into a UI (text field,
+  live suggestions, cards, resource picker, undo/redo) and connect to the
+  existing review/test flow.
