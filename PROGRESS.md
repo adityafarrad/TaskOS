@@ -23,7 +23,7 @@ compressed into implementation plus per-increment physical smoke checks.
 | ID | Work package | Status | Evidence | Notes |
 |---|---|---|---|---|
 | 1.1 | Build the typed domain and registry | in progress | Increment B1 | Typed domain + registry + coding for 4 capabilities; persistence layer pending |
-| 1.2 | Build the shared composer | not started | — | |
+| 1.2 | Build the shared composer | in progress | Increment C1 | Grammar, parser, source spans, canonical phrases done; suggestions + document/UI pending |
 | 1.3 | Build preparation, preview, and execution | done | Increments B2 + B3 | Effect-free preview, resource resolution, permissions, revision-bound approval, sequential execution with timeouts and cancellation |
 | 1.4 | Prove the first complete workflow | not started | — | First reforecast milestone |
 | 1.5 | Complete the basic product shell | not started | — | |
@@ -185,3 +185,39 @@ compressed into implementation plus per-increment physical smoke checks.
 - Next eligible work package: plan 1.2 (shared composer: grammar, text/cards,
   contextual suggestions) or plan 1.4 (canonical workflow end to end).
   Recommended next: plan 1.2 composer, since 1.3 is now complete.
+
+### Increment C1 — Command grammar, parser, and canonical phrases (plan 1.2, partial)
+
+- Status: done
+- Behavior delivered: supported command text is recognized into structured
+  clauses with source spans and diagnostics. The parser distinguishes
+  complete, needs-input, unrecognized, and unsupported requests, keeps
+  unrecognized/unsupported spans visible instead of dropping them, and can
+  regenerate canonical phrasing from resolved actions.
+- Interfaces changed: added `SourceSpan` (+ `String.substring(in:)`),
+  `CommandToken`/`CommandTokenizer` (internal), `ParsedClauseKind`,
+  `ParsedParameter`, `ParsedClause`, `ParseOutcome`, `ParseDiagnostic`,
+  `ParsedCommand`, `CommandParser`, and `CanonicalPhrase`.
+- Grammar covered: `open <app list>` (with `and`/comma-separated names),
+  `wait [for] <number> [unit]`, `show a notification` / `notify`, connectors
+  `and`/`then`/`also`/comma, an excluded-capability dictionary, and a fallback
+  to unrecognized.
+- Tests performed:
+  - `swift test --package-path Packages/TaskOSCore` — 46 tests, 11 suites,
+    pass. New coverage: empty input, app recognition and spans, multi-resource
+    lists, wait parsing (integer/fractional/out-of-range/missing), notification
+    forms, multi-clause input, unsupported vs unrecognized classification, and
+    canonical-phrase round-trip through the parser.
+  - `xcodebuild ... Debug build` — BUILD SUCCEEDED.
+- Physical checks: none (pure Core; no UI yet).
+- Remaining defects / gaps:
+  - No suggestion engine yet, no composer document, no native text editing,
+    cards, undo/redo, draft autosave, or resource selection UI (plan 1.2
+    remainder).
+  - Grammar has no trigger productions yet (manual is implicit); scheduling,
+    hotkey, and event triggers arrive in Phase 2.
+  - Spans use character offsets; confirm UTF-16 alignment when wiring AppKit
+    text editing.
+- Next eligible work package: plan 1.2 remainder, starting with the contextual
+  suggestion engine (Core), then the composer document with text/card sync and
+  native text editing.
