@@ -1,4 +1,5 @@
 import Foundation
+import SwiftData
 import TaskOSCore
 
 @MainActor
@@ -10,7 +11,7 @@ final class AppComposition {
     let preparer: CreationPreparer
     let approvals: ApprovalRegistry
     let suggestions: SuggestionEngine
-    let repository: FileAutomationRepository
+    let repository: any AutomationRepository
 
     private let catalog: WorkspaceResourceCatalog
 
@@ -18,18 +19,21 @@ final class AppComposition {
         let clock = SystemClock()
         let catalog = WorkspaceResourceCatalog()
 
-        let supportDirectory = FileManager.default
-            .urls(for: .applicationSupportDirectory, in: .userDomainMask)
-            .first ?? FileManager.default.temporaryDirectory
-        let workflowDirectory = supportDirectory
-            .appendingPathComponent("TaskOS", isDirectory: true)
-            .appendingPathComponent("Workflows", isDirectory: true)
+        let container: ModelContainer
+        do {
+            container = try ModelContainer(for: WorkflowRecord.self)
+        } catch {
+            container = try! ModelContainer(
+                for: WorkflowRecord.self,
+                configurations: ModelConfiguration(isStoredInMemoryOnly: true)
+            )
+        }
 
         self.clock = clock
         self.catalog = catalog
         self.approvals = ApprovalRegistry()
         self.suggestions = SuggestionEngine()
-        self.repository = FileAutomationRepository(directory: workflowDirectory)
+        self.repository = SwiftDataAutomationRepository(modelContainer: container)
         self.preparer = CreationPreparer(
             catalog: catalog,
             permissions: SystemPermissionStatusProvider()

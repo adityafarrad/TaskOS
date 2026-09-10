@@ -347,10 +347,9 @@ compressed into implementation plus per-increment physical smoke checks.
   - Ran it from the Library; Safari opened and the notification posted.
   - Deleted it; it left the Library. User-confirmed.
 - Deliberate deviation: the plan names SwiftData behind the repository
-  interface (section 2.11). This slice instead implements a versioned, file-based
-  JSON repository behind the same `AutomationRepository` interface so it can be
-  unit-tested in `TaskOSCore`. SwiftData remains the intended target and should
-  replace `FileAutomationRepository` behind the unchanged interface.
+  interface (section 2.11). This slice first implemented a versioned, file-based
+  JSON repository behind the same `AutomationRepository` interface. Resolved in
+  Increment D2: production now uses SwiftData and JSON is a test fixture only.
 - Remaining defects / gaps:
   - Library has no search, rename, duplicate, or edit-in-composer yet; each app
     session currently reuses one draft identity, so saving overwrites rather than
@@ -363,3 +362,43 @@ compressed into implementation plus per-increment physical smoke checks.
 - Next eligible work package: plan 1.4 (drive the canonical workspace journey on
   this persisted, reviewed test path) or continue plan 1.5 (library management
   and menu-bar runtime).
+
+### Increment D2 — Resolve persistence deviation (plan 2.11)
+
+- Status: done
+- Behavior delivered: production persistence now uses SwiftData behind the
+  unchanged `AutomationRepository` abstraction. `TaskOSCore` remains free of
+  SwiftData, enforced by the Core purity test. The JSON file repository was
+  removed from production sources and demoted to a deterministic test fixture.
+- Architecture:
+  - Production: `AutomationRepository` protocol → `SwiftDataAutomationRepository`
+    (`@ModelActor`) → SwiftData `WorkflowRecord` (`@Model`). Callers depend only
+    on `any AutomationRepository`; no caller imports SwiftData.
+  - Tests: `AutomationRepository` → `InMemoryAutomationRepository` and the
+    `FileAutomationRepository` fixture, both in the Core test target.
+  - `SavedWorkflowSerialization` stays in Core to encode the versioned definition
+    payload and for future portable export/import; it is a serialization detail,
+    not the persistence mechanism (the store is SwiftData).
+- Interfaces changed: renamed `SavedWorkflowCoding` to
+  `SavedWorkflowSerialization`; moved `FileAutomationRepository` from Core
+  sources into the Core test target; added `InMemoryAutomationRepository` fixture;
+  added `WorkflowRecord` and `SwiftDataAutomationRepository` to the app; linked
+  `TaskOSCore` into the app test target; `AppComposition` uses the SwiftData
+  repository with an in-memory fallback if the container cannot be created.
+- Tests performed:
+  - `xcodebuild ... test -only-testing:TaskOSTests` — SwiftData repository
+    save/load/update/delete and newest-first ordering through
+    `any AutomationRepository`. TEST SUCCEEDED.
+  - `swift test --package-path Packages/TaskOSCore` — 74 tests, 15 suites, pass
+    (includes file and in-memory repository fixtures, future-schema rejection).
+  - Debug build — BUILD SUCCEEDED.
+  - Release build — BUILD SUCCEEDED (run for safety; not strictly required
+    mid-phase).
+- Physical checks: the SwiftData save/relaunch/run/delete physical confirmation
+  requested previously is still pending explicit user confirmation; not repeated
+  here per the instructed scope.
+- Remaining notes: old JSON files under Application Support/TaskOS/Workflows are
+  no longer read; a one-time import can be added if desired.
+- Next eligible work package: per user direction, plan 1.4 canonical journey,
+  then the remaining plan 1.5 library management and menu-bar runtime. Do not
+  start automatically.

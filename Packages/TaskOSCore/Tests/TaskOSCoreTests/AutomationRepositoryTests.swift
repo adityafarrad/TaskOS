@@ -86,3 +86,45 @@ struct FileAutomationRepositoryTests {
         }
     }
 }
+
+@Suite("In-memory automation repository")
+struct InMemoryAutomationRepositoryTests {
+    private func makeWorkflow(name: String, id: AutomationID = AutomationID(), updatedAt: Date) -> SavedWorkflow {
+        SavedWorkflow(
+            definition: AutomationDefinition(
+                id: id,
+                name: name,
+                revision: WorkflowRevision(1),
+                trigger: .manual(ManualTrigger()),
+                actions: [.wait(WaitAction(duration: 1))]
+            ),
+            isEnabled: false,
+            updatedAt: updatedAt
+        )
+    }
+
+    @Test func saveLoadUpdateDeleteThroughTheAbstraction() async throws {
+        let repository: any AutomationRepository = InMemoryAutomationRepository()
+        let id = AutomationID()
+
+        try await repository.save(makeWorkflow(name: "First", id: id, updatedAt: Date(timeIntervalSince1970: 1)))
+        try await repository.save(makeWorkflow(name: "Renamed", id: id, updatedAt: Date(timeIntervalSince1970: 2)))
+
+        let loaded = try await repository.loadAll()
+        #expect(loaded.count == 1)
+        #expect(loaded.first?.name == "Renamed")
+
+        try await repository.delete(id: id)
+        let emptied = try await repository.loadAll()
+        #expect(emptied.isEmpty)
+    }
+
+    @Test func loadSortsNewestFirst() async throws {
+        let repository: any AutomationRepository = InMemoryAutomationRepository()
+        try await repository.save(makeWorkflow(name: "Older", updatedAt: Date(timeIntervalSince1970: 1)))
+        try await repository.save(makeWorkflow(name: "Newer", updatedAt: Date(timeIntervalSince1970: 2)))
+
+        let loaded = try await repository.loadAll()
+        #expect(loaded.map(\.name) == ["Newer", "Older"])
+    }
+}

@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		5DC542B23052B7D30040BFCE /* TaskOSCore in Frameworks */ = {isa = PBXBuildFile; productRef = 5DC542B13052B7D30040BFCE /* TaskOSCore */; };
+		5DC542B33052B7D30040BFCE /* TaskOSCore in Frameworks */ = {isa = PBXBuildFile; productRef = 5DC542B13052B7D30040BFCE /* TaskOSCore */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -64,6 +65,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				5DC542B33052B7D30040BFCE /* TaskOSCore in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -141,6 +143,7 @@
 			);
 			name = TaskOSTests;
 			packageProductDependencies = (
+				5DC542B13052B7D30040BFCE /* TaskOSCore */,
 			);
 			productName = TaskOSTests;
 			productReference = 5DC542873052B7D30040BFCE /* TaskOSTests.xctest */;
@@ -202,7 +205,7 @@
 			mainGroup = 5DC542713052B7D20040BFCE;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
-				5DC542B03052B7D30040BFCE /* XCLocalSwiftPackageReference "Packages/TaskOSCore" */,
+				5DC542B03052B7D30040BFCE /* XCLocalSwiftPackageReference "../Packages/TaskOSCore" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 5DC5427B3052B7D20040BFCE /* Products */;
@@ -276,20 +279,6 @@
 			targetProxy = 5DC542923052B7D30040BFCE /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
-
-/* Begin XCLocalSwiftPackageReference section */
-		5DC542B03052B7D30040BFCE /* XCLocalSwiftPackageReference "Packages/TaskOSCore" */ = {
-			isa = XCLocalSwiftPackageReference;
-			relativePath = ../Packages/TaskOSCore;
-		};
-/* End XCLocalSwiftPackageReference section */
-
-/* Begin XCSwiftPackageProductDependency section */
-		5DC542B13052B7D30040BFCE /* TaskOSCore */ = {
-			isa = XCSwiftPackageProductDependency;
-			productName = TaskOSCore;
-		};
-/* End XCSwiftPackageProductDependency section */
 
 /* Begin XCBuildConfiguration section */
 		5DC542993052B7D30040BFCE /* Debug */ = {
@@ -596,6 +585,20 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		5DC542B03052B7D30040BFCE /* XCLocalSwiftPackageReference "../Packages/TaskOSCore" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = ../Packages/TaskOSCore;
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		5DC542B13052B7D30040BFCE /* TaskOSCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = TaskOSCore;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 5DC542723052B7D20040BFCE /* Project object */;
 }
