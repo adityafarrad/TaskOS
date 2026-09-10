@@ -8,6 +8,16 @@ public struct OpenApplicationAction: Codable, Hashable, Sendable {
     }
 }
 
+public struct OpenWebsiteAction: Codable, Hashable, Sendable {
+    public var url: String
+    public var browser: ResourceReference?
+
+    public init(url: String, browser: ResourceReference? = nil) {
+        self.url = url
+        self.browser = browser
+    }
+}
+
 public struct WaitAction: Codable, Hashable, Sendable {
     public static let allowedRange: ClosedRange<TimeInterval> = 0.1...30.0
 
@@ -30,6 +40,7 @@ public struct ShowNotificationAction: Codable, Hashable, Sendable {
 
 public enum ActionConfiguration: Codable, Hashable, Sendable {
     case openApplication(OpenApplicationAction)
+    case openWebsite(OpenWebsiteAction)
     case wait(WaitAction)
     case showNotification(ShowNotificationAction)
 
@@ -37,6 +48,8 @@ public enum ActionConfiguration: Codable, Hashable, Sendable {
         switch self {
         case .openApplication:
             return .openApplication
+        case .openWebsite:
+            return .openWebsite
         case .wait:
             return .wait
         case .showNotification:

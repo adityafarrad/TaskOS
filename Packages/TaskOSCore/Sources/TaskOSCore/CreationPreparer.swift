@@ -51,6 +51,32 @@ public struct CreationPreparer: Sendable {
                     issues.append(.error("Action \(index + 1): \(label) is not available on this Mac."))
                 }
 
+            case .openWebsite(let configuration):
+                if OpenWebsiteAction.isAbsoluteHTTPURL(configuration.url) {
+                    actionPreviews.append(
+                        ActionPreview(
+                            index: index,
+                            actionID: .openWebsite,
+                            title: title(for: .openWebsite),
+                            targetLabel: configuration.url,
+                            status: .ready,
+                            detail: nil
+                        )
+                    )
+                } else {
+                    actionPreviews.append(
+                        ActionPreview(
+                            index: index,
+                            actionID: .openWebsite,
+                            title: title(for: .openWebsite),
+                            targetLabel: configuration.url,
+                            status: .missingResource,
+                            detail: "Not a valid web address."
+                        )
+                    )
+                    issues.append(.error("Action \(index + 1): \(configuration.url) is not a valid web address."))
+                }
+
             case .wait(let wait):
                 actionPreviews.append(
                     ActionPreview(

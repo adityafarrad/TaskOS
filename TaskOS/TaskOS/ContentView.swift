@@ -116,6 +116,7 @@ struct ContentView: View {
 
     private var addMenu: some View {
         Menu("Add action") {
+            Button("Open a website") { model.add(.openWebsite(url: "https://")) }
             Button("Wait 1 second") { model.add(.wait(1)) }
             Button("Wait 5 seconds") { model.add(.wait(5)) }
             Button("Show a notification") {
@@ -231,6 +232,7 @@ private struct ActionCard: View {
     private var title: String {
         switch action.draft {
         case .openApplication: return "Open Application"
+        case .openWebsite: return "Open Website"
         case .wait: return "Wait"
         case .showNotification: return "Show Notification"
         }
@@ -257,6 +259,22 @@ private struct ActionCard: View {
                 }
                 .labelsHidden()
                 .frame(width: 220)
+            }
+
+        case .openWebsite(let websiteURL):
+            VStack(alignment: .leading, spacing: 4) {
+                TextField(
+                    "https://example.com",
+                    text: Binding(
+                        get: { websiteURL },
+                        set: { model.updateWebsiteURL(id: action.id, url: $0) }
+                    )
+                )
+                if !OpenWebsiteAction.isAbsoluteHTTPURL(websiteURL) {
+                    Label("Enter an absolute http or https address.", systemImage: "exclamationmark.triangle")
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                }
             }
 
         case .wait(let duration):
@@ -428,6 +446,7 @@ private struct RunResultView: View {
     private func title(for id: ActionID) -> String {
         switch id {
         case .openApplication: return "Open Application"
+        case .openWebsite: return "Open Website"
         case .wait: return "Wait"
         case .showNotification: return "Show Notification"
         }

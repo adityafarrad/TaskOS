@@ -25,7 +25,7 @@ compressed into implementation plus per-increment physical smoke checks.
 | 1.1 | Build the typed domain and registry | done | Increments B1 + D1 | 4-capability catalog, validation, versioned coding, and persistence scaffolding complete; remaining capabilities continue in 2.2 |
 | 1.2 | Build the shared composer | in progress | Increments C1-C4 | Parser, suggestions, document, and composer UI done; templates, autosave persistence, keyboard/VoiceOver sign-off pending |
 | 1.3 | Build preparation, preview, and execution | done | Increments B2 + B3 | Effect-free preview, resource resolution, permissions, revision-bound approval, sequential execution with timeouts and cancellation |
-| 1.4 | Prove the first complete workflow | not started | — | First reforecast milestone |
+| 1.4 | Prove the first complete workflow | in progress | Increment E1 | Open Website capability added; Arrange Window + Accessibility and the full canonical journey pending |
 | 1.5 | Complete the basic product shell | in progress | Increment D1 | Library with save/run/delete and persistence; search/rename/duplicate/menu-bar/hotkey/settings pending |
 
 ### Phase 2 — Complete everyday workflows and automatic execution
@@ -420,3 +420,38 @@ compressed into implementation plus per-increment physical smoke checks.
 - Physical checks: user-reported defect fixed; verified in app per user's report
   flow (accept suggestion after `and`).
 - Next eligible work package: unchanged — plan 1.4 canonical journey.
+
+### Increment E1 — Open Website capability (plan 1.4, partial; plan A4)
+
+- Status: done
+- Behavior delivered: the app supports opening an absolute HTTP(S) URL in the
+  default browser, end to end. Typing a domain such as `open apple.com`
+  classifies it as a website (not an application), normalizes it to
+  `https://apple.com`, shows a website card with an editable URL, previews it,
+  and opens it on test.
+- Interfaces changed: added `OpenWebsiteAction` and `ActionID.openWebsite`;
+  added `ComposerActionDraft.openWebsite`; added `ResourceNameHeuristics`
+  (`isWebsite`, `normalizedWebsiteURL`); tokenizer now keeps URL characters in a
+  single word token; registry, canonical phrases, validation, permissions,
+  preview, and suggestion starters extended; added `OpenWebsiteExecutor`.
+- Tests performed:
+  - `swift test --package-path Packages/TaskOSCore` — 83 tests, 16 suites, pass.
+    New coverage: URL validation (http/https only), website-vs-application
+    heuristics, normalization, composer classification, placeholder blocking
+    until valid, canonical round-trip, preview readiness, and website starter.
+  - App tests (`xcodebuild ... test -only-testing:TaskOSTests`) — PASS.
+  - Debug build — BUILD SUCCEEDED.
+  - Release build — BUILD SUCCEEDED.
+- Physical checks (on this Mac, macOS 26 / Apple silicon):
+  - Empty field listed "Open a website"; typing `open apple.com and wait 1
+    second` produced a ready Open Website card and a Wait card; preview, test
+    (opened the site in the default browser), and the notification all worked;
+    editing the URL updated the command text. User-confirmed.
+- Remaining defects / gaps:
+  - Opening in a *selected* browser is modeled (`browser`) but has no card
+    control yet.
+  - No dedicated URL suggestion from a partial domain yet.
+  - E2 (Arrange Window + Accessibility) and the canonical journey acceptance for
+    plan 1.4 are still pending.
+- Next eligible work package: E2 — Arrange Window (A7) with Accessibility
+  permission handling, window targeting, presets, and display selection.

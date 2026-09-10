@@ -38,7 +38,7 @@ final class ComposerViewModel {
     var canRedo: Bool { document.canRedo }
 
     var hasUnresolved: Bool {
-        document.hasUnresolvedText || document.hasUnresolvedApplications
+        document.hasUnresolvedText || document.hasUnresolvedActions
     }
 
     var canPrepare: Bool {
@@ -120,6 +120,11 @@ final class ComposerViewModel {
     func updateOpenName(id: UUID, name: String) {
         document.updateAction(id: id, draft: .openApplication(name: name, resolved: nil))
         autoResolveApplications()
+        afterEdit()
+    }
+
+    func updateWebsiteURL(id: UUID, url: String) {
+        document.updateAction(id: id, draft: .openWebsite(url: url))
         afterEdit()
     }
 

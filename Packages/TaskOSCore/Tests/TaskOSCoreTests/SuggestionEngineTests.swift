@@ -22,7 +22,8 @@ struct SuggestionEngineTests {
 
     @Test func openOffersActionAndApplications() {
         let suggestions = engine.suggestions(for: "open", applications: applications)
-        #expect(suggestions.first?.id == "action.openApplication")
+        #expect(suggestions.contains { $0.id == "action.openApplication" })
+        #expect(suggestions.contains { $0.id == "action.openWebsite" })
         #expect(suggestions.contains { $0.title == "Safari" })
         #expect(suggestions.contains { $0.title == "Notes" })
     }

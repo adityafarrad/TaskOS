@@ -107,6 +107,17 @@ public struct SuggestionEngine: Sendable {
             )
         )
 
+        suggestions.append(
+            Suggestion(
+                id: "action.openWebsite",
+                phrase: "Open https://",
+                title: "Open a website",
+                category: .action,
+                requiresParameter: true,
+                match: .grammarPosition
+            )
+        )
+
         if !openOnly {
             suggestions.append(
                 Suggestion(

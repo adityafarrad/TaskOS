@@ -2,6 +2,7 @@ import Foundation
 
 public enum ComposerActionDraft: Hashable, Sendable {
     case openApplication(name: String, resolved: ResourceReference?)
+    case openWebsite(url: String)
     case wait(TimeInterval)
     case showNotification(title: String, message: String)
 }
@@ -83,6 +84,19 @@ public struct ComposerDocument: Sendable {
             }
             return false
         }
+    }
+
+    public var hasUnresolvedWebsites: Bool {
+        actions.contains { action in
+            if case .openWebsite(let url) = action.draft {
+                return !OpenWebsiteAction.isAbsoluteHTTPURL(url)
+            }
+            return false
+        }
+    }
+
+    public var hasUnresolvedActions: Bool {
+        hasUnresolvedApplications || hasUnresolvedWebsites
     }
 
     public mutating func setText(_ newText: String) {
@@ -179,6 +193,9 @@ public struct ComposerDocument: Sendable {
             case .openApplication(_, let resolved):
                 guard let resolved else { return nil }
                 result.append(.openApplication(OpenApplicationAction(application: resolved)))
+            case .openWebsite(let url):
+                guard OpenWebsiteAction.isAbsoluteHTTPURL(url) else { return nil }
+                result.append(.openWebsite(OpenWebsiteAction(url: url)))
             case .wait(let duration):
                 result.append(.wait(WaitAction(duration: duration)))
             case .showNotification(let title, let message):
@@ -240,7 +257,12 @@ public struct ComposerDocument: Sendable {
             switch clause.kind {
             case .openApplication:
                 for name in clause.resourceNames {
-                    let draft = ComposerActionDraft.openApplication(name: name, resolved: nil)
+                    let draft: ComposerActionDraft
+                    if ResourceNameHeuristics.isWebsite(name) {
+                        draft = .openWebsite(url: ResourceNameHeuristics.normalizedWebsiteURL(name))
+                    } else {
+                        draft = .openApplication(name: name, resolved: nil)
+                    }
                     newElements.append(.action(reusedAction(for: draft, from: previousActions, cursor: &cursor)))
                 }
 
@@ -294,6 +316,12 @@ public struct ComposerDocument: Sendable {
         case (.showNotification(let title, let message), .showNotification):
             return .showNotification(title: title, message: message)
 
+        case (.openWebsite(let oldURL), .openWebsite(let newURL)):
+            if oldURL.caseInsensitiveCompare(newURL) == .orderedSame {
+                return .openWebsite(url: oldURL)
+            }
+            return new
+
         default:
             return new
         }
@@ -332,6 +360,8 @@ public struct ComposerDocument: Sendable {
         switch draft {
         case .openApplication(let name, _):
             return "Open \(name)"
+        case .openWebsite(let url):
+            return "Open \(url)"
         case .wait(let duration):
             return "Wait \(CanonicalPhrase.durationText(duration)) seconds"
         case .showNotification:

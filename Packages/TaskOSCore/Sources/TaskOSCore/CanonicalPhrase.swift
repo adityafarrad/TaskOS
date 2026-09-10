@@ -5,6 +5,8 @@ public enum CanonicalPhrase {
         switch action {
         case .openApplication(let configuration):
             return "Open \(configuration.application.label)"
+        case .openWebsite(let configuration):
+            return "Open \(configuration.url)"
         case .wait(let wait):
             return "Wait \(durationText(wait.duration)) seconds"
         case .showNotification:

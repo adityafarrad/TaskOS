@@ -13,6 +13,10 @@ struct CommandToken: Equatable, Sendable {
 }
 
 enum CommandTokenizer {
+    private static let wordExtras: Set<Character> = [
+        ".", "-", "_", "/", ":", "?", "=", "%", "&", "#", "@", "~", "+",
+    ]
+
     static func tokenize(_ input: String) -> [CommandToken] {
         var tokens: [CommandToken] = []
         let characters = Array(input)
@@ -61,7 +65,7 @@ enum CommandTokenizer {
                 var literal = ""
                 while end < characters.count {
                     let next = characters[end]
-                    if next.isLetter || next.isNumber || next == "-" || next == "_" {
+                    if next.isLetter || next.isNumber || Self.wordExtras.contains(next) {
                         literal.append(next)
                         end += 1
                     } else {
@@ -241,6 +245,8 @@ private struct ParserWorker {
 
         func flush() {
             let joined = currentWords.joined(separator: " ")
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+                .trimmingCharacters(in: CharacterSet(charactersIn: ".,;"))
             if !joined.isEmpty {
                 names.append(joined)
             }

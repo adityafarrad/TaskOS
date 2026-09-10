@@ -18,7 +18,7 @@ public protocol PermissionStatusProvider: Sendable {
 extension ActionConfiguration {
     public var requiredPermissions: Set<PermissionKind> {
         switch self {
-        case .openApplication, .wait:
+        case .openApplication, .openWebsite, .wait:
             return []
         case .showNotification:
             return [.notifications]

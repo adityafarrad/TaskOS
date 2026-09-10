@@ -55,11 +55,41 @@ extension ActionConfiguration {
         switch self {
         case .openApplication(let action):
             return action.validate()
+        case .openWebsite(let action):
+            return action.validate()
         case .wait(let action):
             return action.validate()
         case .showNotification(let action):
             return action.validate()
         }
+    }
+}
+
+extension OpenWebsiteAction {
+    public func validate() -> ValidationResult {
+        var issues: [ValidationIssue] = []
+
+        let trimmed = url.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.isEmpty {
+            issues.append(.error("Open Website requires a web address."))
+        } else if !Self.isAbsoluteHTTPURL(trimmed) {
+            issues.append(.error("Web address must be an absolute http or https URL."))
+        }
+
+        if let browser, browser.kind != .application {
+            issues.append(.error("Open Website browser must be an application."))
+        }
+
+        return ValidationResult(issues: issues)
+    }
+
+    public static func isAbsoluteHTTPURL(_ value: String) -> Bool {
+        guard let components = URLComponents(string: value) else { return false }
+        guard let scheme = components.scheme?.lowercased(), scheme == "http" || scheme == "https" else {
+            return false
+        }
+        guard let host = components.host, !host.isEmpty else { return false }
+        return true
     }
 }
 

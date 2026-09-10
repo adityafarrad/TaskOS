@@ -61,6 +61,10 @@ public struct CapabilityRegistry: Sendable {
                 title: "Open Application",
                 summary: "Launch the selected app if necessary, then activate it."
             ),
+            .openWebsite: CapabilityDescriptor(
+                title: "Open Website",
+                summary: "Open an absolute HTTP(S) URL in the default or a selected browser."
+            ),
             .wait: CapabilityDescriptor(
                 title: "Wait",
                 summary: "Pause for an explicit duration between 0.1 and 30 seconds."
