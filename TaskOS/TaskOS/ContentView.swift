@@ -17,6 +17,7 @@ struct ContentView: View {
                 reviewSection
                 librarySection
                 historySection
+                settingsSection
                 resultSection
             }
             .padding()
@@ -266,6 +267,53 @@ struct ContentView: View {
         case .failed: return .red
         case .timedOut: return .orange
         case .cancelled: return .gray
+        }
+    }
+
+    private var settingsSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Settings")
+                .font(.headline)
+
+            HStack(spacing: 12) {
+                Text("Notifications: \(permissionLabel(model.notificationPermission))")
+                Text("Accessibility: \(permissionLabel(model.accessibilityPermission))")
+                Button("Recheck") { model.refreshPermissions() }
+                if model.accessibilityPermission != .granted {
+                    Button("Grant Accessibility") {
+                        model.requestAccessibilityPermission()
+                        model.refreshPermissions()
+                    }
+                }
+            }
+
+            Toggle(
+                "Launch at login",
+                isOn: Binding(get: { model.launchAtLogin }, set: { model.setLaunchAtLogin($0) })
+            )
+
+            HStack(spacing: 12) {
+                Button("Clear history") { model.clearHistory() }
+                Button("Delete all workflows") { model.clearAllWorkflows() }
+            }
+
+            Text("Creation and execution work offline. History stores operational metadata only.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            if let settingsNotice = model.settingsNotice {
+                Text(settingsNotice)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    private func permissionLabel(_ state: PermissionState) -> String {
+        switch state {
+        case .granted: return "granted"
+        case .denied: return "denied"
+        case .notDetermined: return "not requested"
         }
     }
 

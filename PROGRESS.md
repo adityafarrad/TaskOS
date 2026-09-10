@@ -26,7 +26,7 @@ compressed into implementation plus per-increment physical smoke checks.
 | 1.2 | Build the shared composer | in progress | Increments C1-C4 | Parser, suggestions, document, and composer UI done; templates, autosave persistence, keyboard/VoiceOver sign-off pending |
 | 1.3 | Build preparation, preview, and execution | done | Increments B2 + B3 | Effect-free preview, resource resolution, permissions, revision-bound approval, sequential execution with timeouts and cancellation |
 | 1.4 | Prove the first complete workflow | done | Increments E1-E3 | Canonical journey verified end to end in Release; Open Website + Arrange Window + Accessibility + history + edit/reuse |
-| 1.5 | Complete the basic product shell | in progress | D1 + F1-F2 | Library save/run/delete/edit/history/search/rename/duplicate; menu-bar runtime; hotkey/settings/recovery pending |
+| 1.5 | Complete the basic product shell | in progress | D1 + F1-F3 | Library, menu-bar runtime, and settings (permissions, launch at login, data controls); hotkey/onboarding/recovery pending |
 
 ### Phase 2 — Complete everyday workflows and automatic execution
 
@@ -606,3 +606,30 @@ compressed into implementation plus per-increment physical smoke checks.
   automatic triggers/queue) are represented by the placeholder pause toggle.
 - Next eligible work package: F3 — settings + permission status + launch at
   login + local-data controls.
+
+### Increment F3 — Settings and permission status (plan 1.5, partial; plan 2.7)
+
+- Status: done
+- Behavior delivered: a Settings section in the main window showing notification
+  and accessibility permission status with a Recheck action and a Grant
+  Accessibility action; a Launch at login toggle; Clear history and Delete all
+  workflows data controls; and a short local-data/privacy note.
+- Interfaces changed: `AppComposition` exposes the permission provider; added
+  `LaunchAtLogin` (ServiceManagement `SMAppService.mainApp`); `ComposerViewModel`
+  gained permission state, launch-at-login, and data-clearing methods;
+  `ContentView` gained the Settings section.
+- Tests performed:
+  - `swift test --package-path Packages/TaskOSCore` — 102 tests, 19 suites, pass.
+  - App tests (`xcodebuild ... test -only-testing:TaskOSTests`) — PASS.
+  - Debug build — BUILD SUCCEEDED.
+  - Release build — BUILD SUCCEEDED.
+- Physical checks (on this Mac, macOS 26 / Apple silicon):
+  - Permission status shown and recheckable; grant action present; launch at
+    login toggle attempted (dev-build location may refuse registration, which is
+    reported); clear history and delete all workflows worked. User-confirmed.
+- Remaining defects / gaps:
+  - Launch at login from a DerivedData build may not register; a /Applications
+    install is needed for a true test.
+  - No settings for update checks yet (Phase 3 / Sparkle).
+- Next eligible work package: F4 — interrupted-run recovery (persist an
+  in-progress run; on startup mark unfinished prior runs interrupted).

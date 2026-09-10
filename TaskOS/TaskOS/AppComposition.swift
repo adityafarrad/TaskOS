@@ -13,6 +13,7 @@ final class AppComposition {
     let suggestions: SuggestionEngine
     let repository: any AutomationRepository
     let runHistory: any RunHistoryRepository
+    let permissions: any PermissionStatusProvider
 
     private let catalog: WorkspaceResourceCatalog
 
@@ -37,9 +38,11 @@ final class AppComposition {
         self.suggestions = SuggestionEngine()
         self.repository = SwiftDataAutomationRepository(modelContainer: container)
         self.runHistory = SwiftDataRunHistoryRepository(modelContainer: container)
+        let permissions = SystemPermissionStatusProvider()
+        self.permissions = permissions
         self.preparer = CreationPreparer(
             catalog: catalog,
-            permissions: SystemPermissionStatusProvider()
+            permissions: permissions
         )
         self.runner = WorkflowRunner(
             clock: clock,

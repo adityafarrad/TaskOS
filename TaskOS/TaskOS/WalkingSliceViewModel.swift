@@ -26,6 +26,10 @@ final class ComposerViewModel {
     var librarySearch = ""
     var renameTarget: AutomationID?
     var renameText = ""
+    private(set) var notificationPermission: PermissionState = .notDetermined
+    private(set) var accessibilityPermission: PermissionState = .notDetermined
+    private(set) var launchAtLogin = LaunchAtLogin.isEnabled
+    private(set) var settingsNotice: String?
 
     private let composition: AppComposition
     private var draftID = AutomationID()
@@ -86,6 +90,7 @@ final class ComposerViewModel {
         applicationsLoaded = true
         loadLibrary()
         loadHistory()
+        refreshPermissions()
         Task { [weak self] in
             guard let self else { return }
             let loaded = await composition.loadApplications()
@@ -274,6 +279,45 @@ final class ComposerViewModel {
             } catch {
                 self.notice = "Could not save: \(error.localizedDescription)"
             }
+        }
+    }
+
+    func refreshPermissions() {
+        Task { [weak self] in
+            guard let self else { return }
+            self.notificationPermission = await self.composition.permissions.state(for: .notifications)
+            self.accessibilityPermission = await self.composition.permissions.state(for: .accessibility)
+            self.launchAtLogin = LaunchAtLogin.isEnabled
+        }
+    }
+
+    func setLaunchAtLogin(_ enabled: Bool) {
+        if LaunchAtLogin.setEnabled(enabled) {
+            launchAtLogin = LaunchAtLogin.isEnabled
+            settingsNotice = enabled ? "Launch at login enabled." : "Launch at login disabled."
+        } else {
+            launchAtLogin = LaunchAtLogin.isEnabled
+            settingsNotice = "Could not change launch at login. Allow it in System Settings > General > Login Items."
+        }
+    }
+
+    func clearHistory() {
+        Task { [weak self] in
+            guard let self else { return }
+            try? await self.composition.runHistory.clear()
+            self.history = []
+            self.settingsNotice = "Run history cleared."
+        }
+    }
+
+    func clearAllWorkflows() {
+        Task { [weak self] in
+            guard let self else { return }
+            for workflow in self.savedWorkflows {
+                try? await self.composition.repository.delete(id: workflow.id)
+            }
+            self.loadLibrary()
+            self.settingsNotice = "All saved workflows deleted."
         }
     }
 
