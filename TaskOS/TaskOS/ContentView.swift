@@ -35,12 +35,16 @@ struct ContentView: View {
     }
 
     private var nameField: some View {
-        TextField(
-            "Workflow name",
-            text: Binding(get: { model.draftName }, set: { model.updateName($0) })
-        )
-        .textFieldStyle(.roundedBorder)
-        .frame(maxWidth: 320)
+        HStack(spacing: 12) {
+            TextField(
+                "Workflow name",
+                text: Binding(get: { model.draftName }, set: { model.updateName($0) })
+            )
+            .textFieldStyle(.roundedBorder)
+            .frame(maxWidth: 320)
+
+            Button("New") { model.newWorkflow() }
+        }
     }
 
     private var commandField: some View {
@@ -178,30 +182,51 @@ struct ContentView: View {
             Text("Library")
                 .font(.headline)
 
+            TextField(
+                "Search workflows",
+                text: Binding(get: { model.librarySearch }, set: { model.librarySearch = $0 })
+            )
+            .textFieldStyle(.roundedBorder)
+            .frame(maxWidth: 320)
+
             if let error = model.libraryError {
                 Text(error)
                     .font(.caption)
                     .foregroundStyle(.red)
             }
 
-            if model.savedWorkflows.isEmpty {
-                Text("No saved workflows yet.")
+            if model.filteredWorkflows.isEmpty {
+                Text(model.savedWorkflows.isEmpty ? "No saved workflows yet." : "No matches.")
                     .foregroundStyle(.secondary)
             }
 
-            ForEach(model.savedWorkflows) { workflow in
+            ForEach(model.filteredWorkflows) { workflow in
                 HStack(spacing: 12) {
-                    Text(workflow.name)
-                    Text(workflow.definition.actions.count == 1 ? "1 step" : "\(workflow.definition.actions.count) steps")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    Spacer()
-                    Text(workflow.updatedAt.formatted(date: .abbreviated, time: .shortened))
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    Button("Edit") { model.loadForEditing(workflow) }
-                    Button("Run") { model.runSaved(workflow) }
-                    Button { model.deleteSaved(workflow) } label: { Image(systemName: "trash") }
+                    if model.renameTarget == workflow.id {
+                        TextField(
+                            "Name",
+                            text: Binding(get: { model.renameText }, set: { model.renameText = $0 })
+                        )
+                        .textFieldStyle(.roundedBorder)
+                        .frame(maxWidth: 200)
+                        .onSubmit { model.commitRename() }
+                        Button("Save") { model.commitRename() }
+                        Button("Cancel") { model.cancelRename() }
+                    } else {
+                        Text(workflow.name)
+                        Text(workflow.definition.actions.count == 1 ? "1 step" : "\(workflow.definition.actions.count) steps")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                        Text(workflow.updatedAt.formatted(date: .abbreviated, time: .shortened))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Button("Edit") { model.loadForEditing(workflow) }
+                        Button("Rename") { model.beginRename(workflow) }
+                        Button("Duplicate") { model.duplicate(workflow) }
+                        Button("Run") { model.runSaved(workflow) }
+                        Button { model.deleteSaved(workflow) } label: { Image(systemName: "trash") }
+                    }
                 }
             }
         }

@@ -26,7 +26,7 @@ compressed into implementation plus per-increment physical smoke checks.
 | 1.2 | Build the shared composer | in progress | Increments C1-C4 | Parser, suggestions, document, and composer UI done; templates, autosave persistence, keyboard/VoiceOver sign-off pending |
 | 1.3 | Build preparation, preview, and execution | done | Increments B2 + B3 | Effect-free preview, resource resolution, permissions, revision-bound approval, sequential execution with timeouts and cancellation |
 | 1.4 | Prove the first complete workflow | done | Increments E1-E3 | Canonical journey verified end to end in Release; Open Website + Arrange Window + Accessibility + history + edit/reuse |
-| 1.5 | Complete the basic product shell | in progress | Increment D1 | Library with save/run/delete and persistence; search/rename/duplicate/menu-bar/hotkey/settings pending |
+| 1.5 | Complete the basic product shell | in progress | D1 + F1 | Library save/run/delete/edit/history + search/rename/duplicate + distinct save identity; menu-bar/hotkey/settings/recovery pending |
 
 ### Phase 2 — Complete everyday workflows and automatic execution
 
@@ -550,3 +550,33 @@ compressed into implementation plus per-increment physical smoke checks.
 - Next eligible work package: plan 1.5 remainder (library search/rename/
   duplicate, menu-bar runtime, settings, interrupted-run recovery) or the plan
   1.2 remainder (templates, autosave, keyboard/VoiceOver).
+
+### Increment F1 — Library management (plan 1.5, partial)
+
+- Status: done
+- Behavior delivered: the Library supports search, rename, duplicate, edit,
+  delete, and run; and saving no longer overwrites: distinct workflows get
+  distinct identities, while unchanged re-saves and Library "Edit" update the
+  existing record. A "New" action starts a fresh draft.
+- Root cause fixed: the composer reused one workflow identity per session, so
+  every save replaced the previous record.
+- Interfaces changed: `ComposerViewModel` gained `librarySearch`,
+  `filteredWorkflows`, `beginRename`/`commitRename`/`cancelRename`, `duplicate`,
+  `newWorkflow`, and save-identity tracking (`editingWorkflowID`,
+  `lastSavedSignature`, `lastSavedID`); `ContentView` Library gained a search
+  field, inline rename, duplicate, and the New button.
+- Tests performed:
+  - `swift test --package-path Packages/TaskOSCore` — 102 tests, 19 suites, pass
+    (Core unchanged).
+  - Debug build — BUILD SUCCEEDED.
+  - Release build — BUILD SUCCEEDED.
+- Physical checks (on this Mac, macOS 26 / Apple silicon):
+  - Saved three distinct workflows; all remain listed (no overwrite).
+  - Search filtered the list; rename persisted; duplicate produced an
+    independent "<name> Copy"; edit-then-save updated in place. User-confirmed.
+- Remaining defects / gaps:
+  - Loading a workflow for editing loses card-only values not present in the
+    canonical command text (website browser, notification title/message).
+  - No enabled/disabled toggle or pause state in the Library yet.
+- Next eligible work package: F2 — menu-bar runtime (open, run a saved workflow,
+  view current run, pause/resume automatic triggers, cancel, quit).

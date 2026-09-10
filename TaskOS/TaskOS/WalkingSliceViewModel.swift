@@ -23,10 +23,16 @@ final class ComposerViewModel {
     private(set) var libraryError: String?
     private(set) var history: [RunRecord] = []
     private(set) var draftName = "Untitled"
+    var librarySearch = ""
+    var renameTarget: AutomationID?
+    var renameText = ""
 
     private let composition: AppComposition
     private var draftID = AutomationID()
     private var startingRevision = WorkflowRevision(1)
+    private var editingWorkflowID: AutomationID?
+    private var lastSavedSignature: String?
+    private var lastSavedID: AutomationID?
     private var lastDefinition: AutomationDefinition?
     private var applicationsLoaded = false
 
@@ -231,7 +237,22 @@ final class ComposerViewModel {
 
     func save() {
         notice = nil
-        guard let definition = document.makeDefinition(name: draftName, id: draftID, revision: currentRevision) else {
+        let signature = currentSignature
+        let isUpdatingExisting = editingWorkflowID != nil
+            || (lastSavedSignature != nil && lastSavedSignature == signature)
+
+        let targetID: AutomationID
+        if let editingWorkflowID {
+            targetID = editingWorkflowID
+        } else if lastSavedSignature == signature, let lastSavedID {
+            targetID = lastSavedID
+        } else {
+            targetID = AutomationID()
+        }
+
+        let revision = isUpdatingExisting ? currentRevision : WorkflowRevision(1)
+
+        guard let definition = document.makeDefinition(name: draftName, id: targetID, revision: revision) else {
             notice = "Finish resolving every step before saving."
             return
         }
@@ -242,12 +263,39 @@ final class ComposerViewModel {
             guard let self else { return }
             do {
                 try await self.composition.repository.save(workflow)
-                self.notice = "Saved."
+                self.editingWorkflowID = nil
+                self.lastSavedSignature = signature
+                self.lastSavedID = targetID
+                self.startingRevision = revision
+                self.notice = isUpdatingExisting
+                    ? "Updated \"\(self.draftName)\"."
+                    : "Saved \"\(self.draftName)\"."
                 self.loadLibrary()
             } catch {
                 self.notice = "Could not save: \(error.localizedDescription)"
             }
         }
+    }
+
+    func newWorkflow() {
+        draftID = AutomationID()
+        editingWorkflowID = nil
+        lastSavedSignature = nil
+        lastSavedID = nil
+        startingRevision = WorkflowRevision(1)
+        draftName = "Untitled"
+        document = ComposerDocument()
+        suggestions = []
+        resetPreview()
+        notice = "Started a new workflow."
+    }
+
+    private var currentSignature: String {
+        let actions = document.resolvedActions() ?? []
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys]
+        let payload = (try? encoder.encode(actions)).map { String(decoding: $0, as: UTF8.self) } ?? document.text
+        return "\(draftName)|\(payload)"
     }
 
     func runSaved(_ workflow: SavedWorkflow) {
@@ -269,8 +317,11 @@ final class ComposerViewModel {
         draftID = workflow.id
         draftName = workflow.name
         startingRevision = workflow.definition.revision
+        editingWorkflowID = workflow.id
+        lastSavedID = workflow.id
         document = ComposerDocument(text: CanonicalPhrase.command(for: workflow.definition.actions))
         autoResolveApplications()
+        lastSavedSignature = currentSignature
         refreshSuggestions()
         resetPreview()
         notice = "Editing \"\(workflow.name)\" (revision \(workflow.definition.revision.value))."
@@ -300,6 +351,66 @@ final class ComposerViewModel {
         Task { [weak self] in
             guard let self else { return }
             try? await self.composition.repository.delete(id: workflow.id)
+            self.loadLibrary()
+        }
+    }
+
+    var filteredWorkflows: [SavedWorkflow] {
+        let query = librarySearch.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !query.isEmpty else { return savedWorkflows }
+        return savedWorkflows.filter { $0.name.localizedCaseInsensitiveContains(query) }
+    }
+
+    func beginRename(_ workflow: SavedWorkflow) {
+        renameTarget = workflow.id
+        renameText = workflow.name
+    }
+
+    func cancelRename() {
+        renameTarget = nil
+        renameText = ""
+    }
+
+    func commitRename() {
+        guard let id = renameTarget,
+              let workflow = savedWorkflows.first(where: { $0.id == id }) else {
+            cancelRename()
+            return
+        }
+        let trimmed = renameText.trimmingCharacters(in: .whitespacesAndNewlines)
+        cancelRename()
+        guard !trimmed.isEmpty, trimmed != workflow.name else { return }
+
+        let renamed = AutomationDefinition(
+            id: workflow.definition.id,
+            name: trimmed,
+            revision: workflow.definition.revision.next(),
+            trigger: workflow.definition.trigger,
+            actions: workflow.definition.actions
+        )
+        let updated = SavedWorkflow(definition: renamed, isEnabled: workflow.isEnabled, updatedAt: Date())
+
+        Task { [weak self] in
+            guard let self else { return }
+            try? await self.composition.repository.save(updated)
+            self.loadLibrary()
+        }
+    }
+
+    func duplicate(_ workflow: SavedWorkflow) {
+        let copyDefinition = AutomationDefinition(
+            id: AutomationID(),
+            name: "\(workflow.name) Copy",
+            revision: WorkflowRevision(1),
+            trigger: workflow.definition.trigger,
+            actions: workflow.definition.actions
+        )
+        let copy = SavedWorkflow(definition: copyDefinition, isEnabled: false, updatedAt: Date())
+
+        Task { [weak self] in
+            guard let self else { return }
+            try? await self.composition.repository.save(copy)
+            self.notice = "Duplicated \"\(workflow.name)\"."
             self.loadLibrary()
         }
     }
