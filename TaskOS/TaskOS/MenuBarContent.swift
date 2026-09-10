@@ -3,7 +3,7 @@ import SwiftUI
 import TaskOSCore
 
 struct MenuBarContent: View {
-    @State private var model = MenuBarViewModel()
+    @State private var model = MenuBarViewModel.shared
     @Environment(\.openWindow) private var openWindow
 
     var body: some View {
@@ -19,7 +19,9 @@ struct MenuBarContent: View {
         Divider()
 
         Menu("Run a workflow") {
-            if model.workflows.isEmpty {
+            if let error = model.libraryError {
+                Text(error)
+            } else if model.workflows.isEmpty {
                 Text("No saved workflows")
             } else {
                 ForEach(model.workflows.prefix(10)) { workflow in

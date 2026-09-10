@@ -16,8 +16,14 @@ struct TaskOSApp: App {
     }
 }
 
+@MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
         false
+    }
+
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        MenuBarViewModel.shared.load()
+        MenuBarViewModel.shared.refreshStatus()
     }
 }

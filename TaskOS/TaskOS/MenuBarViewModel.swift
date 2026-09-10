@@ -6,25 +6,40 @@ import TaskOSCore
 @MainActor
 @Observable
 final class MenuBarViewModel {
+    static let shared = MenuBarViewModel()
+
     private(set) var workflows: [SavedWorkflow] = []
     private(set) var status = "Idle"
     private(set) var isRunning = false
     private(set) var queuedCount = 0
     private(set) var automaticTriggersPaused = false
+    private(set) var libraryError: String?
 
     private let composition: AppComposition
 
-    init(composition: AppComposition = .shared) {
+    private init(composition: AppComposition = .shared) {
         self.composition = composition
         load()
         refreshStatus()
+        recoverInterruptedRuns()
+    }
+
+    private func recoverInterruptedRuns() {
+        Task { [composition] in
+            try? await composition.runHistory.markRunningAsInterrupted()
+        }
     }
 
     func load() {
         Task { [weak self] in
             guard let self else { return }
-            let loaded = (try? await self.composition.repository.loadAll()) ?? []
-            self.workflows = loaded
+            do {
+                self.workflows = try await self.composition.repository.loadAll()
+                self.libraryError = nil
+            } catch {
+                self.workflows = []
+                self.libraryError = "Could not load workflows: \(error.localizedDescription)"
+            }
         }
     }
 

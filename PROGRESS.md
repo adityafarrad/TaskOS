@@ -862,3 +862,32 @@ Next eligible work package: 2.1 — scheduling and runtime admission.
 - Next eligible work package: 2.1 UI half (Increment H3) — schedule parser
   grammar, composer trigger card, next-three-occurrence preview, automatic-run
   enablement, and wiring the composer/library run paths through the coordinator.
+
+### Fix H2-a — Menu-bar runtime lifetime and preload
+
+- Status: done
+- Defect (reported during manual check): the menu-bar "Run a workflow" submenu
+  could appear empty/disabled and a run did not seem to start. Root cause:
+  `MenuBarContent` owned its `MenuBarViewModel` in `@State`, and `MenuBarExtra`
+  menu content can be rebuilt each time it opens, so the run menu was populated
+  asynchronously (and could be discarded) on every open.
+- Fix: `MenuBarViewModel` is now a single long-lived `shared` instance, created
+  at launch from `AppDelegate.applicationDidFinishLaunching`, which loads saved
+  workflows and recovers interrupted runs before the first menu open.
+  `MenuBarContent` now references the shared instance and surfaces a load error
+  instead of silently showing an empty menu. The menu-bar runtime also marks
+  unfinished prior runs interrupted at launch (previously only the main window
+  did this when it appeared).
+- Investigation evidence: the SwiftData store contained the saved workflows and
+  a coordinated `Queue test` run that started and then completed successfully,
+  which showed the runner path worked and isolated the problem to menu
+  presentation. No app errors appeared in the unified log.
+- Tests performed:
+  - App tests (`xcodebuild ... test -only-testing:TaskOSTests`) — TEST
+    SUCCEEDED. (One intermediate run failed; the SwiftData test suite is known
+    to flake on first in-memory container creation and passed on rerun. A
+    follow-up hardening of that fixture is still desirable.)
+  - Release build — BUILD SUCCEEDED.
+- Physical checks: pending re-check of the menu-bar run/pause/cancel flow after
+  relaunch with the shared runtime.
+- Next eligible work package: 2.1 UI half (Increment H3).
