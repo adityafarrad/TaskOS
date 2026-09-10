@@ -12,6 +12,7 @@ final class AppComposition {
     let approvals: ApprovalRegistry
     let suggestions: SuggestionEngine
     let repository: any AutomationRepository
+    let runHistory: any RunHistoryRepository
 
     private let catalog: WorkspaceResourceCatalog
 
@@ -21,10 +22,11 @@ final class AppComposition {
 
         let container: ModelContainer
         do {
-            container = try ModelContainer(for: WorkflowRecord.self)
+            container = try ModelContainer(for: WorkflowRecord.self, RunRecordEntry.self)
         } catch {
             container = try! ModelContainer(
                 for: WorkflowRecord.self,
+                RunRecordEntry.self,
                 configurations: ModelConfiguration(isStoredInMemoryOnly: true)
             )
         }
@@ -34,6 +36,7 @@ final class AppComposition {
         self.approvals = ApprovalRegistry()
         self.suggestions = SuggestionEngine()
         self.repository = SwiftDataAutomationRepository(modelContainer: container)
+        self.runHistory = SwiftDataRunHistoryRepository(modelContainer: container)
         self.preparer = CreationPreparer(
             catalog: catalog,
             permissions: SystemPermissionStatusProvider()

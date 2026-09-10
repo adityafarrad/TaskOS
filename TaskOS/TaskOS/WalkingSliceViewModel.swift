@@ -21,11 +21,18 @@ final class ComposerViewModel {
     private(set) var notice: String?
     private(set) var savedWorkflows: [SavedWorkflow] = []
     private(set) var libraryError: String?
+    private(set) var history: [RunRecord] = []
+    private(set) var draftName = "Untitled"
 
     private let composition: AppComposition
-    private let draftID = AutomationID()
+    private var draftID = AutomationID()
+    private var startingRevision = WorkflowRevision(1)
     private var lastDefinition: AutomationDefinition?
     private var applicationsLoaded = false
+
+    var currentRevision: WorkflowRevision {
+        WorkflowRevision(startingRevision.value + document.revision.value - 1)
+    }
 
     init(composition: AppComposition = .shared) {
         self.composition = composition
@@ -62,16 +69,17 @@ final class ComposerViewModel {
     }
 
     var canTest: Bool {
-        guard let preview, preview.revision == document.revision, preview.isRunnable else {
+        guard let preview, preview.revision == currentRevision, preview.isRunnable else {
             return false
         }
-        return approvedRevision == document.revision
+        return approvedRevision == currentRevision
     }
 
     func loadApplicationsIfNeeded() {
         guard !applicationsLoaded else { return }
         applicationsLoaded = true
         loadLibrary()
+        loadHistory()
         Task { [weak self] in
             guard let self else { return }
             let loaded = await composition.loadApplications()
@@ -124,7 +132,13 @@ final class ComposerViewModel {
     }
 
     func updateWebsiteURL(id: UUID, url: String) {
-        document.updateAction(id: id, draft: .openWebsite(url: url))
+        guard case .openWebsite(_, let browser) = actionDraft(id: id) else { return }
+        document.updateAction(id: id, draft: .openWebsite(url: url, browser: browser))
+        afterEdit()
+    }
+
+    func updateWebsiteBrowser(id: UUID, browser: ResourceReference?) {
+        document.setWebsiteBrowser(id: id, browser: browser)
         afterEdit()
     }
 
@@ -169,7 +183,7 @@ final class ComposerViewModel {
 
     func prepare() {
         notice = nil
-        guard let definition = document.makeDefinition(name: "Untitled", id: draftID, revision: document.revision) else {
+        guard let definition = document.makeDefinition(name: draftName, id: draftID, revision: currentRevision) else {
             notice = "Finish resolving every step before previewing."
             return
         }
@@ -192,8 +206,9 @@ final class ComposerViewModel {
 
         Task { [weak self] in
             guard let self else { return }
-            let record = await composition.runner.run(definition)
+            let record = await self.composition.runner.run(definition)
             self.stage = .finished(record)
+            await self.record(record)
         }
     }
 
@@ -216,7 +231,7 @@ final class ComposerViewModel {
 
     func save() {
         notice = nil
-        guard let definition = document.makeDefinition(name: "Untitled", id: draftID, revision: document.revision) else {
+        guard let definition = document.makeDefinition(name: draftName, id: draftID, revision: currentRevision) else {
             notice = "Finish resolving every step before saving."
             return
         }
@@ -241,6 +256,43 @@ final class ComposerViewModel {
             guard let self else { return }
             let record = await self.composition.runner.run(workflow.definition)
             self.stage = .finished(record)
+            await self.record(record)
+        }
+    }
+
+    func updateName(_ value: String) {
+        draftName = value
+        resetPreview()
+    }
+
+    func loadForEditing(_ workflow: SavedWorkflow) {
+        draftID = workflow.id
+        draftName = workflow.name
+        startingRevision = workflow.definition.revision
+        document = ComposerDocument(text: CanonicalPhrase.command(for: workflow.definition.actions))
+        autoResolveApplications()
+        refreshSuggestions()
+        resetPreview()
+        notice = "Editing \"\(workflow.name)\" (revision \(workflow.definition.revision.value))."
+    }
+
+    func loadHistory() {
+        Task { [weak self] in
+            guard let self else { return }
+            do {
+                self.history = try await self.composition.runHistory.recentRuns(limit: 50)
+            } catch {
+                self.libraryError = "Could not load run history: \(error.localizedDescription)"
+            }
+        }
+    }
+
+    private func record(_ run: RunRecord) async {
+        do {
+            try await composition.runHistory.append(run)
+            history = try await composition.runHistory.recentRuns(limit: 50)
+        } catch {
+            libraryError = "Could not save run history: \(error.localizedDescription)"
         }
     }
 

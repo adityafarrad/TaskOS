@@ -2,7 +2,7 @@ import Foundation
 
 public enum ComposerActionDraft: Hashable, Sendable {
     case openApplication(name: String, resolved: ResourceReference?)
-    case openWebsite(url: String)
+    case openWebsite(url: String, browser: ResourceReference?)
     case arrangeWindow(name: String, resolved: ResourceReference?, preset: WindowPreset, display: WindowDisplaySelection)
     case wait(TimeInterval)
     case showNotification(title: String, message: String)
@@ -93,7 +93,7 @@ public struct ComposerDocument: Sendable {
 
     public var hasUnresolvedWebsites: Bool {
         actions.contains { action in
-            if case .openWebsite(let url) = action.draft {
+            if case .openWebsite(let url, _) = action.draft {
                 return !OpenWebsiteAction.isAbsoluteHTTPURL(url)
             }
             return false
@@ -165,6 +165,11 @@ public struct ComposerDocument: Sendable {
         }
     }
 
+    public mutating func setWebsiteBrowser(id: UUID, browser: ResourceReference?) {
+        guard case .openWebsite(let url, _) = action(id: id)?.draft else { return }
+        updateAction(id: id, draft: .openWebsite(url: url, browser: browser))
+    }
+
     public mutating func moveActionUp(id: UUID) {
         guard let position = actionPosition(of: id), position > 0 else { return }
         recordHistory()
@@ -205,9 +210,9 @@ public struct ComposerDocument: Sendable {
             case .openApplication(_, let resolved):
                 guard let resolved else { return nil }
                 result.append(.openApplication(OpenApplicationAction(application: resolved)))
-            case .openWebsite(let url):
+            case .openWebsite(let url, let browser):
                 guard OpenWebsiteAction.isAbsoluteHTTPURL(url) else { return nil }
-                result.append(.openWebsite(OpenWebsiteAction(url: url)))
+                result.append(.openWebsite(OpenWebsiteAction(url: url, browser: browser)))
             case .arrangeWindow(_, let resolved, let preset, let display):
                 guard let resolved else { return nil }
                 result.append(.arrangeWindow(ArrangeWindowAction(application: resolved, preset: preset, display: display)))
@@ -274,7 +279,7 @@ public struct ComposerDocument: Sendable {
                 for name in clause.resourceNames {
                     let draft: ComposerActionDraft
                     if ResourceNameHeuristics.isWebsite(name) {
-                        draft = .openWebsite(url: ResourceNameHeuristics.normalizedWebsiteURL(name))
+                        draft = .openWebsite(url: ResourceNameHeuristics.normalizedWebsiteURL(name), browser: nil)
                     } else {
                         draft = .openApplication(name: name, resolved: nil)
                     }
@@ -345,9 +350,9 @@ public struct ComposerDocument: Sendable {
         case (.showNotification(let title, let message), .showNotification):
             return .showNotification(title: title, message: message)
 
-        case (.openWebsite(let oldURL), .openWebsite(let newURL)):
+        case (.openWebsite(let oldURL, let browser), .openWebsite(let newURL, _)):
             if oldURL.caseInsensitiveCompare(newURL) == .orderedSame {
-                return .openWebsite(url: oldURL)
+                return .openWebsite(url: oldURL, browser: browser)
             }
             return new
 
@@ -395,7 +400,7 @@ public struct ComposerDocument: Sendable {
         switch draft {
         case .openApplication(let name, _):
             return "Open \(name)"
-        case .openWebsite(let url):
+        case .openWebsite(let url, _):
             return "Open \(url)"
         case .arrangeWindow(let name, _, let preset, _):
             switch preset {

@@ -18,11 +18,11 @@ struct ArrangeWindowExecutor: ActionExecutor {
             )
         }
 
-        return await MainActor.run { arrange(configuration) }
+        return await arrange(configuration)
     }
 
     @MainActor
-    private func arrange(_ configuration: ArrangeWindowAction) -> ActionOutcome {
+    private func arrange(_ configuration: ArrangeWindowAction) async -> ActionOutcome {
         let bundleIdentifier = configuration.application.identifier
         let label = configuration.application.label
 
@@ -32,8 +32,8 @@ struct ArrangeWindowExecutor: ActionExecutor {
 
         let axApplication = AXUIElementCreateApplication(running.processIdentifier)
 
-        guard let window = targetWindow(of: axApplication) else {
-            return .failed(ActionFailure(message: "No unambiguous window found for \(label)."))
+        guard let window = await waitForWindow(of: axApplication) else {
+            return .failed(ActionFailure(message: "No unambiguous window found for \(label). Make sure it is open and has a visible window."))
         }
 
         guard let current = frame(of: window) else {
@@ -66,6 +66,20 @@ struct ArrangeWindowExecutor: ActionExecutor {
         return matches
             ? .succeeded
             : .failed(ActionFailure(message: "The \(label) window did not reach the requested position."))
+    }
+
+    @MainActor
+    private func waitForWindow(of axApplication: AXUIElement, timeout: TimeInterval = 8) async -> AXUIElement? {
+        let deadline = Date().addingTimeInterval(timeout)
+        while true {
+            if let window = targetWindow(of: axApplication) {
+                return window
+            }
+            if Date() >= deadline {
+                return nil
+            }
+            try? await Task.sleep(for: .milliseconds(200))
+        }
     }
 
     @MainActor

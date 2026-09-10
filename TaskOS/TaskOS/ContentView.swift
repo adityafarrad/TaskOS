@@ -8,6 +8,7 @@ struct ContentView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 header
+                nameField
                 commandField
                 suggestionsSection
                 unresolvedNotice
@@ -15,6 +16,7 @@ struct ContentView: View {
                 addMenu
                 reviewSection
                 librarySection
+                historySection
                 resultSection
             }
             .padding()
@@ -30,6 +32,15 @@ struct ContentView: View {
             Text("Type what you want your Mac to do, then review and test it.")
                 .foregroundStyle(.secondary)
         }
+    }
+
+    private var nameField: some View {
+        TextField(
+            "Workflow name",
+            text: Binding(get: { model.draftName }, set: { model.updateName($0) })
+        )
+        .textFieldStyle(.roundedBorder)
+        .frame(maxWidth: 320)
     }
 
     private var commandField: some View {
@@ -116,7 +127,7 @@ struct ContentView: View {
 
     private var addMenu: some View {
         Menu("Add action") {
-            Button("Open a website") { model.add(.openWebsite(url: "https://")) }
+            Button("Open a website") { model.add(.openWebsite(url: "https://", browser: nil)) }
             Button("Arrange a window") {
                 model.add(.arrangeWindow(name: "", resolved: nil, preset: .leftHalf, display: .current))
             }
@@ -188,10 +199,48 @@ struct ContentView: View {
                     Text(workflow.updatedAt.formatted(date: .abbreviated, time: .shortened))
                         .font(.caption)
                         .foregroundStyle(.secondary)
+                    Button("Edit") { model.loadForEditing(workflow) }
                     Button("Run") { model.runSaved(workflow) }
                     Button { model.deleteSaved(workflow) } label: { Image(systemName: "trash") }
                 }
             }
+        }
+    }
+
+    private var historySection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("History")
+                .font(.headline)
+
+            if model.history.isEmpty {
+                Text("No runs yet.")
+                    .foregroundStyle(.secondary)
+            }
+
+            ForEach(Array(model.history.prefix(10).enumerated()), id: \.offset) { _, run in
+                HStack(spacing: 12) {
+                    Text(run.automationName)
+                    Text(run.status.rawValue)
+                        .font(.caption)
+                        .foregroundStyle(runStatusColor(run.status))
+                    Spacer()
+                    Text("\(run.actions.count) steps")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Text(run.startedAt.formatted(date: .abbreviated, time: .shortened))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+    }
+
+    private func runStatusColor(_ status: RunStatus) -> Color {
+        switch status {
+        case .succeeded: return .green
+        case .failed: return .red
+        case .timedOut: return .orange
+        case .cancelled: return .gray
         }
     }
 
@@ -269,15 +318,28 @@ private struct ActionCard: View {
                 .frame(width: 220)
             }
 
-        case .openWebsite(let websiteURL):
+        case .openWebsite(let websiteURL, let websiteBrowser):
             VStack(alignment: .leading, spacing: 4) {
-                TextField(
-                    "https://example.com",
-                    text: Binding(
-                        get: { websiteURL },
-                        set: { model.updateWebsiteURL(id: action.id, url: $0) }
+                HStack(spacing: 8) {
+                    TextField(
+                        "https://example.com",
+                        text: Binding(
+                            get: { websiteURL },
+                            set: { model.updateWebsiteURL(id: action.id, url: $0) }
+                        )
                     )
-                )
+                    Picker("Browser", selection: websiteBrowserSelection) {
+                        Text("Default browser").tag("")
+                        ForEach(model.applications, id: \.bundleIdentifier) { application in
+                            Text(application.displayName).tag(application.bundleIdentifier)
+                        }
+                    }
+                    .labelsHidden()
+                    .frame(width: 200)
+                }
+                Text(websiteBrowser.map { "Opens in \($0.label)" } ?? "Opens in your default browser")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
                 if !OpenWebsiteAction.isAbsoluteHTTPURL(websiteURL) {
                     Label("Enter an absolute http or https address.", systemImage: "exclamationmark.triangle")
                         .font(.caption)
@@ -380,6 +442,27 @@ private struct ActionCard: View {
                     return
                 }
                 model.resolve(id: action.id, application: application)
+            }
+        )
+    }
+
+    private var websiteBrowserSelection: Binding<String> {
+        Binding(
+            get: {
+                if case .openWebsite(_, let browser) = action.draft {
+                    return browser?.identifier ?? ""
+                }
+                return ""
+            },
+            set: { newValue in
+                if newValue.isEmpty {
+                    model.updateWebsiteBrowser(id: action.id, browser: nil)
+                } else if let application = model.applications.first(where: { $0.bundleIdentifier == newValue }) {
+                    model.updateWebsiteBrowser(
+                        id: action.id,
+                        browser: .application(bundleIdentifier: application.bundleIdentifier, label: application.displayName)
+                    )
+                }
             }
         )
     }

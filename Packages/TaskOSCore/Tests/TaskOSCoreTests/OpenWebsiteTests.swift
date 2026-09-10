@@ -35,7 +35,7 @@ struct OpenWebsiteTests {
         document.setText("open apple.com")
 
         #expect(document.actions.count == 1)
-        guard case .openWebsite(let url) = document.actions[0].draft else {
+        guard case .openWebsite(let url, _) = document.actions[0].draft else {
             Issue.record("Expected a website draft")
             return
         }
@@ -46,11 +46,11 @@ struct OpenWebsiteTests {
 
     @Test func placeholderWebsiteBlocksUntilValid() {
         var document = ComposerDocument()
-        document.addAction(.openWebsite(url: "https://"))
+        document.addAction(.openWebsite(url: "https://", browser: nil))
 
         #expect(document.hasUnresolvedWebsites)
 
-        document.updateAction(id: document.actions[0].id, draft: .openWebsite(url: "https://example.com"))
+        document.updateAction(id: document.actions[0].id, draft: .openWebsite(url: "https://example.com", browser: nil))
 
         #expect(!document.hasUnresolvedWebsites)
     }
@@ -79,5 +79,43 @@ struct OpenWebsiteTests {
     @Test func emptyFieldSuggestsWebsite() {
         let suggestions = SuggestionEngine().suggestions(for: "")
         #expect(suggestions.contains { $0.id == "action.openWebsite" })
+    }
+
+    @Test func selectedBrowserFlowsIntoResolvedAction() {
+        var document = ComposerDocument()
+        document.setText("open apple.com")
+
+        document.setWebsiteBrowser(
+            id: document.actions[0].id,
+            browser: .application(bundleIdentifier: "com.apple.Safari", label: "Safari")
+        )
+
+        let actions = document.resolvedActions()
+        #expect(actions?.count == 1)
+        guard case .openWebsite(let action)? = actions?.first else {
+            Issue.record("Expected an open website action")
+            return
+        }
+        #expect(action.browser?.identifier == "com.apple.Safari")
+    }
+
+    @Test func previewReportsMissingBrowser() async {
+        let preparer = CreationPreparer(catalog: EmptyCatalog(), permissions: GrantedPermissions())
+        let definition = AutomationDefinition(
+            name: "Site",
+            trigger: .manual(ManualTrigger()),
+            actions: [
+                .openWebsite(
+                    OpenWebsiteAction(
+                        url: "https://example.com",
+                        browser: .application(bundleIdentifier: "com.brave.Browser", label: "Brave")
+                    )
+                )
+            ]
+        )
+
+        let preview = await preparer.prepare(definition)
+        #expect(!preview.isValid)
+        #expect(preview.actions[0].status == .missingResource)
     }
 }

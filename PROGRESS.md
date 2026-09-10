@@ -25,7 +25,7 @@ compressed into implementation plus per-increment physical smoke checks.
 | 1.1 | Build the typed domain and registry | done | Increments B1 + D1 | 4-capability catalog, validation, versioned coding, and persistence scaffolding complete; remaining capabilities continue in 2.2 |
 | 1.2 | Build the shared composer | in progress | Increments C1-C4 | Parser, suggestions, document, and composer UI done; templates, autosave persistence, keyboard/VoiceOver sign-off pending |
 | 1.3 | Build preparation, preview, and execution | done | Increments B2 + B3 | Effect-free preview, resource resolution, permissions, revision-bound approval, sequential execution with timeouts and cancellation |
-| 1.4 | Prove the first complete workflow | in progress | Increments E1-E2 | Open Website and Arrange Window + Accessibility done; full canonical journey pending |
+| 1.4 | Prove the first complete workflow | done | Increments E1-E3 | Canonical journey verified end to end in Release; Open Website + Arrange Window + Accessibility + history + edit/reuse |
 | 1.5 | Complete the basic product shell | in progress | Increment D1 | Library with save/run/delete and persistence; search/rename/duplicate/menu-bar/hotkey/settings pending |
 
 ### Phase 2 — Complete everyday workflows and automatic execution
@@ -502,3 +502,51 @@ compressed into implementation plus per-increment physical smoke checks.
     independently interruptible.
 - Next eligible work package: E3 — run the full canonical journey (Safari left,
   Notes right) end to end and capture the plan 1.4 acceptance evidence.
+
+### Increment E3 — Canonical journey (plan 1.4 completion)
+
+- Status: done
+- Behavior delivered: the plan 1.4 canonical workspace journey works end to end
+  in a Release build on this Mac: create (text and cards), preview, grant
+  Accessibility, test, save, edit (new revision), inspect history, quit and
+  relaunch, and run the restored workflow.
+- Fixes made during the journey:
+  - Open Website: the card now selects a browser (default or a specific app);
+    the selected browser is carried in the resolved action and the preview
+    resolves its availability. Previously the site always opened in the system
+    default browser.
+  - Arrange Window: the executor now waits (up to 8s) for the target app's
+    window to exist before positioning, so opening an app and arranging it in
+    the same run no longer fails on window availability.
+- Interfaces changed: `ComposerActionDraft.openWebsite` now carries a browser;
+  `ComposerDocument.setWebsiteBrowser`; `CreationPreparer` resolves the selected
+  browser; `ArrangeWindowExecutor` gained a bounded window-availability wait.
+- Tests performed:
+  - `swift test --package-path Packages/TaskOSCore` — 102 tests, 19 suites,
+    pass. New coverage: browser flows into the resolved action, and preview
+    reports a missing selected browser.
+  - App tests (`xcodebuild ... test -only-testing:TaskOSTests`) — PASS
+    (includes SwiftData workflow and run-history repositories).
+  - Debug build — BUILD SUCCEEDED.
+  - Release build — BUILD SUCCEEDED.
+- Physical checks (on this Mac, macOS 26 / Apple silicon):
+  - Canonical command `open Safari and Notes and open apple.com and put Safari
+    on the left half and put Notes on the right half` with the website browser
+    set to Safari: apple.com opened in Safari; Safari moved left; Notes moved
+    right. Save, edit-and-revise, history, quit/relaunch, and run-from-library
+    all verified. User-confirmed.
+- Acceptance against plan 1.4:
+  - Entire path works in Release on a physical Mac — yes.
+  - Saved execution does not invoke the parser — yes (runs the structured
+    definition).
+  - Application and window behavior verified on real apps — yes.
+  - Missing permission, unavailable application, and ambiguous window produce
+    useful recovery text — yes.
+- Remaining defects / gaps:
+  - Browser selection is card-only; retyping the command text resets it to the
+    default browser.
+  - Multi-window ambiguity fails with a message but has no disambiguation UI.
+  - A specific display is modeled but not selectable in the UI.
+- Next eligible work package: plan 1.5 remainder (library search/rename/
+  duplicate, menu-bar runtime, settings, interrupted-run recovery) or the plan
+  1.2 remainder (templates, autosave, keyboard/VoiceOver).

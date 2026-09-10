@@ -52,13 +52,27 @@ public struct CreationPreparer: Sendable {
                 }
 
             case .openWebsite(let configuration):
-                if OpenWebsiteAction.isAbsoluteHTTPURL(configuration.url) {
+                if let browser = configuration.browser,
+                   await catalog.application(bundleIdentifier: browser.identifier) == nil {
                     actionPreviews.append(
                         ActionPreview(
                             index: index,
                             actionID: .openWebsite,
                             title: title(for: .openWebsite),
                             targetLabel: configuration.url,
+                            status: .missingResource,
+                            detail: "Browser not installed."
+                        )
+                    )
+                    issues.append(.error("Action \(index + 1): \(browser.label) is not available on this Mac."))
+                } else if OpenWebsiteAction.isAbsoluteHTTPURL(configuration.url) {
+                    let target = configuration.browser.map { "\(configuration.url) in \($0.label)" } ?? configuration.url
+                    actionPreviews.append(
+                        ActionPreview(
+                            index: index,
+                            actionID: .openWebsite,
+                            title: title(for: .openWebsite),
+                            targetLabel: target,
                             status: .ready,
                             detail: nil
                         )

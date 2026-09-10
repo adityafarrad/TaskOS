@@ -64,3 +64,21 @@ actor InMemoryAutomationRepository: AutomationRepository {
         storage[id] = nil
     }
 }
+
+actor InMemoryRunHistoryRepository: RunHistoryRepository {
+    private var storage: [RunRecord] = []
+
+    init() {}
+
+    func recentRuns(limit: Int) async throws -> [RunRecord] {
+        Array(storage.sorted { $0.startedAt > $1.startedAt }.prefix(limit))
+    }
+
+    func append(_ record: RunRecord) async throws {
+        storage.append(record)
+    }
+
+    func clear() async throws {
+        storage.removeAll()
+    }
+}
