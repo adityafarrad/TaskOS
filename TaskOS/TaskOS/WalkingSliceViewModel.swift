@@ -19,6 +19,8 @@ final class ComposerViewModel {
     private(set) var stage: Stage = .composing
     private(set) var approvedRevision: WorkflowRevision?
     private(set) var notice: String?
+    private(set) var savedWorkflows: [SavedWorkflow] = []
+    private(set) var libraryError: String?
 
     private let composition: AppComposition
     private let draftID = AutomationID()
@@ -69,6 +71,7 @@ final class ComposerViewModel {
     func loadApplicationsIfNeeded() {
         guard !applicationsLoaded else { return }
         applicationsLoaded = true
+        loadLibrary()
         Task { [weak self] in
             guard let self else { return }
             let loaded = await composition.loadApplications()
@@ -170,6 +173,56 @@ final class ComposerViewModel {
             guard let self else { return }
             let record = await composition.runner.run(definition)
             self.stage = .finished(record)
+        }
+    }
+
+    func loadLibrary() {
+        Task { [weak self] in
+            guard let self else { return }
+            do {
+                self.savedWorkflows = try await self.composition.repository.loadAll()
+                self.libraryError = nil
+            } catch {
+                self.libraryError = "Could not load saved workflows: \(error.localizedDescription)"
+            }
+        }
+    }
+
+    func save() {
+        notice = nil
+        guard let definition = document.makeDefinition(name: "Untitled", id: draftID, revision: document.revision) else {
+            notice = "Finish resolving every step before saving."
+            return
+        }
+
+        let workflow = SavedWorkflow(definition: definition, isEnabled: false)
+
+        Task { [weak self] in
+            guard let self else { return }
+            do {
+                try await self.composition.repository.save(workflow)
+                self.notice = "Saved."
+                self.loadLibrary()
+            } catch {
+                self.notice = "Could not save: \(error.localizedDescription)"
+            }
+        }
+    }
+
+    func runSaved(_ workflow: SavedWorkflow) {
+        stage = .running
+        Task { [weak self] in
+            guard let self else { return }
+            let record = await self.composition.runner.run(workflow.definition)
+            self.stage = .finished(record)
+        }
+    }
+
+    func deleteSaved(_ workflow: SavedWorkflow) {
+        Task { [weak self] in
+            guard let self else { return }
+            try? await self.composition.repository.delete(id: workflow.id)
+            self.loadLibrary()
         }
     }
 

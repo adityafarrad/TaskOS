@@ -14,6 +14,7 @@ struct ContentView: View {
                 stepsSection
                 addMenu
                 reviewSection
+                librarySection
                 resultSection
             }
             .padding()
@@ -130,6 +131,9 @@ struct ContentView: View {
                 Button(model.isBusy ? "Previewing..." : "Preview") { model.prepare() }
                     .disabled(!model.canPrepare || model.isBusy)
 
+                Button("Save") { model.save() }
+                    .disabled(!model.canPrepare)
+
                 Button("Test now") { model.test() }
                     .disabled(!model.canTest)
 
@@ -146,6 +150,39 @@ struct ContentView: View {
 
             if let preview = model.preview {
                 PreviewBox(preview: preview)
+            }
+        }
+    }
+
+    private var librarySection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Library")
+                .font(.headline)
+
+            if let error = model.libraryError {
+                Text(error)
+                    .font(.caption)
+                    .foregroundStyle(.red)
+            }
+
+            if model.savedWorkflows.isEmpty {
+                Text("No saved workflows yet.")
+                    .foregroundStyle(.secondary)
+            }
+
+            ForEach(model.savedWorkflows) { workflow in
+                HStack(spacing: 12) {
+                    Text(workflow.name)
+                    Text(workflow.definition.actions.count == 1 ? "1 step" : "\(workflow.definition.actions.count) steps")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    Text(workflow.updatedAt.formatted(date: .abbreviated, time: .shortened))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Button("Run") { model.runSaved(workflow) }
+                    Button { model.deleteSaved(workflow) } label: { Image(systemName: "trash") }
+                }
             }
         }
     }

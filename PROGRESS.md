@@ -22,11 +22,11 @@ compressed into implementation plus per-increment physical smoke checks.
 
 | ID | Work package | Status | Evidence | Notes |
 |---|---|---|---|---|
-| 1.1 | Build the typed domain and registry | in progress | Increment B1 | Typed domain + registry + coding for 4 capabilities; persistence layer pending |
+| 1.1 | Build the typed domain and registry | done | Increments B1 + D1 | 4-capability catalog, validation, versioned coding, and persistence scaffolding complete; remaining capabilities continue in 2.2 |
 | 1.2 | Build the shared composer | in progress | Increments C1-C4 | Parser, suggestions, document, and composer UI done; templates, autosave persistence, keyboard/VoiceOver sign-off pending |
 | 1.3 | Build preparation, preview, and execution | done | Increments B2 + B3 | Effect-free preview, resource resolution, permissions, revision-bound approval, sequential execution with timeouts and cancellation |
 | 1.4 | Prove the first complete workflow | not started | — | First reforecast milestone |
-| 1.5 | Complete the basic product shell | not started | — | |
+| 1.5 | Complete the basic product shell | in progress | Increment D1 | Library with save/run/delete and persistence; search/rename/duplicate/menu-bar/hotkey/settings pending |
 
 ### Phase 2 — Complete everyday workflows and automatic execution
 
@@ -322,3 +322,44 @@ compressed into implementation plus per-increment physical smoke checks.
   plan 1.2 remainder (templates, autosave, keyboard/VoiceOver). Recommended
   next: plan 1.4 to prove the full saved-and-reopened journey, then return for
   templates/autosave.
+
+### Increment D1 — Persistence and workflow library (plan 1.5 start, plan 2.11 partial)
+
+- Status: done
+- Behavior delivered: the first complete saved-and-reopened journey. A composed
+  workflow can be saved, appears in a Library, survives quitting and relaunching
+  the app, can be run from the Library, and can be deleted.
+- Interfaces changed: added `SavedWorkflow`, the `AutomationRepository` protocol,
+  and `FileAutomationRepository` (actor). `AppComposition` now owns a repository
+  rooted at Application Support/TaskOS/Workflows. `ComposerViewModel` gained
+  library load/save/run/delete; `ContentView` gained a Save button and a Library
+  section.
+- Tests performed:
+  - `swift test --package-path Packages/TaskOSCore` — 72 tests, 14 suites,
+    pass. New coverage: save/load round-trip, same-identity update (no
+    duplicate), delete, newest-first ordering, and rejection of a future schema
+    version.
+  - `xcodebuild ... Debug build` — BUILD SUCCEEDED.
+  - `xcodebuild ... Release build` — BUILD SUCCEEDED.
+- Physical checks (on this Mac, macOS 26 / Apple silicon):
+  - Composed a workflow, previewed, and saved it; it appeared in the Library.
+  - Quit the app, relaunched, and the workflow was still listed.
+  - Ran it from the Library; Safari opened and the notification posted.
+  - Deleted it; it left the Library. User-confirmed.
+- Deliberate deviation: the plan names SwiftData behind the repository
+  interface (section 2.11). This slice instead implements a versioned, file-based
+  JSON repository behind the same `AutomationRepository` interface so it can be
+  unit-tested in `TaskOSCore`. SwiftData remains the intended target and should
+  replace `FileAutomationRepository` behind the unchanged interface.
+- Remaining defects / gaps:
+  - Library has no search, rename, duplicate, or edit-in-composer yet; each app
+    session currently reuses one draft identity, so saving overwrites rather than
+    creating distinct workflows.
+  - No menu-bar runtime, global hotkey, onboarding, settings, or interrupted-run
+    recovery yet (plan 1.5 remainder).
+  - The repository throws on a malformed file rather than isolating it; a
+    per-record recovery path is still needed.
+  - Draft autosave is not persisted; only saved workflows are.
+- Next eligible work package: plan 1.4 (drive the canonical workspace journey on
+  this persisted, reviewed test path) or continue plan 1.5 (library management
+  and menu-bar runtime).
