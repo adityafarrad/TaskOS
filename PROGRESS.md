@@ -23,7 +23,7 @@ compressed into implementation plus per-increment physical smoke checks.
 | ID | Work package | Status | Evidence | Notes |
 |---|---|---|---|---|
 | 1.1 | Build the typed domain and registry | in progress | Increment B1 | Typed domain + registry + coding for 4 capabilities; persistence layer pending |
-| 1.2 | Build the shared composer | in progress | Increment C1 | Grammar, parser, source spans, canonical phrases done; suggestions + document/UI pending |
+| 1.2 | Build the shared composer | in progress | Increments C1-C2 | Grammar, parser, spans, canonical phrases, contextual suggestion engine done; document/UI pending |
 | 1.3 | Build preparation, preview, and execution | done | Increments B2 + B3 | Effect-free preview, resource resolution, permissions, revision-bound approval, sequential execution with timeouts and cancellation |
 | 1.4 | Prove the first complete workflow | not started | — | First reforecast milestone |
 | 1.5 | Complete the basic product shell | not started | — | |
@@ -221,3 +221,36 @@ compressed into implementation plus per-increment physical smoke checks.
 - Next eligible work package: plan 1.2 remainder, starting with the contextual
   suggestion engine (Core), then the composer document with text/card sync and
   native text editing.
+
+### Increment C2 — Contextual suggestion engine (plan 1.2, partial)
+
+- Status: done
+- Behavior delivered: deterministic, offline completion over the supported
+  catalog and locally available applications. Suggestions adapt to the current
+  context (empty field, `open`, `open <prefix>`, `wait`, `show`/`show a`) and
+  are ranked grammar-position first, then exact, prefix, alias, and typo
+  matches, with alphabetical tie-break and a visible-list limit of eight.
+  Typo-tolerant results only surface as suggestions and are never selected
+  automatically.
+- Interfaces changed: added `Suggestion`, `SuggestionMatch`, and
+  `SuggestionEngine`. Installed applications are injected as
+  `[ApplicationResource]`, so the engine stays pure and deterministic; the app
+  supplies them from `ResourceCatalog`.
+- Tests performed:
+  - `swift test --package-path Packages/TaskOSCore` — 57 tests, 12 suites,
+    pass. New coverage: empty-field starters, `open` action + application
+    suggestions, prefix match, exact match ranking, typo discovery, short
+    prefixes excluded from typo search, eight-item limit, alphabetical
+    tie-break, wait and notification contexts, and no suggestions for a
+    completed `notify`.
+  - `xcodebuild ... Debug build` — BUILD SUCCEEDED.
+- Physical checks: none (pure Core; engine not yet wired to a UI).
+- Remaining defects / gaps:
+  - Engine uses the full installed-application list; incremental refresh and
+    stale-result protection will be handled when wired to the live catalog.
+  - No trigger or template suggestions yet (those capabilities arrive with
+    Phase 2 and 2.5).
+  - Plan section 2.2 keys/labels are not yet exposed for accessibility; that
+    lands with the composer UI.
+- Next eligible work package: plan 1.2 composer document with text/card sync,
+  native text editing, resource selection, undo/redo, and draft autosave.
