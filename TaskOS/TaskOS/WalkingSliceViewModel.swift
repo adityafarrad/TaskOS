@@ -15,6 +15,8 @@ final class ComposerViewModel {
 
     private(set) var document = ComposerDocument()
     private(set) var suggestions: [Suggestion] = []
+    private(set) var highlightedSuggestion = 0
+    private(set) var suggestionsDismissed = false
     private(set) var applications: [ApplicationResource] = []
     private(set) var stage: Stage = .composing
     private(set) var approvedRevision: WorkflowRevision?
@@ -528,6 +530,28 @@ final class ComposerViewModel {
 
     private func refreshSuggestions() {
         suggestions = composition.suggestions.suggestions(for: document.text, applications: applications)
+        highlightedSuggestion = 0
+        suggestionsDismissed = false
+    }
+
+    var visibleSuggestions: [Suggestion] {
+        suggestionsDismissed ? [] : suggestions
+    }
+
+    func moveHighlight(by delta: Int) {
+        guard !suggestions.isEmpty else { return }
+        suggestionsDismissed = false
+        let count = suggestions.count
+        highlightedSuggestion = ((highlightedSuggestion + delta) % count + count) % count
+    }
+
+    func acceptHighlighted() {
+        guard !suggestionsDismissed, suggestions.indices.contains(highlightedSuggestion) else { return }
+        accept(suggestions[highlightedSuggestion])
+    }
+
+    func dismissSuggestions() {
+        suggestionsDismissed = true
     }
 
     private func autoResolveApplications() {

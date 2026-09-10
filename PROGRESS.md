@@ -23,7 +23,7 @@ compressed into implementation plus per-increment physical smoke checks.
 | ID | Work package | Status | Evidence | Notes |
 |---|---|---|---|---|
 | 1.1 | Build the typed domain and registry | done | Increments B1 + D1 | 4-capability catalog, validation, versioned coding, and persistence scaffolding complete; remaining capabilities continue in 2.2 |
-| 1.2 | Build the shared composer | in progress | C1-C4 + G1 | Parser, suggestions, document, UI, and draft autosave done; keyboard/VoiceOver pending; templates scheduled for Phase 2.5 |
+| 1.2 | Build the shared composer | done | C1-C4 + G1-G2 | Parser, suggestions, document, UI, draft autosave, keyboard + VoiceOver; 12 templates scheduled for Phase 2.5 |
 | 1.3 | Build preparation, preview, and execution | done | Increments B2 + B3 | Effect-free preview, resource resolution, permissions, revision-bound approval, sequential execution with timeouts and cancellation |
 | 1.4 | Prove the first complete workflow | done | Increments E1-E3 | Canonical journey verified end to end in Release; Open Website + Arrange Window + Accessibility + history + edit/reuse |
 | 1.5 | Complete the basic product shell | done | D1 + F1-F5 | Library, menu-bar runtime, settings, interrupted-run recovery, onboarding; global hotkey deferred to Phase 2 by user decision |
@@ -712,3 +712,29 @@ compressed into implementation plus per-increment physical smoke checks.
   Templates are scheduled for Phase 2.5.
 - Next eligible work package: G2 — keyboard navigation + VoiceOver for the
   composer suggestions.
+
+### Increment G2 — Suggestion keyboard navigation + VoiceOver (plan 1.2 completion)
+
+- Status: done
+- Behavior delivered: up/down move a highlighted suggestion, Enter accepts the
+  highlighted suggestion, and Escape dismisses suggestions without clearing the
+  command. Suggestions carry accessibility labels announcing title, category,
+  and whether more input is required; the command field has a label.
+- Interfaces changed: `ComposerViewModel` gained `highlightedSuggestion`,
+  `suggestionsDismissed`, `visibleSuggestions`, `moveHighlight`,
+  `acceptHighlighted`, and `dismissSuggestions`; `ContentView` added key-press
+  handling and accessibility labels.
+- Tests performed:
+  - `swift test --package-path Packages/TaskOSCore` — 106 tests, 20 suites, pass.
+  - App tests (`xcodebuild ... test -only-testing:TaskOSTests`) — PASS.
+  - Debug build — BUILD SUCCEEDED.
+  - Release build — BUILD SUCCEEDED.
+- Physical checks (on this Mac, macOS 26 / Apple silicon): arrows moved the
+  highlight, Enter accepted, Escape dismissed, and VoiceOver announced the
+  suggestion title/category/parameter state. User-confirmed.
+- Plan 1.2 status: complete. The twelve curated templates remain scheduled for
+  Phase 2.5 per the plan, not this phase.
+- Next eligible work package: Phase 1 is now complete (1.1-1.5). Next is the
+  Phase 1 exit gate (full-package build/test and Release journey) before Phase 2,
+  or begin Phase 2.1 (scheduling and runtime admission). Recommended: run the
+  Phase 1 gate first.

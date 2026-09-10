@@ -62,6 +62,26 @@ struct ContentView: View {
             )
             .textFieldStyle(.roundedBorder)
             .lineLimit(2...4)
+            .accessibilityLabel("Automation command")
+            .onKeyPress(.upArrow) {
+                model.moveHighlight(by: -1)
+                return .handled
+            }
+            .onKeyPress(.downArrow) {
+                model.moveHighlight(by: 1)
+                return .handled
+            }
+            .onKeyPress(.return) {
+                if !model.visibleSuggestions.isEmpty {
+                    model.acceptHighlighted()
+                    return .handled
+                }
+                return .ignored
+            }
+            .onKeyPress(.escape) {
+                model.dismissSuggestions()
+                return .handled
+            }
 
             HStack(spacing: 8) {
                 Button("Undo") { model.undo() }
@@ -74,13 +94,13 @@ struct ContentView: View {
 
     @ViewBuilder
     private var suggestionsSection: some View {
-        if !model.suggestions.isEmpty {
+        if !model.visibleSuggestions.isEmpty {
             VStack(alignment: .leading, spacing: 2) {
                 Text("Suggestions")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
 
-                ForEach(model.suggestions, id: \.id) { suggestion in
+                ForEach(Array(model.visibleSuggestions.enumerated()), id: \.element.id) { index, suggestion in
                     Button {
                         model.accept(suggestion)
                     } label: {
@@ -100,11 +120,25 @@ struct ContentView: View {
                     }
                     .buttonStyle(.plain)
                     .padding(.vertical, 2)
+                    .background(
+                        index == model.highlightedSuggestion
+                            ? Color.accentColor.opacity(0.2)
+                            : Color.clear
+                    )
+                    .accessibilityLabel(suggestionAccessibilityLabel(suggestion))
                 }
             }
             .padding(8)
             .background(RoundedRectangle(cornerRadius: 6).fill(Color.gray.opacity(0.08)))
         }
+    }
+
+    private func suggestionAccessibilityLabel(_ suggestion: Suggestion) -> String {
+        var parts = ["\(suggestion.title), \(suggestion.category.rawValue)"]
+        if suggestion.requiresParameter {
+            parts.append("needs more input")
+        }
+        return parts.joined(separator: ", ")
     }
 
     @ViewBuilder
