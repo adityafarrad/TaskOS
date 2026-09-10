@@ -21,7 +21,8 @@ public struct AutomationDraft: Codable, Hashable, Sendable {
 
     public func resolvedDefinition(
         id: AutomationID = AutomationID(),
-        revision: WorkflowRevision = WorkflowRevision(1)
+        revision: WorkflowRevision = WorkflowRevision(1),
+        relativeTo now: Date? = nil
     ) -> AutomationDefinition? {
         let definition = AutomationDefinition(
             id: id,
@@ -30,6 +31,6 @@ public struct AutomationDraft: Codable, Hashable, Sendable {
             trigger: effectiveTrigger,
             actions: actions
         )
-        return definition.validate().isValid ? definition : nil
+        return definition.validate(relativeTo: now).isValid ? definition : nil
     }
 }

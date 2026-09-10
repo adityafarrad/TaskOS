@@ -20,7 +20,42 @@ public enum CanonicalPhrase {
         switch trigger {
         case .manual:
             return "Manually"
+        case .schedule(let schedule):
+            return text(for: schedule)
         }
+    }
+
+    public static func text(for schedule: ScheduleTrigger) -> String {
+        switch schedule {
+        case .oneTime(let date):
+            return "Once on \(shortDateTime(date))"
+        case .daily(let hour, let minute):
+            return "Every day at \(clockText(hour: hour, minute: minute))"
+        case .weekdays(let days, let hour, let minute):
+            let names = days.sorted { $0.rawValue < $1.rawValue }.map(\.displayName).joined(separator: ", ")
+            return "Every \(names) at \(clockText(hour: hour, minute: minute))"
+        case .interval(let every, _):
+            return "Every \(intervalText(every))"
+        }
+    }
+
+    public static func clockText(hour: Int, minute: Int) -> String {
+        String(format: "%02d:%02d", hour, minute)
+    }
+
+    private static func intervalText(_ seconds: TimeInterval) -> String {
+        let minutes = seconds / 60
+        if minutes >= 60, minutes.truncatingRemainder(dividingBy: 60) == 0 {
+            return "\(Int(minutes / 60)) hours"
+        }
+        return "\(Int(minutes)) minutes"
+    }
+
+    private static func shortDateTime(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .medium
+        formatter.timeStyle = .short
+        return formatter.string(from: date)
     }
 
     public static func command(for actions: [ActionConfiguration]) -> String {

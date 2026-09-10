@@ -43,9 +43,15 @@ public struct ValidationResult: Sendable {
 
 extension TriggerConfiguration {
     public func validate() -> ValidationResult {
+        validate(relativeTo: nil)
+    }
+
+    public func validate(relativeTo now: Date?) -> ValidationResult {
         switch self {
         case .manual:
             return .valid
+        case .schedule(let schedule):
+            return schedule.validate(relativeTo: now)
         }
     }
 }

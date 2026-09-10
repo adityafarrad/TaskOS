@@ -2,6 +2,7 @@ import Foundation
 
 public enum TriggerID: String, Codable, Sendable, CaseIterable, Hashable {
     case manual
+    case schedule
 
     public var stableID: String { rawValue }
 }

@@ -55,6 +55,10 @@ public struct CapabilityRegistry: Sendable {
                 title: "Manual",
                 summary: "Run the workflow from the app or menu bar."
             ),
+            .schedule: CapabilityDescriptor(
+                title: "Schedule",
+                summary: "Run once, daily, on selected weekdays, or on a fixed interval."
+            ),
         ],
         actions: [
             .openApplication: CapabilityDescriptor(

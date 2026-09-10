@@ -32,7 +32,7 @@ compressed into implementation plus per-increment physical smoke checks.
 
 | ID | Work package | Status | Evidence | Notes |
 |---|---|---|---|---|
-| 2.1 | Add scheduling and runtime admission | not started | — | |
+| 2.1 | Add scheduling and runtime admission | in progress | Increment H1 | Schedule model + next-occurrence calculations in Core; runtime admission + UI pending |
 | 2.2 | Finish app, window, and utility actions | not started | — | |
 | 2.3 | Add selected files and portable workflows | not started | — | |
 | 2.4 | Add event-triggered workflows | not started | — | |
@@ -762,3 +762,50 @@ the twelve curated templates (scheduled Phase 2.5) and global hotkey recording
 (Phase 2, with the KeyboardShortcuts package).
 
 Next eligible work package: 2.1 — scheduling and runtime admission.
+
+### Increment H1 — Schedule model and occurrence calculations (plan 2.1, partial; plan T3)
+
+- Status: done
+- Behavior delivered: the typed schedule trigger and deterministic
+  next-occurrence calculations that the runtime and editor will build on.
+  Supports one-time, daily, selected-weekday, and fixed-interval schedules;
+  computes the next three occurrences; follows the supplied time zone; skips a
+  nonexistent daylight-saving local time; uses the first occurrence of a
+  repeated daylight-saving local time; skips missed occurrences/backlog instead
+  of replaying them; and rejects past-due one-time schedules when validated
+  against a reference date.
+- Interfaces changed: added `Weekday`; added `ScheduleTrigger` (oneTime, daily,
+  weekdays, interval) with `validate()`/`validate(relativeTo:)`/`isPastDue`;
+  added `ScheduleCalculator` (calendar/time-zone injectable, `nextOccurrence`/
+  `nextOccurrences`). Added `TriggerID.schedule` and
+  `TriggerConfiguration.schedule(_:)` plus a `schedule` accessor.
+  `TriggerConfiguration.validate(relativeTo:)`, `AutomationDefinition.validate(
+  relativeTo:)`, and `AutomationDraft.resolvedDefinition(relativeTo:)` now carry
+  an optional reference date. Added a Schedule descriptor to
+  `CapabilityRegistry.standard` and canonical schedule phrases to
+  `CanonicalPhrase`.
+- Tests performed:
+  - `swift test --package-path Packages/TaskOSCore` — 124 tests, 21 suites, pass
+    (was 106/20; +18 schedule tests). New coverage: one-time future/past,
+    past-due validation relative to now, daily next-three ordering and
+    strictly-after behavior, daylight-saving gap skip (America/New_York,
+    2026-03-08 02:30 nonexistent), repeated-time first occurrence (2026-11-01
+    01:30 EDT then next day 01:30 EST), weekday selection, empty-weekday
+    rejection, interval anchor alignment, missed-interval backlog skip,
+    interval-before-anchor start, interval and time-of-day validation bounds,
+    time-zone following, trigger exposure, Codable round-trip, and reference-date
+    gating of a past-due definition.
+  - `xcodebuild ... Debug build` — BUILD SUCCEEDED.
+  - `xcodebuild ... Release build` — BUILD SUCCEEDED.
+- Physical checks: none (pure Core; no UI or runtime registration yet). This
+  increment makes no user-visible claim of its own.
+- Remaining defects / gaps:
+  - No runtime registration, admission queue, cooldown, deduplication,
+    pause/resume, or launch-at-login yet (plan 2.1 runtime half).
+  - No parser grammar, composer card, next-occurrence UI, or automatic-run
+    enablement yet (plan 2.1 UI half). `WillRunAutomatically` is still false.
+  - Interval schedules are anchored to an absolute start instant; interval
+    wall-clock/DST policy is deliberately not applied (fixed-duration interval).
+- Next eligible work package: 2.1 runtime half (Increment H2) — admission,
+  queue limits and expiration, duplicate suppression, cooldown, pause/resume,
+  cancellation, launch at login, and sleep/session readiness.

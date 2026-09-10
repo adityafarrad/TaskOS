@@ -51,13 +51,17 @@ public struct AutomationDefinition: Codable, Hashable, Sendable {
     }
 
     public func validate() -> ValidationResult {
+        validate(relativeTo: nil)
+    }
+
+    public func validate(relativeTo now: Date?) -> ValidationResult {
         var issues: [ValidationIssue] = []
 
         if name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             issues.append(.error("Workflow name is required."))
         }
 
-        issues.append(contentsOf: trigger.validate().issues)
+        issues.append(contentsOf: trigger.validate(relativeTo: now).issues)
 
         if actions.isEmpty {
             issues.append(.error("A workflow requires at least one action."))
