@@ -57,11 +57,29 @@ extension ActionConfiguration {
             return action.validate()
         case .openWebsite(let action):
             return action.validate()
+        case .arrangeWindow(let action):
+            return action.validate()
         case .wait(let action):
             return action.validate()
         case .showNotification(let action):
             return action.validate()
         }
+    }
+}
+
+extension ArrangeWindowAction {
+    public func validate() -> ValidationResult {
+        var issues: [ValidationIssue] = []
+        if application.kind != .application {
+            issues.append(.error("Arrange Window requires an application resource."))
+        }
+        if application.identifier.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            issues.append(.error("Arrange Window requires a selected application."))
+        }
+        if application.label.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            issues.append(.error("Arrange Window requires a display name for the selected application."))
+        }
+        return ValidationResult(issues: issues)
     }
 }
 

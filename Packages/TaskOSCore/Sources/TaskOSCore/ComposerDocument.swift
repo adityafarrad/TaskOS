@@ -3,6 +3,7 @@ import Foundation
 public enum ComposerActionDraft: Hashable, Sendable {
     case openApplication(name: String, resolved: ResourceReference?)
     case openWebsite(url: String)
+    case arrangeWindow(name: String, resolved: ResourceReference?, preset: WindowPreset, display: WindowDisplaySelection)
     case wait(TimeInterval)
     case showNotification(title: String, message: String)
 }
@@ -79,10 +80,14 @@ public struct ComposerDocument: Sendable {
 
     public var hasUnresolvedApplications: Bool {
         actions.contains { action in
-            if case .openApplication(_, let resolved) = action.draft {
+            switch action.draft {
+            case .openApplication(_, let resolved):
                 return resolved == nil
+            case .arrangeWindow(_, let resolved, _, _):
+                return resolved == nil
+            default:
+                return false
             }
-            return false
         }
     }
 
@@ -149,8 +154,15 @@ public struct ComposerDocument: Sendable {
     }
 
     public mutating func resolveApplication(id: UUID, reference: ResourceReference) {
-        guard case .openApplication(let name, _) = action(id: id)?.draft else { return }
-        updateAction(id: id, draft: .openApplication(name: name, resolved: reference))
+        guard let action = action(id: id) else { return }
+        switch action.draft {
+        case .openApplication(let name, _):
+            updateAction(id: id, draft: .openApplication(name: name, resolved: reference))
+        case .arrangeWindow(let name, _, let preset, let display):
+            updateAction(id: id, draft: .arrangeWindow(name: name, resolved: reference, preset: preset, display: display))
+        default:
+            break
+        }
     }
 
     public mutating func moveActionUp(id: UUID) {
@@ -196,6 +208,9 @@ public struct ComposerDocument: Sendable {
             case .openWebsite(let url):
                 guard OpenWebsiteAction.isAbsoluteHTTPURL(url) else { return nil }
                 result.append(.openWebsite(OpenWebsiteAction(url: url)))
+            case .arrangeWindow(_, let resolved, let preset, let display):
+                guard let resolved else { return nil }
+                result.append(.arrangeWindow(ArrangeWindowAction(application: resolved, preset: preset, display: display)))
             case .wait(let duration):
                 result.append(.wait(WaitAction(duration: duration)))
             case .showNotification(let title, let message):
@@ -266,6 +281,20 @@ public struct ComposerDocument: Sendable {
                     newElements.append(.action(reusedAction(for: draft, from: previousActions, cursor: &cursor)))
                 }
 
+            case .arrangeWindow:
+                let name = (clause.arrangeApplicationName ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+                if let preset = clause.arrangePreset, !name.isEmpty {
+                    let draft = ComposerActionDraft.arrangeWindow(
+                        name: name,
+                        resolved: nil,
+                        preset: preset,
+                        display: .current
+                    )
+                    newElements.append(.action(reusedAction(for: draft, from: previousActions, cursor: &cursor)))
+                } else {
+                    newElements.append(.unresolved(clauseText(clause)))
+                }
+
             case .wait:
                 if let duration = clause.duration, WaitAction.allowedRange.contains(duration) {
                     newElements.append(.action(reusedAction(for: .wait(duration), from: previousActions, cursor: &cursor)))
@@ -322,6 +351,12 @@ public struct ComposerDocument: Sendable {
             }
             return new
 
+        case (.arrangeWindow(let oldName, let resolved, let preset, let display), .arrangeWindow(let newName, _, _, _)):
+            if oldName.caseInsensitiveCompare(newName) == .orderedSame {
+                return .arrangeWindow(name: newName, resolved: resolved, preset: preset, display: display)
+            }
+            return new
+
         default:
             return new
         }
@@ -362,6 +397,15 @@ public struct ComposerDocument: Sendable {
             return "Open \(name)"
         case .openWebsite(let url):
             return "Open \(url)"
+        case .arrangeWindow(let name, _, let preset, _):
+            switch preset {
+            case .maximize:
+                return "Maximize \(name)"
+            case .center:
+                return "Center \(name)"
+            default:
+                return "Put \(name) \(preset.phraseSuffix)"
+            }
         case .wait(let duration):
             return "Wait \(CanonicalPhrase.durationText(duration)) seconds"
         case .showNotification:

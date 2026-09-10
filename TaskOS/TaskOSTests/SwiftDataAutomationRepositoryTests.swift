@@ -4,7 +4,7 @@ import SwiftData
 import TaskOSCore
 @testable import TaskOS
 
-@Suite("SwiftData automation repository")
+@Suite("SwiftData automation repository", .serialized)
 struct SwiftDataAutomationRepositoryTests {
     private func makeRepository() throws -> SwiftDataAutomationRepository {
         let container = try ModelContainer(

@@ -43,6 +43,7 @@ final class AppComposition {
             executors: [
                 OpenApplicationExecutor(),
                 OpenWebsiteExecutor(),
+                ArrangeWindowExecutor(),
                 NotificationExecutor(),
             ]
         )

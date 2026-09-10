@@ -20,6 +20,8 @@ extension ActionConfiguration {
         switch self {
         case .openApplication, .openWebsite, .wait:
             return []
+        case .arrangeWindow:
+            return [.accessibility]
         case .showNotification:
             return [.notifications]
         }

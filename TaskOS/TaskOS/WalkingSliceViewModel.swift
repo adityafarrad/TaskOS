@@ -128,6 +128,22 @@ final class ComposerViewModel {
         afterEdit()
     }
 
+    func updateArrangePreset(id: UUID, preset: WindowPreset) {
+        guard case .arrangeWindow(let name, let resolved, _, let display) = actionDraft(id: id) else { return }
+        document.updateAction(id: id, draft: .arrangeWindow(name: name, resolved: resolved, preset: preset, display: display))
+        afterEdit()
+    }
+
+    func updateArrangeDisplay(id: UUID, display: WindowDisplaySelection) {
+        guard case .arrangeWindow(let name, let resolved, let preset, _) = actionDraft(id: id) else { return }
+        document.updateAction(id: id, draft: .arrangeWindow(name: name, resolved: resolved, preset: preset, display: display))
+        afterEdit()
+    }
+
+    private func actionDraft(id: UUID) -> ComposerActionDraft? {
+        document.actions.first { $0.id == id }?.draft
+    }
+
     func resolve(id: UUID, application: ApplicationResource) {
         document.resolveApplication(
             id: id,
@@ -179,6 +195,11 @@ final class ComposerViewModel {
             let record = await composition.runner.run(definition)
             self.stage = .finished(record)
         }
+    }
+
+    func requestAccessibilityPermission() {
+        AccessibilityPermission.request()
+        notice = "If TaskOS is listed in System Settings, turn it on, then run Preview again."
     }
 
     func loadLibrary() {
@@ -243,9 +264,21 @@ final class ComposerViewModel {
 
     private func autoResolveApplications() {
         for action in document.actions {
-            guard case .openApplication(let name, let resolved) = action.draft, resolved == nil else {
-                continue
+            let name: String?
+            let resolved: ResourceReference?
+            switch action.draft {
+            case .openApplication(let value, let reference):
+                name = value
+                resolved = reference
+            case .arrangeWindow(let value, let reference, _, _):
+                name = value
+                resolved = reference
+            default:
+                name = nil
+                resolved = nil
             }
+
+            guard let name, resolved == nil else { continue }
             if let match = applications.first(where: { $0.displayName.caseInsensitiveCompare(name) == .orderedSame }) {
                 document.resolveApplication(
                     id: action.id,

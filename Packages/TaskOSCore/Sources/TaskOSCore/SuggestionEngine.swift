@@ -121,6 +121,16 @@ public struct SuggestionEngine: Sendable {
         if !openOnly {
             suggestions.append(
                 Suggestion(
+                    id: "action.arrangeWindow",
+                    phrase: "Put an application on the left half",
+                    title: "Arrange a window",
+                    category: .action,
+                    requiresParameter: true,
+                    match: .grammarPosition
+                )
+            )
+            suggestions.append(
+                Suggestion(
                     id: "action.wait",
                     phrase: "Wait 5 seconds",
                     title: "Wait",

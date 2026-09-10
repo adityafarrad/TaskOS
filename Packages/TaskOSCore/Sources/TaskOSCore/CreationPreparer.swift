@@ -77,6 +77,60 @@ public struct CreationPreparer: Sendable {
                     issues.append(.error("Action \(index + 1): \(configuration.url) is not a valid web address."))
                 }
 
+            case .arrangeWindow(let configuration):
+                let appLabel = configuration.application.label
+                if let application = await catalog.application(bundleIdentifier: configuration.application.identifier) {
+                    let state = await permissions.state(for: .accessibility)
+                    switch state {
+                    case .granted:
+                        actionPreviews.append(
+                            ActionPreview(
+                                index: index,
+                                actionID: .arrangeWindow,
+                                title: title(for: .arrangeWindow),
+                                targetLabel: "\(application.displayName) - \(configuration.preset.displayName)",
+                                status: .ready,
+                                detail: nil
+                            )
+                        )
+                    case .notDetermined:
+                        actionPreviews.append(
+                            ActionPreview(
+                                index: index,
+                                actionID: .arrangeWindow,
+                                title: title(for: .arrangeWindow),
+                                targetLabel: application.displayName,
+                                status: .needsPermission,
+                                detail: "Accessibility permission will be requested when you test."
+                            )
+                        )
+                    case .denied:
+                        actionPreviews.append(
+                            ActionPreview(
+                                index: index,
+                                actionID: .arrangeWindow,
+                                title: title(for: .arrangeWindow),
+                                targetLabel: application.displayName,
+                                status: .needsPermission,
+                                detail: "Accessibility is off for TaskOS."
+                            )
+                        )
+                        issues.append(.error("Action \(index + 1): Accessibility permission is denied. Enable it in System Settings > Privacy & Security > Accessibility."))
+                    }
+                } else {
+                    actionPreviews.append(
+                        ActionPreview(
+                            index: index,
+                            actionID: .arrangeWindow,
+                            title: title(for: .arrangeWindow),
+                            targetLabel: appLabel,
+                            status: .missingResource,
+                            detail: "Not installed or unavailable."
+                        )
+                    )
+                    issues.append(.error("Action \(index + 1): \(appLabel) is not available on this Mac."))
+                }
+
             case .wait(let wait):
                 actionPreviews.append(
                     ActionPreview(

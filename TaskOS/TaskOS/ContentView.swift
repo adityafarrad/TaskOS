@@ -117,6 +117,9 @@ struct ContentView: View {
     private var addMenu: some View {
         Menu("Add action") {
             Button("Open a website") { model.add(.openWebsite(url: "https://")) }
+            Button("Arrange a window") {
+                model.add(.arrangeWindow(name: "", resolved: nil, preset: .leftHalf, display: .current))
+            }
             Button("Wait 1 second") { model.add(.wait(1)) }
             Button("Wait 5 seconds") { model.add(.wait(5)) }
             Button("Show a notification") {
@@ -137,6 +140,10 @@ struct ContentView: View {
 
                 Button("Test now") { model.test() }
                     .disabled(!model.canTest)
+
+                if let preview = model.preview, preview.requiredPermissions.contains(.accessibility) {
+                    Button("Grant Accessibility") { model.requestAccessibilityPermission() }
+                }
 
                 Text("Test runs for real.")
                     .font(.caption)
@@ -233,6 +240,7 @@ private struct ActionCard: View {
         switch action.draft {
         case .openApplication: return "Open Application"
         case .openWebsite: return "Open Website"
+        case .arrangeWindow: return "Arrange Window"
         case .wait: return "Wait"
         case .showNotification: return "Show Notification"
         }
@@ -277,6 +285,48 @@ private struct ActionCard: View {
                 }
             }
 
+        case .arrangeWindow(let arrangementName, let arrangementResolved, let preset, let display):
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(spacing: 8) {
+                    if let arrangementResolved {
+                        Label(arrangementResolved.label, systemImage: "checkmark.circle.fill")
+                            .foregroundStyle(.green)
+                    } else {
+                        Label(
+                            arrangementName.isEmpty ? "Choose an application" : "Unresolved: \(arrangementName)",
+                            systemImage: "exclamationmark.triangle"
+                        )
+                        .foregroundStyle(.orange)
+                    }
+                    Spacer()
+                    Picker("Application", selection: applicationSelection) {
+                        Text("Select...").tag("")
+                        ForEach(model.applications, id: \.bundleIdentifier) { application in
+                            Text(application.displayName).tag(application.bundleIdentifier)
+                        }
+                    }
+                    .labelsHidden()
+                    .frame(width: 200)
+                }
+
+                HStack(spacing: 8) {
+                    Picker("Position", selection: presetBinding(for: preset)) {
+                        ForEach(WindowPreset.allCases, id: \.self) { value in
+                            Text(value.displayName).tag(value)
+                        }
+                    }
+                    .labelsHidden()
+                    .frame(width: 190)
+
+                    Picker("Display", selection: displayBinding(for: display)) {
+                        Text("This window's display").tag(WindowDisplaySelection.current)
+                        Text("Main display").tag(WindowDisplaySelection.main)
+                    }
+                    .labelsHidden()
+                    .frame(width: 190)
+                }
+            }
+
         case .wait(let duration):
             HStack(spacing: 8) {
                 Text("Duration")
@@ -316,10 +366,14 @@ private struct ActionCard: View {
     private var applicationSelection: Binding<String> {
         Binding(
             get: {
-                if case .openApplication(_, let resolved) = action.draft {
+                switch action.draft {
+                case .openApplication(_, let resolved):
                     return resolved?.identifier ?? ""
+                case .arrangeWindow(_, let resolved, _, _):
+                    return resolved?.identifier ?? ""
+                default:
+                    return ""
                 }
-                return ""
             },
             set: { newValue in
                 guard let application = model.applications.first(where: { $0.bundleIdentifier == newValue }) else {
@@ -327,6 +381,20 @@ private struct ActionCard: View {
                 }
                 model.resolve(id: action.id, application: application)
             }
+        )
+    }
+
+    private func presetBinding(for preset: WindowPreset) -> Binding<WindowPreset> {
+        Binding(
+            get: { preset },
+            set: { model.updateArrangePreset(id: action.id, preset: $0) }
+        )
+    }
+
+    private func displayBinding(for display: WindowDisplaySelection) -> Binding<WindowDisplaySelection> {
+        Binding(
+            get: { display },
+            set: { model.updateArrangeDisplay(id: action.id, display: $0) }
         )
     }
 }
@@ -447,6 +515,7 @@ private struct RunResultView: View {
         switch id {
         case .openApplication: return "Open Application"
         case .openWebsite: return "Open Website"
+        case .arrangeWindow: return "Arrange Window"
         case .wait: return "Wait"
         case .showNotification: return "Show Notification"
         }

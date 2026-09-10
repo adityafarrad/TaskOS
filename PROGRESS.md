@@ -25,7 +25,7 @@ compressed into implementation plus per-increment physical smoke checks.
 | 1.1 | Build the typed domain and registry | done | Increments B1 + D1 | 4-capability catalog, validation, versioned coding, and persistence scaffolding complete; remaining capabilities continue in 2.2 |
 | 1.2 | Build the shared composer | in progress | Increments C1-C4 | Parser, suggestions, document, and composer UI done; templates, autosave persistence, keyboard/VoiceOver sign-off pending |
 | 1.3 | Build preparation, preview, and execution | done | Increments B2 + B3 | Effect-free preview, resource resolution, permissions, revision-bound approval, sequential execution with timeouts and cancellation |
-| 1.4 | Prove the first complete workflow | in progress | Increment E1 | Open Website capability added; Arrange Window + Accessibility and the full canonical journey pending |
+| 1.4 | Prove the first complete workflow | in progress | Increments E1-E2 | Open Website and Arrange Window + Accessibility done; full canonical journey pending |
 | 1.5 | Complete the basic product shell | in progress | Increment D1 | Library with save/run/delete and persistence; search/rename/duplicate/menu-bar/hotkey/settings pending |
 
 ### Phase 2 — Complete everyday workflows and automatic execution
@@ -455,3 +455,50 @@ compressed into implementation plus per-increment physical smoke checks.
     plan 1.4 are still pending.
 - Next eligible work package: E2 — Arrange Window (A7) with Accessibility
   permission handling, window targeting, presets, and display selection.
+
+### Increment E2 — Arrange Window + Accessibility (plan 1.4, partial; plan A7)
+
+- Status: done
+- Behavior delivered: an app window can be positioned by preset and display
+  selection, end to end. Typing `put Safari on the left half` (or
+  `maximize`/`center`) builds an Arrange Window step; the card selects the
+  application, preset, and display; preview reports the required Accessibility
+  permission and offers recovery; test moves the real window and verifies the
+  resulting geometry.
+- Interfaces changed: added `WindowFrame`, `WindowPreset` (halves, quarters,
+  maximize, center with deterministic frame math), `WindowDisplaySelection`,
+  and `ArrangeWindowAction` + `ActionID.arrangeWindow`; added
+  `ComposerActionDraft.arrangeWindow`; parser gained `put`/`arrange`/
+  `maximize`/`center` grammar with presets; registry, canonical phrases,
+  validation, permissions, and preview extended; added `ArrangeWindowExecutor`
+  (Accessibility: main/focused/single window targeting, settable checks,
+  geometry verification, usable-area clamping) and `AccessibilityPermission`.
+- Architecture decision: `ENABLE_APP_SANDBOX` changed from `YES` to `NO` for the
+  app target. The App Sandbox blocks Accessibility control of other apps, which
+  A7 requires; the plan mandates Hardened Runtime and notarization (both kept)
+  but does not require the sandbox. Side effect: app storage moved out of the
+  sandbox container, so previously saved workflows do not appear.
+- Tests performed:
+  - `swift test --package-path Packages/TaskOSCore` — 96 tests, 18 suites, pass.
+    New coverage: preset frame math (halves, quarters, maximize, center +
+    clamp), validation, required permission, parser (halves/quarters/maximize/
+    center, missing preset), composer draft and resolution, canonical
+    round-trip, and preview states for granted/undetermined/denied Accessibility.
+  - App tests (`xcodebuild ... test -only-testing:TaskOSTests`) — PASS, verified
+    stable across three consecutive runs (suite marked `.serialized` to avoid a
+    SwiftData in-memory container-creation race).
+  - Debug build — BUILD SUCCEEDED.
+  - Release build — BUILD SUCCEEDED.
+- Physical checks (on this Mac, macOS 26 / Apple silicon):
+  - Preview flagged Arrange Window as needing Accessibility; the grant flow
+    opened System Settings; after granting and relaunching, preview showed ready
+    and Test moved the Safari window to the left half. User-confirmed.
+- Remaining defects / gaps:
+  - Window targeting picks main/focused/only; a multi-window ambiguity fails
+    clearly but there is no user disambiguation UI yet.
+  - Display selection supports current and main; a specific display is modeled
+    but not selectable in the UI.
+  - Whole-workflow timeout still bounds per-action; a hung AX call is not
+    independently interruptible.
+- Next eligible work package: E3 — run the full canonical journey (Safari left,
+  Notes right) end to end and capture the plan 1.4 acceptance evidence.

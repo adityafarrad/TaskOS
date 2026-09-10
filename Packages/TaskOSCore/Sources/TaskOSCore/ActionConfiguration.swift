@@ -18,6 +18,18 @@ public struct OpenWebsiteAction: Codable, Hashable, Sendable {
     }
 }
 
+public struct ArrangeWindowAction: Codable, Hashable, Sendable {
+    public var application: ResourceReference
+    public var preset: WindowPreset
+    public var display: WindowDisplaySelection
+
+    public init(application: ResourceReference, preset: WindowPreset, display: WindowDisplaySelection = .current) {
+        self.application = application
+        self.preset = preset
+        self.display = display
+    }
+}
+
 public struct WaitAction: Codable, Hashable, Sendable {
     public static let allowedRange: ClosedRange<TimeInterval> = 0.1...30.0
 
@@ -41,6 +53,7 @@ public struct ShowNotificationAction: Codable, Hashable, Sendable {
 public enum ActionConfiguration: Codable, Hashable, Sendable {
     case openApplication(OpenApplicationAction)
     case openWebsite(OpenWebsiteAction)
+    case arrangeWindow(ArrangeWindowAction)
     case wait(WaitAction)
     case showNotification(ShowNotificationAction)
 
@@ -50,6 +63,8 @@ public enum ActionConfiguration: Codable, Hashable, Sendable {
             return .openApplication
         case .openWebsite:
             return .openWebsite
+        case .arrangeWindow:
+            return .arrangeWindow
         case .wait:
             return .wait
         case .showNotification:

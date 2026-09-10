@@ -112,7 +112,9 @@ private struct ParserWorker {
     var position = 0
 
     static let connectors: Set<String> = ["and", "then", "also", ","]
-    static let clauseKeywords: Set<String> = ["open", "wait", "show", "notify"]
+    static let clauseKeywords: Set<String> = [
+        "open", "wait", "show", "notify", "put", "arrange", "maximize", "center",
+    ]
     static let timeUnits: Set<String> = ["second", "seconds", "sec", "secs", "s"]
     static let excluded: [String: String] = [
         "email": "Sending email is not supported in this release.",
@@ -180,6 +182,9 @@ private struct ParserWorker {
         switch clause.kind {
         case .openApplication:
             return clause.resourceNames.isEmpty
+        case .arrangeWindow:
+            let name = clause.arrangeApplicationName ?? ""
+            return clause.arrangePreset == nil || name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         case .wait:
             guard let duration = clause.duration else { return true }
             return !WaitAction.allowedRange.contains(duration)
@@ -200,6 +205,16 @@ private struct ParserWorker {
                 return [.error("Wait must be between 0.1 and 30 seconds.", span: clause.span)]
             }
             return []
+        case .arrangeWindow:
+            var issues: [ParseDiagnostic] = []
+            let name = (clause.arrangeApplicationName ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+            if name.isEmpty {
+                issues.append(.error("Arrange Window needs an application name.", span: clause.span))
+            }
+            if clause.arrangePreset == nil {
+                issues.append(.error("Arrange Window needs a position, for example the left half.", span: clause.span))
+            }
+            return issues
         case .unsupported:
             return [.error(clause.detail ?? "This capability is not supported in this release.", span: clause.span)]
         case .unrecognized:
@@ -227,6 +242,12 @@ private struct ParserWorker {
             return parseWait()
         case "show", "notify":
             return parseNotification()
+        case "put", "arrange":
+            return parseArrange()
+        case "maximize":
+            return parseArrangeWithFixedPreset(.maximize)
+        case "center":
+            return parseArrangeWithFixedPreset(.center)
         default:
             if let reason = Self.excluded[word] {
                 return parseUnsupported(reason: reason)
@@ -300,6 +321,121 @@ private struct ParserWorker {
             parameter: .resourceNames(names),
             detail: nil
         )
+    }
+
+    private mutating func parseArrange() -> ParsedClause {
+        let startToken = tokens[position]
+        position += 1
+
+        var appWords: [String] = []
+        var end = startToken.span.end
+        var preset: WindowPreset?
+
+        while position < tokens.count {
+            let token = tokens[position]
+            guard case .word(let word) = token.kind else { break }
+            if Self.connectors.contains(word) { break }
+            if word == "on" || word == "to" {
+                let (found, newEnd) = parsePresetPhrase()
+                if let found {
+                    preset = found
+                }
+                end = max(end, newEnd)
+                break
+            }
+            appWords.append(token.original)
+            end = token.span.end
+            position += 1
+        }
+
+        return arrangeClause(
+            applicationName: appWords.joined(separator: " "),
+            preset: preset,
+            start: startToken.span.start,
+            end: end
+        )
+    }
+
+    private mutating func parseArrangeWithFixedPreset(_ preset: WindowPreset) -> ParsedClause {
+        let startToken = tokens[position]
+        position += 1
+
+        var appWords: [String] = []
+        var end = startToken.span.end
+
+        while position < tokens.count {
+            let token = tokens[position]
+            guard case .word(let word) = token.kind else { break }
+            if Self.connectors.contains(word) || word == "on" || word == "to" { break }
+            appWords.append(token.original)
+            end = token.span.end
+            position += 1
+        }
+
+        return arrangeClause(
+            applicationName: appWords.joined(separator: " "),
+            preset: preset,
+            start: startToken.span.start,
+            end: end
+        )
+    }
+
+    private func arrangeClause(applicationName: String, preset: WindowPreset?, start: Int, end: Int) -> ParsedClause {
+        let trimmed = applicationName.trimmingCharacters(in: .whitespacesAndNewlines)
+        return ParsedClause(
+            kind: .arrangeWindow,
+            span: SourceSpan(start: start, end: end),
+            parameter: .arrange(preset: preset, applicationName: trimmed),
+            detail: nil
+        )
+    }
+
+    private mutating func parsePresetPhrase() -> (WindowPreset?, Int) {
+        var end = tokens[position].span.end
+        position += 1
+
+        if position < tokens.count, case .word(let article) = tokens[position].kind, article == "the" {
+            end = tokens[position].span.end
+            position += 1
+        }
+
+        guard position < tokens.count, case .word(let side) = tokens[position].kind else {
+            return (nil, end)
+        }
+        end = tokens[position].span.end
+        position += 1
+
+        switch side {
+        case "left", "right":
+            if position < tokens.count, case .word(let noun) = tokens[position].kind, noun == "half" {
+                end = tokens[position].span.end
+                position += 1
+            }
+            return (side == "left" ? .leftHalf : .rightHalf, end)
+
+        case "top", "bottom":
+            if position < tokens.count, case .word(let horizontal) = tokens[position].kind,
+               horizontal == "left" || horizontal == "right" {
+                end = tokens[position].span.end
+                position += 1
+                let preset: WindowPreset
+                switch (side, horizontal) {
+                case ("top", "left"): preset = .topLeftQuarter
+                case ("top", "right"): preset = .topRightQuarter
+                case ("bottom", "left"): preset = .bottomLeftQuarter
+                default: preset = .bottomRightQuarter
+                }
+                return (preset, end)
+            }
+            if position < tokens.count, case .word(let noun) = tokens[position].kind, noun == "half" {
+                end = tokens[position].span.end
+                position += 1
+            }
+            return (side == "top" ? .topHalf : .bottomHalf, end)
+
+        default:
+            return (nil, end)
+        }
     }
 
     private mutating func parseWait() -> ParsedClause {
