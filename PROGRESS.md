@@ -738,3 +738,27 @@ compressed into implementation plus per-increment physical smoke checks.
   Phase 1 exit gate (full-package build/test and Release journey) before Phase 2,
   or begin Phase 2.1 (scheduling and runtime admission). Recommended: run the
   Phase 1 gate first.
+
+## Phase 1 exit gate — PASSED
+
+- Core tests: `swift test --package-path Packages/TaskOSCore` — 106 tests,
+  20 suites, pass (includes a Core purity test forbidding SwiftUI/AppKit/
+  SwiftData).
+- Clean build: `xcodebuild ... -configuration Release clean` succeeded, then
+  Release build succeeded.
+- App tests: `xcodebuild ... test -only-testing:TaskOSTests` — passed (SwiftData
+  workflow, run-history, and draft repositories).
+- Physical canonical journey (Release, this Mac, macOS 26 / Apple silicon):
+  named workflow, `open Safari and Notes and open apple.com and put Safari on
+  the left half and put Notes on the right half` with the website browser set to
+  Safari; preview, test (Safari/Notes opened, apple.com in Safari, windows moved
+  left/right), save, quit, relaunch, and run-from-library. User-confirmed.
+- Gate criteria (plan Phase 1 exit gate): a new user can complete the canonical
+  workspace journey using autocomplete or cards, recover from common errors, and
+  run the saved workflow after relaunch. Met.
+
+Phase 1 work packages 1.1-1.5 are complete. Deferred by plan/user decision:
+the twelve curated templates (scheduled Phase 2.5) and global hotkey recording
+(Phase 2, with the KeyboardShortcuts package).
+
+Next eligible work package: 2.1 — scheduling and runtime admission.
