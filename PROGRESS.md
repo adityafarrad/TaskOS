@@ -24,7 +24,7 @@ compressed into implementation plus per-increment physical smoke checks.
 |---|---|---|---|---|
 | 1.1 | Build the typed domain and registry | in progress | Increment B1 | Typed domain + registry + coding for 4 capabilities; persistence layer pending |
 | 1.2 | Build the shared composer | not started | — | |
-| 1.3 | Build preparation, preview, and execution | not started | — | Thin slice of this lands in Increment B |
+| 1.3 | Build preparation, preview, and execution | in progress | Increment B2 | Sequential runner + timeouts + cancellation + run record; preview/resolution pending |
 | 1.4 | Prove the first complete workflow | not started | — | First reforecast milestone |
 | 1.5 | Complete the basic product shell | not started | — | |
 
@@ -111,3 +111,37 @@ compressed into implementation plus per-increment physical smoke checks.
   adapters (plan 1.3 start), then sequential execution with timeouts and
   `RunRecord`, then the minimal Run UI. Registry surface (B2) and domain
   types (B1) are complete.
+
+### Increment B2 — Execution slice (plan 1.3, partial)
+
+- Status: done
+- Behavior delivered: a real, user-visible Run path. Pressing "Run now" runs
+  `Manual -> Open Application (Safari) -> Wait 1s -> Show Notification`
+  through the production `WorkflowRunner` and native adapters, then shows the
+  per-action result and overall status.
+- Interfaces changed: added `ActionFailure`, `ActionOutcome`, `RunStatus`,
+  `ActionRunRecord`, `RunRecord`, and the `ActionExecutor` protocol; added the
+  `WorkflowRunner` actor with configurable `Timeouts`. App target added
+  `OpenApplicationExecutor`, `NotificationExecutor`, `AppComposition`,
+  `WalkingSliceViewModel`, and a Run UI in `ContentView`.
+- Tests performed:
+  - `swift test --package-path Packages/TaskOSCore` — 24 tests, 7 suites, pass.
+    New coverage: ordered success with stop-on-first-failure, per-action
+    timeout, cumulative-wait limit, injected-clock wait, and cancellation
+    marking the in-flight action cancelled and later actions not executed.
+  - `xcodebuild ... Debug build` — BUILD SUCCEEDED.
+  - `xcodebuild ... Release build` — BUILD SUCCEEDED.
+- Physical checks (on this Mac, macOS 26 / Apple silicon):
+  - Release app launched, stayed running.
+  - Pressed "Run now": Safari opened/activated, the 1s wait elapsed, and the
+    TaskOS notification "Safari is open." was delivered; UI reported the run.
+- Remaining defects / gaps:
+  - Preview, effect-free preflight, resource resolution, and revision-bound
+    approval are not built yet (plan 1.3 remainder).
+  - Whole-workflow timeout is enforced between actions, not as a hard deadline
+    over a single long action.
+  - No persistence of run history yet (in-memory `RunRecord` only).
+  - Run is one-at-a-time via the UI guard; no queue/deduplication yet.
+- Next eligible work package: plan 1.2 shared composer, or finish 1.3
+  (preview + resolution + approval). Recommended next: preview/approval
+  (1.3 remainder) to complete the reviewed, deliberate test path.
