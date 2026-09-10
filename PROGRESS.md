@@ -26,7 +26,7 @@ compressed into implementation plus per-increment physical smoke checks.
 | 1.2 | Build the shared composer | in progress | Increments C1-C4 | Parser, suggestions, document, and composer UI done; templates, autosave persistence, keyboard/VoiceOver sign-off pending |
 | 1.3 | Build preparation, preview, and execution | done | Increments B2 + B3 | Effect-free preview, resource resolution, permissions, revision-bound approval, sequential execution with timeouts and cancellation |
 | 1.4 | Prove the first complete workflow | done | Increments E1-E3 | Canonical journey verified end to end in Release; Open Website + Arrange Window + Accessibility + history + edit/reuse |
-| 1.5 | Complete the basic product shell | in progress | D1 + F1 | Library save/run/delete/edit/history + search/rename/duplicate + distinct save identity; menu-bar/hotkey/settings/recovery pending |
+| 1.5 | Complete the basic product shell | in progress | D1 + F1-F2 | Library save/run/delete/edit/history/search/rename/duplicate; menu-bar runtime; hotkey/settings/recovery pending |
 
 ### Phase 2 — Complete everyday workflows and automatic execution
 
@@ -580,3 +580,29 @@ compressed into implementation plus per-increment physical smoke checks.
   - No enabled/disabled toggle or pause state in the Library yet.
 - Next eligible work package: F2 — menu-bar runtime (open, run a saved workflow,
   view current run, pause/resume automatic triggers, cancel, quit).
+
+### Increment F2 — Menu-bar runtime (plan 1.5, partial; plan 2.7)
+
+- Status: done
+- Behavior delivered: a menu-bar extra ("TaskOS", text label) that stays live
+  after the main window closes and provides: Open TaskOS, Run a workflow
+  (submenu of saved workflows), current status, Pause/Resume automatic triggers
+  (placeholder until Phase 2), Cancel current run, and Quit.
+- Interfaces changed: `TaskOSApp` gained a `MenuBarExtra` and an `AppDelegate`
+  that keeps the app alive when the last window closes; added
+  `MenuBarViewModel` and `MenuBarContent`.
+- Tests performed:
+  - `swift test --package-path Packages/TaskOSCore` — 102 tests, 19 suites, pass
+    (Core unchanged).
+  - App tests (`xcodebuild ... test -only-testing:TaskOSTests`) — PASS.
+  - Debug build — BUILD SUCCEEDED.
+  - Release build — BUILD SUCCEEDED.
+- Physical checks (on this Mac, macOS 26 / Apple silicon):
+  - Menu-bar item visible; closing the window keeps it alive; running a workflow
+    from the menu updates status and records history; cancel stops a waiting run;
+    Open TaskOS reopens the window; Quit exits. User-confirmed.
+- Notes: the menu first used an icon label, which was hard to find; switched to
+  a text "TaskOS" label. Deferred menu items that depend on Phase 2 (real
+  automatic triggers/queue) are represented by the placeholder pause toggle.
+- Next eligible work package: F3 — settings + permission status + launch at
+  login + local-data controls.

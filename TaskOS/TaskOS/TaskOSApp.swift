@@ -1,17 +1,23 @@
-//
-//  TaskOSApp.swift
-//  TaskOS
-//
-//  Created by ADITYA SINGH on 10/09/26.
-//
-
+import AppKit
 import SwiftUI
 
 @main
 struct TaskOSApp: App {
+    @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
+
     var body: some Scene {
-        WindowGroup {
+        WindowGroup(id: "main") {
             ContentView()
         }
+
+        MenuBarExtra("TaskOS") {
+            MenuBarContent()
+        }
+    }
+}
+
+final class AppDelegate: NSObject, NSApplicationDelegate {
+    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
+        false
     }
 }
