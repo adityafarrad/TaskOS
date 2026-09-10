@@ -30,6 +30,7 @@ final class ComposerViewModel {
     private(set) var accessibilityPermission: PermissionState = .notDetermined
     private(set) var launchAtLogin = LaunchAtLogin.isEnabled
     private(set) var settingsNotice: String?
+    var showOnboarding = !OnboardingStore.hasCompleted
 
     private let composition: AppComposition
     private var draftID = AutomationID()
@@ -282,6 +283,15 @@ final class ComposerViewModel {
                 self.notice = "Could not save: \(error.localizedDescription)"
             }
         }
+    }
+
+    func completeOnboarding() {
+        OnboardingStore.complete()
+        showOnboarding = false
+    }
+
+    func showOnboardingHelp() {
+        showOnboarding = true
     }
 
     func refreshPermissions() {

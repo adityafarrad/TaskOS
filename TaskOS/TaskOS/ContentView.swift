@@ -24,6 +24,11 @@ struct ContentView: View {
         }
         .frame(minWidth: 700, minHeight: 660, alignment: .topLeading)
         .onAppear { model.loadApplicationsIfNeeded() }
+        .sheet(
+            isPresented: Binding(get: { model.showOnboarding }, set: { model.showOnboarding = $0 })
+        ) {
+            OnboardingView { model.completeOnboarding() }
+        }
     }
 
     private var header: some View {
@@ -297,6 +302,7 @@ struct ContentView: View {
             HStack(spacing: 12) {
                 Button("Clear history") { model.clearHistory() }
                 Button("Delete all workflows") { model.clearAllWorkflows() }
+                Button("Show intro") { model.showOnboardingHelp() }
             }
 
             Text("Creation and execution work offline. History stores operational metadata only.")
