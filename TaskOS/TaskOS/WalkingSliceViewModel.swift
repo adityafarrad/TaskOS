@@ -992,8 +992,7 @@ final class ComposerViewModel {
         startingRevision = workflow.definition.revision
         editingWorkflowID = workflow.id
         lastSavedID = workflow.id
-        document = ComposerDocument(text: CanonicalPhrase.command(for: workflow.definition.actions))
-        applyTrigger(workflow.definition.trigger)
+        document = ComposerDocument(definition: workflow.definition)
         autoRunEnabled = workflow.isEnabled
         autoResolveApplications()
         lastSavedSignature = currentSignature
@@ -1220,44 +1219,6 @@ final class ComposerViewModel {
 
     func dismissSuggestions() {
         suggestionsDismissed = true
-    }
-
-    private func applyTrigger(_ trigger: TriggerConfiguration) {
-        let draft: ComposerTriggerDraft
-        switch trigger {
-        case .manual:
-            draft = .manual
-        case .schedule(let schedule):
-            switch schedule {
-            case .daily(let hour, let minute):
-                draft = .daily(hour: hour, minute: minute)
-            case .weekdays(let days, let hour, let minute):
-                draft = .weekdays(days, hour: hour, minute: minute)
-            case .interval(let every, _):
-                draft = .interval(every)
-            case .oneTime(let date):
-                draft = .oneTime(date)
-            }
-        case .applicationLifecycle(let trigger):
-            draft = .applicationLifecycle(
-                application: trigger.application.identifier.isEmpty ? nil : trigger.application,
-                label: trigger.application.label,
-                event: trigger.event
-            )
-        case .wake:
-            draft = .wake
-        case .displayConnection(let trigger):
-            draft = .displayConnection(event: trigger.event, selection: trigger.selection)
-        case .externalVolume(let trigger):
-            draft = .externalVolume(event: trigger.event, selection: trigger.selection)
-        case .powerSource(let trigger):
-            draft = .powerSource(trigger.event)
-        case .batteryThreshold(let trigger):
-            draft = .batteryThreshold(comparator: trigger.comparator, percentage: trigger.percentage)
-        }
-        if draft != .manual {
-            document.setTrigger(draft)
-        }
     }
 
     private func autoResolveApplications() {

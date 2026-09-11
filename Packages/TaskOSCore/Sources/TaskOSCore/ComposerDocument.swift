@@ -29,6 +29,82 @@ public enum ComposerTriggerDraft: Hashable, Sendable {
     case batteryThreshold(comparator: ThresholdComparison, percentage: Int)
 }
 
+extension ComposerActionDraft {
+    public init(_ action: ActionConfiguration) {
+        switch action {
+        case .openApplication(let value):
+            self = .openApplication(name: value.application.label, resolved: Self.resolved(value.application))
+        case .hideApplication(let value):
+            self = .hideApplication(name: value.application.label, resolved: Self.resolved(value.application))
+        case .quitApplication(let value):
+            self = .quitApplication(name: value.application.label, resolved: Self.resolved(value.application))
+        case .openFile(let value):
+            self = .openFile(target: Self.resolved(value.target))
+        case .revealInFinder(let value):
+            self = .revealInFinder(target: Self.resolved(value.target))
+        case .openWebsite(let value):
+            self = .openWebsite(url: value.url, browser: value.browser.flatMap(Self.resolved))
+        case .arrangeWindow(let value):
+            self = .arrangeWindow(
+                name: value.application.label,
+                resolved: Self.resolved(value.application),
+                preset: value.preset,
+                display: value.display
+            )
+        case .wait(let value):
+            self = .wait(value.duration)
+        case .showNotification(let value):
+            self = .showNotification(title: value.title, message: value.message)
+        case .copyText(let value):
+            self = .copyText(value.text)
+        }
+    }
+
+    private static func resolved(_ reference: ResourceReference) -> ResourceReference? {
+        reference.identifier.isEmpty ? nil : reference
+    }
+
+    private static func resolved(_ target: FileTarget) -> FileTarget? {
+        target.path.isEmpty ? nil : target
+    }
+}
+
+extension ComposerTriggerDraft {
+    public init(_ trigger: TriggerConfiguration) {
+        switch trigger {
+        case .manual:
+            self = .manual
+        case .schedule(let schedule):
+            switch schedule {
+            case .daily(let hour, let minute):
+                self = .daily(hour: hour, minute: minute)
+            case .weekdays(let days, let hour, let minute):
+                self = .weekdays(days, hour: hour, minute: minute)
+            case .interval(let every, _):
+                self = .interval(every)
+            case .oneTime(let date):
+                self = .oneTime(date)
+            }
+        case .applicationLifecycle(let value):
+            self = .applicationLifecycle(
+                application: value.application,
+                label: value.application.label,
+                event: value.event
+            )
+        case .wake:
+            self = .wake
+        case .displayConnection(let value):
+            self = .displayConnection(event: value.event, selection: value.selection)
+        case .externalVolume(let value):
+            self = .externalVolume(event: value.event, selection: value.selection)
+        case .powerSource(let value):
+            self = .powerSource(value.event)
+        case .batteryThreshold(let value):
+            self = .batteryThreshold(comparator: value.comparator, percentage: value.percentage)
+        }
+    }
+}
+
 public struct ComposerAction: Hashable, Sendable, Identifiable {
     public let id: UUID
     public let draft: ComposerActionDraft
@@ -81,6 +157,16 @@ public struct ComposerDocument: Sendable {
         self.text = ""
         self.trigger = trigger
         self.elements = actions.map { .action(ComposerAction(draft: $0)) }
+        self.parseOutcome = .needsInput
+        self.diagnostics = []
+        self.revision = WorkflowRevision(1)
+        self.text = renderedText()
+    }
+
+    public init(definition: AutomationDefinition) {
+        self.text = ""
+        self.trigger = ComposerTriggerDraft(definition.trigger)
+        self.elements = definition.actions.map { .action(ComposerAction(draft: ComposerActionDraft($0))) }
         self.parseOutcome = .needsInput
         self.diagnostics = []
         self.revision = WorkflowRevision(1)

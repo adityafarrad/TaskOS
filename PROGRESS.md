@@ -1830,3 +1830,31 @@ Next eligible work package: 2.1 — scheduling and runtime admission.
   - Debug and Release builds — BUILD SUCCEEDED.
 - Physical checks: pending (grant Accessibility, return, confirm the badge clears
   within ~1–2s without Preview; Recheck also clears it).
+
+## Post-Phase-2 hardening (pre-Phase 3)
+
+Selected open gaps implemented before Phase 3 qualification. Gap 4 (malformed
+record isolation/recovery) is deferred to Phase 3 with the migration fixtures.
+
+### Increment P1 — Preserve card-only values when editing (gap 3)
+
+- Status: done
+- Behavior delivered: opening a saved workflow for editing now restores the
+  exact structured definition instead of re-parsing canonical text, so values
+  that text cannot express are preserved: the selected web browser, notification
+  title/message, file target and bookmark, specific window display, one-time
+  date, and interval duration. Imported workflows (empty identifiers/paths) are
+  correctly shown as unresolved so they must be rebound before saving.
+- Interfaces changed: added `ComposerActionDraft.init(_:)`,
+  `ComposerTriggerDraft.init(_:)`, and `ComposerDocument.init(definition:)`;
+  `loadForEditing` uses the definition directly and `applyTrigger` was removed.
+- Tests performed:
+  - `swift test --package-path Packages/TaskOSCore` — 259 tests, 34 suites, pass
+    (was 255/33; +4). New coverage: editing round-trips browser/notification/
+    file/display/one-time values, preserves interval duration and event triggers,
+    and imported definitions remain unresolved.
+  - App tests (`xcodebuild ... test -only-testing:TaskOSTests`) — TEST SUCCEEDED.
+  - Debug and Release builds — BUILD SUCCEEDED.
+- Physical checks: pending (edit a workflow with a chosen browser and custom
+  notification text; confirm both are still set).
+- Next eligible work package: P2 — route manual runs through admission.
