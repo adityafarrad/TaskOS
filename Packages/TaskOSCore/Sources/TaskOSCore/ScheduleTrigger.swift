@@ -58,7 +58,7 @@ extension ScheduleTrigger {
 
         switch self {
         case .oneTime(let date):
-            if let now, date <= now {
+            if let now, date < now {
                 issues.append(.error("A one-time schedule must be in the future."))
             }
         case .daily(let hour, let minute):
@@ -79,7 +79,7 @@ extension ScheduleTrigger {
 
     public func isPastDue(relativeTo now: Date) -> Bool {
         guard case .oneTime(let date) = self else { return false }
-        return date <= now
+        return date < now
     }
 
     private static func timeIssues(hour: Int, minute: Int) -> [ValidationIssue] {

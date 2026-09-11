@@ -981,3 +981,39 @@ Next eligible work package: 2.1 — scheduling and runtime admission.
 - Next eligible work package: H3b — schedule runtime (registration, validation
   before events, fired via the coordinator) and H3c — trigger card, next
   three-occurrence preview, automatic-run enablement, and save/edit wiring.
+
+### Increment H3b — Schedule runtime registry (plan 2.1, partial)
+
+- Status: done
+- Behavior delivered: enabled schedules are registered and fire automatically
+  through the admission coordinator. The registry validates each definition
+  before registering it and again before delivering a fire, computes the
+  earliest next occurrence across all registrations, sleeps until then, and
+  submits an automatic run. It skips missed occurrences (only future
+  occurrences are scheduled), fires one-time schedules once, repeats interval
+  schedules, cancels obsolete registrations on unregister/replace, and can be
+  stopped.
+- Interfaces changed: added `ScheduleRegistry` (actor) with `register`,
+  `unregister`, `replaceAll`, `stop`, `registeredCount`, `isRegistered`, and
+  `nextOccurrence(for:after:)`. Fixed a boundary defect in
+  `ScheduleTrigger.isPastDue`/validation: a one-time schedule exactly at its
+  fire instant was treated as past-due, which blocked the fire; the boundary is
+  now strictly before.
+- Tests performed:
+  - `swift test --package-path Packages/TaskOSCore` — 166 tests, 24 suites, pass
+    (was 158/23; +8). New coverage: daily fire via the coordinator, missed
+    occurrences skipped, interval repeated fires, unregister stops firing,
+    past-due one-time not registered, invalid definition not registered,
+    replaceAll keeps only enabled schedules, and one-time fires exactly once.
+    The suite is `.serialized` because the clock-driven tasks starve under the
+    default parallel execution.
+  - Debug build — BUILD SUCCEEDED.
+- Physical checks: none (registry not yet wired to app startup/enable UI).
+- Remaining defects / gaps:
+  - The registry is not yet constructed in the app, not loaded from saved
+    workflows at launch, and not updated when workflows are saved, enabled,
+    disabled, edited, or deleted. That wiring is H3c.
+  - No trigger card, next-occurrence preview, or enable toggle yet.
+- Next eligible work package: H3c — trigger card, next three-occurrence preview,
+  automatic-run enablement, app startup registration/registration updates, and
+  routing composer/library run paths through the coordinator.
