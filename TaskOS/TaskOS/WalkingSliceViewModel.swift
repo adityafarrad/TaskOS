@@ -367,6 +367,10 @@ final class ComposerViewModel {
         afterEdit()
     }
 
+    func isMissingFile(_ target: FileTarget) -> Bool {
+        !FileTargetResolver.exists(target)
+    }
+
     func chooseFile(id: UUID) {
         guard let draft = actionDraft(id: id) else { return }
 

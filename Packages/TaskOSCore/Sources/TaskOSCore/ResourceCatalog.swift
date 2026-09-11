@@ -27,6 +27,7 @@ public protocol ResourceCatalog: Sendable {
     func installedApplications() async -> [ApplicationResource]
     func display(identifier: String) async -> DisplayResource?
     func installedDisplays() async -> [DisplayResource]
+    func fileExists(path: String) async -> Bool?
 }
 
 public extension ResourceCatalog {
@@ -40,5 +41,9 @@ public extension ResourceCatalog {
 
     func display(identifier: String) async -> DisplayResource? {
         await installedDisplays().first { $0.identifier == identifier }
+    }
+
+    func fileExists(path: String) async -> Bool? {
+        nil
     }
 }

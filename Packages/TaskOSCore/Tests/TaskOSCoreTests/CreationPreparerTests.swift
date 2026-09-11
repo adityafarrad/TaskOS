@@ -5,6 +5,7 @@ import Foundation
 private struct FakeCatalog: ResourceCatalog {
     var installed: [String: ApplicationResource]
     var displays: [DisplayResource] = []
+    var files: Set<String> = []
 
     func application(bundleIdentifier: String) async -> ApplicationResource? {
         installed[bundleIdentifier]
@@ -12,6 +13,10 @@ private struct FakeCatalog: ResourceCatalog {
 
     func installedDisplays() async -> [DisplayResource] {
         displays
+    }
+
+    func fileExists(path: String) async -> Bool? {
+        files.contains(path)
     }
 }
 
@@ -143,6 +148,30 @@ struct CreationPreparerTests {
             )
         )
         let preview = await subject.prepare(makeDefinition([action]))
+
+        #expect(preview.actions[0].status == .ready)
+        #expect(preview.isRunnable)
+    }
+
+    @Test func missingFileBlocksOpenFile() async {
+        let subject = CreationPreparer(
+            catalog: FakeCatalog(installed: [:], files: []),
+            permissions: FakePermissions(states: [:])
+        )
+        let target = FileTarget(kind: .file, displayName: "report.pdf", path: "/Users/me/report.pdf")
+        let preview = await subject.prepare(makeDefinition([.openFile(OpenFileAction(target: target))]))
+
+        #expect(preview.actions[0].status == .missingResource)
+        #expect(!preview.isRunnable)
+    }
+
+    @Test func existingFileIsReady() async {
+        let subject = CreationPreparer(
+            catalog: FakeCatalog(installed: [:], files: ["/Users/me/report.pdf"]),
+            permissions: FakePermissions(states: [:])
+        )
+        let target = FileTarget(kind: .file, displayName: "report.pdf", path: "/Users/me/report.pdf")
+        let preview = await subject.prepare(makeDefinition([.openFile(OpenFileAction(target: target))]))
 
         #expect(preview.actions[0].status == .ready)
         #expect(preview.isRunnable)

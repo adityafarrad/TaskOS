@@ -608,6 +608,11 @@ private struct ActionCard: View {
             HStack(spacing: 8) {
                 if let fileTarget {
                     Label(fileTarget.displayName, systemImage: fileTarget.kind == .folder ? "folder" : "doc")
+                    if model.isMissingFile(fileTarget) {
+                        Label("Moved or deleted", systemImage: "exclamationmark.triangle")
+                            .font(.caption)
+                            .foregroundStyle(.orange)
+                    }
                 } else {
                     Label("Choose a file or folder", systemImage: "exclamationmark.triangle")
                         .foregroundStyle(.orange)

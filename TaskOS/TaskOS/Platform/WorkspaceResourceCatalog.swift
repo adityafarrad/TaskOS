@@ -13,6 +13,11 @@ struct WorkspaceResourceCatalog: ResourceCatalog {
         }
     }
 
+    nonisolated func fileExists(path: String) async -> Bool? {
+        guard !path.isEmpty else { return false }
+        return FileManager.default.fileExists(atPath: path)
+    }
+
     nonisolated func installedDisplays() async -> [DisplayResource] {
         await MainActor.run {
             NSScreen.screens.compactMap { screen in

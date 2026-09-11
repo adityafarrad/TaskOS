@@ -34,7 +34,7 @@ compressed into implementation plus per-increment physical smoke checks.
 |---|---|---|---|---|
 | 2.1 | Add scheduling and runtime admission | done | Increments H1–H3 + fixes H3-d/H3-e | Schedule model, occurrence calc, admission/queue/pause/cancel, schedule grammar, runtime registry, trigger card + next-run preview + enable toggle; physical tests A–E passed |
 | 2.2 | Finish app, window, and utility actions | done | Increments I1–I3 | Copy Text, Hide, normal Quit, specific-display selection, window presets, and notification editing/presentation done; lifecycle loop suppression tracked in 2.4 |
-| 2.3 | Add selected files and portable workflows | in progress | Increment J1 | Open File/Reveal in Finder with explicit selection done; durable repair and export/import pending |
+| 2.3 | Add selected files and portable workflows | in progress | Increments J1 + J2 | File selection, Open/Reveal, durable bookmarks, and missing-resource repair done; export/import pending |
 | 2.4 | Add event-triggered workflows | not started | — | |
 | 2.5 | Finish the template and discovery experience | not started | — | |
 | 2.6 | Complete everyday management and recovery | not started | — | |
@@ -1258,3 +1258,31 @@ Next eligible work package: 2.1 — scheduling and runtime admission.
   rebinding and disabled defaults.
 - Next eligible work package: 2.3 increment J2 — durable file references and
   missing-resource repair.
+
+### Increment J2 — Durable file references and missing-resource repair (plan 2.3, partial)
+
+- Status: done
+- Behavior delivered: selected-file references are durable (path plus a
+  bookmark that is resolved first at execution) and missing files are detected
+  and repairable. Preview flags a moved/deleted file as a missing resource with
+  a "choose it again" instruction; the card shows a "Moved or deleted" warning
+  and always offers **Choose…** to re-select. Execution fails with recovery text
+  rather than substituting another file.
+- Interfaces changed: `ResourceCatalog` gained `fileExists(path:)` (defaulted);
+  `WorkspaceResourceCatalog` implements it; `CreationPreparer` checks file
+  existence for Open File/Reveal; `ComposerViewModel.isMissingFile`; the file
+  card shows a missing warning.
+- Tests performed:
+  - `swift test --package-path Packages/TaskOSCore` — 198 tests, 27 suites, pass
+    (was 196/27; +2). New coverage: a missing file blocks Open File as a missing
+    resource, and an existing file previews as ready.
+  - App tests (`xcodebuild ... test -only-testing:TaskOSTests`) — TEST SUCCEEDED.
+  - Debug build — BUILD SUCCEEDED.
+  - Release build — BUILD SUCCEEDED.
+- Physical checks: pending (select a file, move it, confirm the card/preview flag
+  it, re-choose it, and run).
+- Remaining defects/gaps: a stale bookmark is resolved but not refreshed back
+  into the stored reference (non-sandbox paths still resolve); explicit
+  security-scoped bookmark refresh is deferred.
+- Next eligible work package: 2.3 increment J3 — portable export/import with
+  rebinding and disabled defaults.

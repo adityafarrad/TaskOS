@@ -131,6 +131,18 @@ public struct CreationPreparer: Sendable {
                         )
                     )
                     issues.append(.error("Action \(index + 1): TaskOS cannot open applications, installers, scripts, or automation files."))
+                } else if await catalog.fileExists(path: target.path) == false {
+                    actionPreviews.append(
+                        ActionPreview(
+                            index: index,
+                            actionID: .openFile,
+                            title: title(for: .openFile),
+                            targetLabel: target.displayName,
+                            status: .missingResource,
+                            detail: "Moved or deleted. Choose it again."
+                        )
+                    )
+                    issues.append(.error("Action \(index + 1): \(target.displayName) was moved or deleted. Choose it again."))
                 } else {
                     actionPreviews.append(
                         ActionPreview(
@@ -145,16 +157,31 @@ public struct CreationPreparer: Sendable {
                 }
 
             case .revealInFinder(let configuration):
-                actionPreviews.append(
-                    ActionPreview(
-                        index: index,
-                        actionID: .revealInFinder,
-                        title: title(for: .revealInFinder),
-                        targetLabel: configuration.target.displayName,
-                        status: .ready,
-                        detail: "Fails if the item was moved or deleted."
+                let target = configuration.target
+                if await catalog.fileExists(path: target.path) == false {
+                    actionPreviews.append(
+                        ActionPreview(
+                            index: index,
+                            actionID: .revealInFinder,
+                            title: title(for: .revealInFinder),
+                            targetLabel: target.displayName,
+                            status: .missingResource,
+                            detail: "Moved or deleted. Choose it again."
+                        )
                     )
-                )
+                    issues.append(.error("Action \(index + 1): \(target.displayName) was moved or deleted. Choose it again."))
+                } else {
+                    actionPreviews.append(
+                        ActionPreview(
+                            index: index,
+                            actionID: .revealInFinder,
+                            title: title(for: .revealInFinder),
+                            targetLabel: target.displayName,
+                            status: .ready,
+                            detail: "Fails if the item was moved or deleted."
+                        )
+                    )
+                }
 
             case .openWebsite(let configuration):
                 if let browser = configuration.browser,
