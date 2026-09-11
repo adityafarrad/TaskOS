@@ -129,12 +129,44 @@ public enum ObservedTriggerEvent: Sendable, Equatable {
     case applicationLaunched(bundleIdentifier: String)
     case applicationQuit(bundleIdentifier: String)
     case woke
-    case displayConnected(identifier: String)
-    case displayDisconnected(identifier: String)
-    case volumeMounted(identifier: String)
-    case volumeUnmounted(identifier: String)
+    case displayConnected(identifier: String, isExternal: Bool)
+    case displayDisconnected(identifier: String, isExternal: Bool)
+    case volumeMounted(identifier: String, isExternal: Bool)
+    case volumeUnmounted(identifier: String, isExternal: Bool)
     case powerSourceChanged(isOnExternalPower: Bool)
     case batteryChanged(percentage: Int?)
+}
+
+public struct DeviceStateReconciler: Sendable {
+    public struct Transition: Sendable, Equatable {
+        public let added: [String]
+        public let removed: [String]
+
+        public init(added: [String], removed: [String]) {
+            self.added = added
+            self.removed = removed
+        }
+
+        public var isEmpty: Bool {
+            added.isEmpty && removed.isEmpty
+        }
+    }
+
+    private var known: Set<String> = []
+
+    public init() {}
+
+    public mutating func establishBaseline(_ identifiers: [String]) {
+        known = Set(identifiers)
+    }
+
+    public mutating func reconcile(_ identifiers: [String]) -> Transition {
+        let current = Set(identifiers)
+        let added = current.subtracting(known).sorted()
+        let removed = known.subtracting(current).sorted()
+        known = current
+        return Transition(added: added, removed: removed)
+    }
 }
 
 public protocol TriggerSource: Sendable {
@@ -163,11 +195,11 @@ extension TriggerConfiguration {
 
         case .displayConnection(let trigger):
             switch (trigger.event, event) {
-            case (.connected, .displayConnected(let identifier)),
-                 (.disconnected, .displayDisconnected(let identifier)):
+            case (.connected, .displayConnected(let identifier, let isExternal)),
+                 (.disconnected, .displayDisconnected(let identifier, let isExternal)):
                 switch trigger.selection {
                 case .anyExternal:
-                    return true
+                    return isExternal
                 case .display(let expected, _):
                     return expected == identifier
                 }
@@ -177,11 +209,11 @@ extension TriggerConfiguration {
 
         case .externalVolume(let trigger):
             switch (trigger.event, event) {
-            case (.mounted, .volumeMounted(let identifier)),
-                 (.unmounted, .volumeUnmounted(let identifier)):
+            case (.mounted, .volumeMounted(let identifier, let isExternal)),
+                 (.unmounted, .volumeUnmounted(let identifier, let isExternal)):
                 switch trigger.selection {
                 case .anyExternal:
-                    return true
+                    return isExternal
                 case .volume(let expected, _):
                     return expected == identifier
                 }

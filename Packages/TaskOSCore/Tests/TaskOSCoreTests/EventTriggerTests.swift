@@ -45,28 +45,30 @@ struct EventTriggerTests {
 
     @Test func matchesDisplaySelection() {
         let anyExternal = DisplayConnectionTrigger(selection: .anyExternal, event: .connected).trigger
-        #expect(anyExternal.matches(.displayConnected(identifier: "123")))
-        #expect(!anyExternal.matches(.displayDisconnected(identifier: "123")))
+        #expect(anyExternal.matches(.displayConnected(identifier: "123", isExternal: true)))
+        #expect(!anyExternal.matches(.displayConnected(identifier: "builtin", isExternal: false)))
+        #expect(!anyExternal.matches(.displayDisconnected(identifier: "123", isExternal: true)))
 
         let specific = DisplayConnectionTrigger(
             selection: .display(identifier: "123", label: "Studio Display"),
             event: .disconnected
         ).trigger
-        #expect(specific.matches(.displayDisconnected(identifier: "123")))
-        #expect(!specific.matches(.displayDisconnected(identifier: "999")))
-        #expect(!specific.matches(.displayConnected(identifier: "123")))
+        #expect(specific.matches(.displayDisconnected(identifier: "123", isExternal: true)))
+        #expect(!specific.matches(.displayDisconnected(identifier: "999", isExternal: true)))
+        #expect(!specific.matches(.displayConnected(identifier: "123", isExternal: true)))
     }
 
     @Test func matchesVolumeSelection() {
         let anyExternal = ExternalVolumeTrigger(selection: .anyExternal, event: .mounted).trigger
-        #expect(anyExternal.matches(.volumeMounted(identifier: "disk4s1")))
+        #expect(anyExternal.matches(.volumeMounted(identifier: "disk4s1", isExternal: true)))
+        #expect(!anyExternal.matches(.volumeMounted(identifier: "disk0s1", isExternal: false)))
 
         let specific = ExternalVolumeTrigger(
             selection: .volume(identifier: "disk4s1", label: "Backup"),
             event: .unmounted
         ).trigger
-        #expect(specific.matches(.volumeUnmounted(identifier: "disk4s1")))
-        #expect(!specific.matches(.volumeUnmounted(identifier: "disk5s1")))
+        #expect(specific.matches(.volumeUnmounted(identifier: "disk4s1", isExternal: true)))
+        #expect(!specific.matches(.volumeUnmounted(identifier: "disk5s1", isExternal: true)))
     }
 
     @Test func matchesPowerTransitions() {
@@ -141,6 +143,48 @@ struct EventTriggerTests {
         #expect(document.trigger == .wake)
         let definition = document.makeDefinition(name: "Wake")
         #expect(definition?.trigger == .wake(WakeTrigger()))
+    }
+
+    @Test func reconcilerEstablishesBaselineThenReportsChanges() {
+        var reconciler = DeviceStateReconciler()
+        reconciler.establishBaseline(["A", "B"])
+        #expect(reconciler.reconcile(["A", "B"]).isEmpty)
+
+        let added = reconciler.reconcile(["A", "B", "C"])
+        #expect(added.added == ["C"])
+        #expect(added.removed.isEmpty)
+
+        let removed = reconciler.reconcile(["A"])
+        #expect(removed.removed == ["B", "C"])
+        #expect(removed.added.isEmpty)
+    }
+
+    @Test func parsesDisplayAndVolumePhrases() {
+        let parser = CommandParser()
+
+        let connected = parser.parse("when a display connects")
+        #expect(connected.outcome == .complete)
+        #expect(connected.clauses.first?.kind == .displayConnection)
+        #expect(connected.clauses.first?.displayEvent == .connected)
+
+        let disconnected = parser.parse("when an external display disconnects")
+        #expect(disconnected.clauses.first?.displayEvent == .disconnected)
+
+        let mounted = parser.parse("when an external drive mounts")
+        #expect(mounted.outcome == .complete)
+        #expect(mounted.clauses.first?.kind == .externalVolume)
+        #expect(mounted.clauses.first?.volumeEvent == .mounted)
+
+        let unmounted = parser.parse("when a drive unmounts")
+        #expect(unmounted.clauses.first?.volumeEvent == .unmounted)
+    }
+
+    @Test func displayAndVolumeComposerBuildDefinitions() {
+        let display = ComposerDocument(text: "when a display connects, then show a notification")
+        #expect(display.makeDefinition(name: "Display")?.trigger == .displayConnection(DisplayConnectionTrigger(selection: .anyExternal, event: .connected)))
+
+        let volume = ComposerDocument(text: "when an external drive mounts, then show a notification")
+        #expect(volume.makeDefinition(name: "Drive")?.trigger == .externalVolume(ExternalVolumeTrigger(selection: .anyExternal, event: .mounted)))
     }
 
     @Test func eventTriggerRoundTripsThroughCoding() throws {

@@ -25,6 +25,8 @@ final class AppComposition {
     private let sessionObserver: SystemSessionObserver
     private let lifecycleSource: ApplicationLifecycleSource
     private let wakeSource: WakeTriggerSource
+    private let displaySource: DisplayTriggerSource
+    private let volumeSource: VolumeTriggerSource
 
     init() {
         let clock = SystemClock()
@@ -104,6 +106,8 @@ final class AppComposition {
         )
         self.lifecycleSource = ApplicationLifecycleSource()
         self.wakeSource = WakeTriggerSource()
+        self.displaySource = DisplayTriggerSource()
+        self.volumeSource = VolumeTriggerSource()
 
         self.sessionObserver = SystemSessionObserver(coordinator: coordinator)
     }
@@ -130,6 +134,12 @@ final class AppComposition {
             Task { await eventTriggerRegistry.handle(event) }
         }
         _ = await wakeSource.start { [eventTriggerRegistry] event in
+            Task { await eventTriggerRegistry.handle(event) }
+        }
+        _ = await displaySource.start { [eventTriggerRegistry] event in
+            Task { await eventTriggerRegistry.handle(event) }
+        }
+        _ = await volumeSource.start { [eventTriggerRegistry] event in
             Task { await eventTriggerRegistry.handle(event) }
         }
     }

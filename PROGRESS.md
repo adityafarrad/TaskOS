@@ -35,7 +35,7 @@ compressed into implementation plus per-increment physical smoke checks.
 | 2.1 | Add scheduling and runtime admission | done | Increments H1–H3 + fixes H3-d/H3-e | Schedule model, occurrence calc, admission/queue/pause/cancel, schedule grammar, runtime registry, trigger card + next-run preview + enable toggle; physical tests A–E passed |
 | 2.2 | Finish app, window, and utility actions | done | Increments I1–I3 | Copy Text, Hide, normal Quit, specific-display selection, window presets, and notification editing/presentation done; lifecycle loop suppression tracked in 2.4 |
 | 2.3 | Add selected files and portable workflows | done | Increments J1–J3 | File selection, Open/Reveal, durable references, repair, and portable export/import with rebinding done |
-| 2.4 | Add event-triggered workflows | in progress | Increments K1–K3 | Application-lifecycle and Mac-wake triggers done end to end; display/volume/power/battery pending |
+| 2.4 | Add event-triggered workflows | in progress | Increments K1–K4 | App lifecycle, wake, display, and external-volume triggers done end to end; power/battery pending |
 | 2.5 | Finish the template and discovery experience | not started | — | |
 | 2.6 | Complete everyday management and recovery | not started | — | |
 
@@ -1432,3 +1432,43 @@ Next eligible work package: 2.1 — scheduling and runtime admission.
   editing.
 - Next eligible work package: 2.4 increment K4 — display connection and external
   volume triggers with baseline reconciliation.
+
+### Increment K4 — Display and external volume triggers (plan 2.4, partial; plan T6 + T7)
+
+- Status: done
+- Behavior delivered: workflows can run when a display connects/disconnects
+  (any external or a specific display) or when an external volume
+  mounts/unmounts. Text supports `when a display connects`,
+  `when an external display disconnects`, `when an external drive mounts`,
+  `when a drive unmounts`; the When card gained **Display** and **Drive**
+  families with event selectors and a display selector (any external or a named
+  connected display). Device callbacks are reconciled by diffing actual
+  identifier sets against a baseline taken at start, so bursts produce logical
+  additions/removals and the initial state is never reported as an event.
+  `ObservedTriggerEvent` now carries an `isExternal` flag so "any external"
+  ignores the built-in display and internal disks.
+- Interfaces changed: `ObservedTriggerEvent` display/volume cases gained
+  `isExternal`; added `DeviceStateReconciler` (baseline + diff); parser
+  `ParsedClauseKind.displayConnection`/`.externalVolume`, `ParsedParameter
+  .display`/`.volume`, a shared `whenVerbs` table, and display/volume phrases;
+  `ComposerTriggerDraft` display/volume cases with rendering and configuration;
+  app `DisplayTriggerSource` (screen-parameter notifications) and
+  `VolumeTriggerSource` (NSWorkspace mount/unmount) with reconciliation;
+  `ComposerViewModel` display/volume family state and controls; trigger family
+  picker and cards.
+- Tests performed:
+  - `swift test --package-path Packages/TaskOSCore` — 233 tests, 30 suites, pass
+    (was 230/30; +3). New coverage: reconciler baseline/add/remove, display and
+    volume phrase parsing, composer display/volume definitions, and updated
+    external-aware matching tests.
+  - App tests (`xcodebuild ... test -only-testing:TaskOSTests`) — TEST SUCCEEDED.
+  - Debug build — BUILD SUCCEEDED.
+  - Release build — BUILD SUCCEEDED.
+- Physical checks: pending (connect/disconnect an external display and mount/
+  unmount a USB drive; confirm one logical event each and that the initial state
+  produces no event). Requires external display/removable storage.
+- Remaining/gaps: specific volume selection in the card is deferred (text/card
+  use "any external drive"); display identity uses the screen number, which is
+  stable per session but not across reboots.
+- Next eligible work package: 2.4 increment K5 — power source and battery
+  threshold triggers.

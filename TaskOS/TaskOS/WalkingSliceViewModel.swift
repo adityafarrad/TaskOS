@@ -119,6 +119,8 @@ final class ComposerViewModel {
         case schedule
         case applicationLifecycle
         case wake
+        case displayConnection
+        case externalVolume
     }
 
     var triggerFamily: TriggerFamily {
@@ -129,6 +131,10 @@ final class ComposerViewModel {
             return .applicationLifecycle
         case .wake:
             return .wake
+        case .displayConnection:
+            return .displayConnection
+        case .externalVolume:
+            return .externalVolume
         case .daily, .weekdays, .interval, .relative, .once, .oneTime:
             return .schedule
         }
@@ -137,6 +143,8 @@ final class ComposerViewModel {
     var isScheduled: Bool { triggerFamily == .schedule }
     var isLifecycleTrigger: Bool { triggerFamily == .applicationLifecycle }
     var isWakeTrigger: Bool { triggerFamily == .wake }
+    var isDisplayTrigger: Bool { triggerFamily == .displayConnection }
+    var isVolumeTrigger: Bool { triggerFamily == .externalVolume }
     var supportsAutomaticRuns: Bool { triggerFamily != .manual }
 
     func setTriggerFamily(_ family: TriggerFamily) {
@@ -150,7 +158,54 @@ final class ComposerViewModel {
             document.setTrigger(.applicationLifecycle(application: nil, label: "", event: .launched))
         case .wake:
             document.setTrigger(.wake)
+        case .displayConnection:
+            document.setTrigger(.displayConnection(event: .connected, selection: .anyExternal))
+        case .externalVolume:
+            document.setTrigger(.externalVolume(event: .mounted, selection: .anyExternal))
         }
+        afterEdit()
+    }
+
+    var displayEvent: DisplayEvent {
+        if case .displayConnection(let event, _) = document.trigger {
+            return event
+        }
+        return .connected
+    }
+
+    var displaySelection: DisplaySelection {
+        if case .displayConnection(_, let selection) = document.trigger {
+            return selection
+        }
+        return .anyExternal
+    }
+
+    func setDisplayEvent(_ event: DisplayEvent) {
+        document.setTrigger(.displayConnection(event: event, selection: displaySelection))
+        afterEdit()
+    }
+
+    func setDisplaySelection(_ selection: DisplaySelection) {
+        document.setTrigger(.displayConnection(event: displayEvent, selection: selection))
+        afterEdit()
+    }
+
+    var volumeEvent: VolumeEvent {
+        if case .externalVolume(let event, _) = document.trigger {
+            return event
+        }
+        return .mounted
+    }
+
+    var volumeSelection: VolumeSelection {
+        if case .externalVolume(_, let selection) = document.trigger {
+            return selection
+        }
+        return .anyExternal
+    }
+
+    func setVolumeEvent(_ event: VolumeEvent) {
+        document.setTrigger(.externalVolume(event: event, selection: volumeSelection))
         afterEdit()
     }
 
@@ -199,7 +254,7 @@ final class ComposerViewModel {
             return .interval
         case .once, .oneTime:
             return .once
-        case .daily, .manual, .applicationLifecycle, .wake:
+        case .daily, .manual, .applicationLifecycle, .wake, .displayConnection, .externalVolume:
             return .daily
         }
     }
@@ -221,7 +276,8 @@ final class ComposerViewModel {
             return calendar.date(bySettingHour: hour, minute: minute, second: 0, of: base) ?? base
         case .oneTime(let date):
             return date
-        case .relative, .interval, .manual, .applicationLifecycle, .wake:
+        case .relative, .interval, .manual, .applicationLifecycle, .wake,
+             .displayConnection, .externalVolume:
             return calendar.date(bySettingHour: 9, minute: 0, second: 0, of: base) ?? base
         }
     }
@@ -967,7 +1023,11 @@ final class ComposerViewModel {
             )
         case .wake:
             draft = .wake
-        case .displayConnection, .externalVolume, .powerSource, .batteryThreshold:
+        case .displayConnection(let trigger):
+            draft = .displayConnection(event: trigger.event, selection: trigger.selection)
+        case .externalVolume(let trigger):
+            draft = .externalVolume(event: trigger.event, selection: trigger.selection)
+        case .powerSource, .batteryThreshold:
             draft = .manual
         }
         if draft != .manual {

@@ -23,6 +23,8 @@ public enum ComposerTriggerDraft: Hashable, Sendable {
     case oneTime(Date)
     case applicationLifecycle(application: ResourceReference?, label: String, event: LifecycleEvent)
     case wake
+    case displayConnection(event: DisplayEvent, selection: DisplaySelection)
+    case externalVolume(event: VolumeEvent, selection: VolumeSelection)
 }
 
 public struct ComposerAction: Hashable, Sendable, Identifiable {
@@ -355,6 +357,10 @@ public struct ComposerDocument: Sendable {
             return .applicationLifecycle(ApplicationLifecycleTrigger(application: reference, event: event))
         case .wake:
             return .wake(WakeTrigger())
+        case .displayConnection(let event, let selection):
+            return .displayConnection(DisplayConnectionTrigger(selection: selection, event: event))
+        case .externalVolume(let event, let selection):
+            return .externalVolume(ExternalVolumeTrigger(selection: selection, event: event))
         }
     }
 
@@ -411,6 +417,20 @@ public struct ComposerDocument: Sendable {
 
             case .wake:
                 newTrigger = .wake
+
+            case .displayConnection:
+                if let event = clause.displayEvent {
+                    newTrigger = .displayConnection(event: event, selection: .anyExternal)
+                } else {
+                    newElements.append(.unresolved(clauseText(clause)))
+                }
+
+            case .externalVolume:
+                if let event = clause.volumeEvent {
+                    newTrigger = .externalVolume(event: event, selection: .anyExternal)
+                } else {
+                    newElements.append(.unresolved(clauseText(clause)))
+                }
 
             case .schedule:
                 switch clause.schedule {
@@ -650,6 +670,12 @@ public struct ComposerDocument: Sendable {
             return label.isEmpty ? "" : "When \(label) \(event.displayName)"
         case .wake:
             return "When the Mac wakes"
+        case .displayConnection(let event, let selection):
+            let noun = selection == .anyExternal ? "a display" : selection.displayName
+            return event == .connected ? "When \(noun) connects" : "When \(noun) disconnects"
+        case .externalVolume(let event, let selection):
+            let noun = selection == .anyExternal ? "an external drive" : selection.displayName
+            return event == .mounted ? "When \(noun) mounts" : "When \(noun) unmounts"
         }
     }
 

@@ -9,6 +9,8 @@ public enum ParsedClauseKind: Hashable, Sendable {
     case revealInFinder
     case applicationLifecycle
     case wake
+    case displayConnection
+    case externalVolume
     case arrangeWindow
     case wait
     case showNotification
@@ -35,6 +37,8 @@ public enum ParsedParameter: Hashable, Sendable {
     case fileSelection(kind: FileTarget.Kind)
     case lifecycle(event: LifecycleEvent?, applicationName: String)
     case wake
+    case display(DisplayEvent)
+    case volume(VolumeEvent)
     case none
 }
 
@@ -113,6 +117,20 @@ public struct ParsedClause: Hashable, Sendable {
         }
         return nil
     }
+
+    public var displayEvent: DisplayEvent? {
+        if case .display(let event) = parameter {
+            return event
+        }
+        return nil
+    }
+
+    public var volumeEvent: VolumeEvent? {
+        if case .volume(let event) = parameter {
+            return event
+        }
+        return nil
+    }
 }
 
 public enum ParseOutcome: String, Hashable, Sendable, Codable {
@@ -170,7 +188,8 @@ public struct ParsedCommand: Hashable, Sendable {
                  .openFile, .revealInFinder, .arrangeWindow, .wait,
                  .showNotification, .copyText:
                 return true
-            case .schedule, .applicationLifecycle, .wake, .unsupported, .unrecognized:
+            case .schedule, .applicationLifecycle, .wake, .displayConnection,
+                 .externalVolume, .unsupported, .unrecognized:
                 return false
             }
         }

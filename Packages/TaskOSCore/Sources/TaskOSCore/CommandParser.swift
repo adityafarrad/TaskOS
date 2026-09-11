@@ -116,13 +116,36 @@ private struct ParserWorker {
         "open", "hide", "quit", "reveal", "wait", "show", "notify", "put",
         "arrange", "maximize", "center", "copy", "every", "once", "in", "when",
     ]
-    static let lifecycleVerbs: [String: LifecycleEvent] = [
-        "opens": .launched,
-        "launches": .launched,
-        "launched": .launched,
-        "quits": .quit,
-        "exits": .quit,
-        "closes": .quit,
+    enum WhenVerb {
+        case lifecycle(LifecycleEvent)
+        case wake
+        case display(DisplayEvent)
+        case volume(VolumeEvent)
+    }
+
+    static let whenVerbs: [String: WhenVerb] = [
+        "opens": .lifecycle(.launched),
+        "launches": .lifecycle(.launched),
+        "launched": .lifecycle(.launched),
+        "quits": .lifecycle(.quit),
+        "exits": .lifecycle(.quit),
+        "closes": .lifecycle(.quit),
+        "wakes": .wake,
+        "woke": .wake,
+        "connects": .display(.connected),
+        "disconnects": .display(.disconnected),
+        "mounts": .volume(.mounted),
+        "unmounts": .volume(.unmounted),
+    ]
+    static let displayPhrases: Set<String> = [
+        "a display", "the display", "an external display", "the external display",
+        "external display", "a monitor", "an external monitor", "the external monitor",
+        "external monitor", "a screen", "an external screen", "the external screen",
+    ]
+    static let volumePhrases: Set<String> = [
+        "a drive", "the drive", "an external drive", "the external drive", "external drive",
+        "a volume", "the volume", "an external volume", "the external volume", "external volume",
+        "a disk", "the disk", "an external disk", "the external disk",
     ]
     static let timeUnits: Set<String> = ["second", "seconds", "sec", "secs", "s"]
     static let weekdayNames: [String: Weekday] = [
@@ -211,7 +234,7 @@ private struct ParserWorker {
         case .applicationLifecycle:
             let name = (clause.lifecycleApplicationName ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
             return clause.lifecycleEvent == nil || name.isEmpty
-        case .wake:
+        case .wake, .displayConnection, .externalVolume:
             return false
         case .arrangeWindow:
             let name = clause.arrangeApplicationName ?? ""
@@ -653,20 +676,13 @@ private struct ParserWorker {
         position += 1
         var end = keyword.span.end
         var words: [String] = []
-        var event: LifecycleEvent?
-        var isWake = false
+        var verb: WhenVerb?
 
         while position < tokens.count {
             let token = tokens[position]
             guard case .word(let word) = token.kind, !Self.connectors.contains(word) else { break }
-            if word == "wakes" || word == "woke" {
-                isWake = true
-                end = token.span.end
-                position += 1
-                break
-            }
-            if let verb = Self.lifecycleVerbs[word] {
-                event = verb
+            if let found = Self.whenVerbs[word] {
+                verb = found
                 end = token.span.end
                 position += 1
                 break
@@ -677,19 +693,37 @@ private struct ParserWorker {
         }
 
         let name = words.joined(separator: " ").trimmingCharacters(in: .whitespacesAndNewlines)
-        if isWake, name.lowercased() == "the mac" {
+        let lower = name.lowercased()
+        let span = SourceSpan(start: keyword.span.start, end: end)
+
+        switch verb {
+        case .wake:
+            if lower == "the mac" {
+                return ParsedClause(kind: .wake, span: span, parameter: .wake, detail: nil)
+            }
+        case .display(let event):
+            if Self.displayPhrases.contains(lower) {
+                return ParsedClause(kind: .displayConnection, span: span, parameter: .display(event), detail: nil)
+            }
+        case .volume(let event):
+            if Self.volumePhrases.contains(lower) {
+                return ParsedClause(kind: .externalVolume, span: span, parameter: .volume(event), detail: nil)
+            }
+        case .lifecycle(let event):
             return ParsedClause(
-                kind: .wake,
-                span: SourceSpan(start: keyword.span.start, end: end),
-                parameter: .wake,
+                kind: .applicationLifecycle,
+                span: span,
+                parameter: .lifecycle(event: event, applicationName: name),
                 detail: nil
             )
+        case .none:
+            break
         }
 
         return ParsedClause(
             kind: .applicationLifecycle,
-            span: SourceSpan(start: keyword.span.start, end: end),
-            parameter: .lifecycle(event: event, applicationName: name),
+            span: span,
+            parameter: .lifecycle(event: nil, applicationName: name),
             detail: nil
         )
     }

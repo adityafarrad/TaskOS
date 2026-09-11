@@ -68,9 +68,11 @@ struct ContentView: View {
                 Text("Schedule").tag(ComposerViewModel.TriggerFamily.schedule)
                 Text("App event").tag(ComposerViewModel.TriggerFamily.applicationLifecycle)
                 Text("Mac wakes").tag(ComposerViewModel.TriggerFamily.wake)
+                Text("Display").tag(ComposerViewModel.TriggerFamily.displayConnection)
+                Text("Drive").tag(ComposerViewModel.TriggerFamily.externalVolume)
             }
             .pickerStyle(.segmented)
-            .frame(maxWidth: 520)
+            .frame(maxWidth: 640)
 
             if model.isScheduled {
                 scheduleCard
@@ -80,6 +82,10 @@ struct ContentView: View {
                 Text("Runs after the Mac wakes, once the session is ready.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
+            } else if model.isDisplayTrigger {
+                displayCard
+            } else if model.isVolumeTrigger {
+                volumeCard
             } else {
                 Text("Runs only when you start it from the app or menu bar.")
                     .font(.caption)
@@ -199,6 +205,67 @@ struct ContentView: View {
                 model.setLifecycleApplication(application)
             }
         )
+    }
+
+    @ViewBuilder
+    private var displayCard: some View {
+        HStack(spacing: 8) {
+            Picker(
+                "Display event",
+                selection: Binding(get: { model.displayEvent }, set: { model.setDisplayEvent($0) })
+            ) {
+                Text("connects").tag(DisplayEvent.connected)
+                Text("disconnects").tag(DisplayEvent.disconnected)
+            }
+            .pickerStyle(.segmented)
+            .frame(width: 200)
+
+            Picker("Display", selection: displaySelectionBinding) {
+                Text("Any external display").tag("any")
+                ForEach(model.displays, id: \.identifier) { screen in
+                    Text(screen.displayName).tag(screen.identifier)
+                }
+            }
+            .labelsHidden()
+            .frame(width: 240)
+        }
+    }
+
+    private var displaySelectionBinding: Binding<String> {
+        Binding(
+            get: {
+                if case .display(let identifier, _) = model.displaySelection {
+                    return identifier
+                }
+                return "any"
+            },
+            set: { newValue in
+                if newValue == "any" {
+                    model.setDisplaySelection(.anyExternal)
+                } else if let screen = model.displays.first(where: { $0.identifier == newValue }) {
+                    model.setDisplaySelection(.display(identifier: screen.identifier, label: screen.displayName))
+                }
+            }
+        )
+    }
+
+    @ViewBuilder
+    private var volumeCard: some View {
+        HStack(spacing: 8) {
+            Picker(
+                "Drive event",
+                selection: Binding(get: { model.volumeEvent }, set: { model.setVolumeEvent($0) })
+            ) {
+                Text("mounts").tag(VolumeEvent.mounted)
+                Text("unmounts").tag(VolumeEvent.unmounted)
+            }
+            .pickerStyle(.segmented)
+            .frame(width: 220)
+
+            Text("Any external drive")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
     }
 
     private var timeBinding: Binding<Date> {
