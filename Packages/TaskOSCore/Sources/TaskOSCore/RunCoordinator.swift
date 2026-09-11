@@ -119,6 +119,7 @@ public actor RunCoordinator {
     private let clock: CoreClock
     private let limits: Limits
     private let execution: RunExecution
+    private let eventSink: (any AdmissionEventSink)?
     private let maximumEventLog: Int
 
     private var queue: [QueuedRun] = []
@@ -136,11 +137,13 @@ public actor RunCoordinator {
         clock: CoreClock,
         limits: Limits = .default,
         maximumEventLog: Int = RunCoordinator.maximumEventLog,
+        eventSink: (any AdmissionEventSink)? = nil,
         execution: @escaping RunExecution
     ) {
         self.clock = clock
         self.limits = limits
         self.maximumEventLog = maximumEventLog
+        self.eventSink = eventSink
         self.execution = execution
     }
 
@@ -356,6 +359,9 @@ public actor RunCoordinator {
         eventLog.append(event)
         if eventLog.count > maximumEventLog {
             eventLog.removeFirst(eventLog.count - maximumEventLog)
+        }
+        if let eventSink {
+            Task { await eventSink.record(event) }
         }
     }
 }

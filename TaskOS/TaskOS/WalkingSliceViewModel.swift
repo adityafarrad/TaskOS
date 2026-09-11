@@ -858,7 +858,9 @@ final class ComposerViewModel {
         Task { [weak self] in
             guard let self else { return }
             try? await self.composition.runHistory.clear()
+            try? await self.composition.admissionEvents.clear()
             self.history = []
+            self.admissionEvents = []
             self.settingsNotice = "Run history cleared."
         }
     }
@@ -1040,8 +1042,8 @@ final class ComposerViewModel {
         Task { [weak self] in
             guard let self else { return }
             let status = await self.composition.coordinator.status()
-            self.admissionEvents = status.recentEvents
             self.automaticTriggersPaused = status.isPaused
+            self.admissionEvents = (try? await self.composition.admissionEvents.recentEvents(limit: 50)) ?? []
         }
     }
 

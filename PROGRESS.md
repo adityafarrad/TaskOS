@@ -1884,3 +1884,28 @@ record isolation/recovery) is deferred to Phase 3 with the migration fixtures.
 - Physical checks: pending (Test now / Library Run still work; queued behind a
   long automatic run; menu Cancel stops it).
 - Next eligible work package: P3 — persist admission/skipped events.
+
+### Increment P3 — Persist admission/skipped events (gap 1)
+
+- Status: done
+- Behavior delivered: queue overflow, expiration, duplicate/cooldown
+  suppression, pause clears, and sleep interrupts are now persisted and survive
+  relaunch. The main window's "Skipped and queue events" section loads from the
+  store; Clear history also clears these events. Retention keeps the last 200
+  events or 30 days.
+- Interfaces changed: added `AdmissionEventSink` / `AdmissionEventRepository`
+  protocols and `AdmissionEventRetention` (Core); `RunCoordinator` gained an
+  optional `eventSink` and forwards each event to it. App added
+  `AdmissionEventRecord` + `SwiftDataAdmissionEventRepository`, wired into the
+  `ModelContainer` and passed as the coordinator's sink; `ComposerViewModel`
+  loads events from the repository; `clearHistory` clears them too.
+- Tests performed:
+  - `swift test --package-path Packages/TaskOSCore` — 263 tests, 34 suites, pass
+    (was 262/34; +1). New coverage: the coordinator forwards admission events to
+    a sink (cooldown suppression observed).
+  - App tests (`xcodebuild ... test -only-testing:TaskOSTests`) — TEST SUCCEEDED,
+    including a new SwiftData admission-event append/recent/clear test.
+  - Debug and Release builds — BUILD SUCCEEDED.
+- Physical checks: pending (cause a suppressed event, quit, relaunch, and confirm
+  it is still listed; Clear history removes it).
+- Next eligible work package: optional quick wins Q1/Q2.

@@ -93,6 +93,16 @@ final class ExecutionProbe: @unchecked Sendable {
     }
 }
 
+actor RecordingAdmissionSink: AdmissionEventSink {
+    private(set) var events: [AdmissionEvent] = []
+
+    var count: Int { events.count }
+
+    func record(_ event: AdmissionEvent) async {
+        events.append(event)
+    }
+}
+
 @Suite("Run coordinator")
 struct RunCoordinatorTests {
     private func workflow(_ name: String = "Workflow") -> AutomationDefinition {
@@ -430,6 +440,28 @@ struct RunCoordinatorTests {
         probe.open()
         await coordinator.waitUntilIdle()
         #expect(!(await coordinator.status().isRunning))
+    }
+
+    @Test func forwardsAdmissionEventsToSink() async {
+        let clock = TestClock()
+        let probe = ExecutionProbe()
+        let sink = RecordingAdmissionSink()
+        let coordinator = RunCoordinator(clock: clock, eventSink: sink) { definition, id in
+            await probe.run(definition, id)
+        }
+        let definition = workflow()
+
+        #expect(await coordinator.submit(definition, source: .automatic(.schedule)) == .started)
+        await coordinator.waitUntilIdle()
+        #expect(await coordinator.submit(definition, source: .automatic(.schedule)) == .suppressedCooldown)
+
+        var attempts = 0
+        while attempts < 200, await sink.count == 0 {
+            await Task.yield()
+            attempts += 1
+        }
+        #expect(await sink.count == 1)
+        #expect(await sink.events.first?.kind == .cooldownSuppressed)
     }
 
     @Test func submitAndWaitReturnsTheRecord() async {

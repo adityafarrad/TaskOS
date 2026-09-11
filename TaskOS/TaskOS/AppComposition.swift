@@ -27,6 +27,7 @@ final class AppComposition {
     let templates = TemplateCatalog.standard
     let repository: any AutomationRepository
     let runHistory: any RunHistoryRepository
+    let admissionEvents: any AdmissionEventRepository
     let drafts: any DraftRepository
     let permissions: any PermissionStatusProvider
 
@@ -44,17 +45,24 @@ final class AppComposition {
 
         let container: ModelContainer
         do {
-            container = try ModelContainer(for: WorkflowRecord.self, RunRecordEntry.self, DraftRecord.self)
+            container = try ModelContainer(
+                for: WorkflowRecord.self,
+                RunRecordEntry.self,
+                AdmissionEventRecord.self,
+                DraftRecord.self
+            )
         } catch {
             container = try! ModelContainer(
                 for: WorkflowRecord.self,
                 RunRecordEntry.self,
+                AdmissionEventRecord.self,
                 DraftRecord.self,
                 configurations: ModelConfiguration(isStoredInMemoryOnly: true)
             )
         }
 
         let runHistory = SwiftDataRunHistoryRepository(modelContainer: container)
+        let admissionEvents = SwiftDataAdmissionEventRepository(modelContainer: container)
         let lifecycleSuppressor = LifecycleSuppressor(clock: clock)
         let runner = WorkflowRunner(
             clock: clock,
@@ -77,6 +85,7 @@ final class AppComposition {
         self.suggestions = SuggestionEngine()
         self.repository = SwiftDataAutomationRepository(modelContainer: container)
         self.runHistory = runHistory
+        self.admissionEvents = admissionEvents
         self.drafts = SwiftDataDraftRepository(modelContainer: container)
         let permissions = SystemPermissionStatusProvider()
         self.permissions = permissions
@@ -85,7 +94,7 @@ final class AppComposition {
             permissions: permissions
         )
         self.runner = runner
-        let coordinator = RunCoordinator(clock: clock) { definition, id in
+        let coordinator = RunCoordinator(clock: clock, eventSink: admissionEvents) { definition, id in
             try? await runHistory.append(RunRecord.starting(definition, id: id))
             await MainActor.run {
                 NotificationCenter.default.post(name: .taskOSRunHistoryDidChange, object: nil)
