@@ -1909,3 +1909,36 @@ record isolation/recovery) is deferred to Phase 3 with the migration fixtures.
 - Physical checks: pending (cause a suppressed event, quit, relaunch, and confirm
   it is still listed; Clear history removes it).
 - Next eligible work package: optional quick wins Q1/Q2.
+
+### Increment Q1 — Import maps a specific display to the current display
+
+- Status: done
+- Behavior delivered: importing a workflow that was exported with a specific
+  display identifier now maps that selection to the current display, avoiding a
+  false "display not connected" state on a different Mac. `current`/`main`
+  selections import unchanged.
+- Interfaces changed: `WorkflowPortability.PortableAction.makeAction` maps
+  `.display(identifier:)` to `.current`.
+- Tests performed: `swift test` — new coverage importing a specific display
+  yields `.current`.
+
+### Increment Q2 — Website suggestion from a typed domain
+
+- Status: done
+- Behavior delivered: typing `open <domain>` (e.g. `open apple.com`) now offers
+  an exact "Open https://apple.com" website suggestion alongside application
+  matches.
+- Interfaces changed: `SuggestionEngine` `.openApplication` context adds a
+  website suggestion when the fragment contains a dot and looks like a website.
+- Tests performed: `swift test` — new coverage for the domain suggestion.
+
+- Tests performed (Q1+Q2):
+  - `swift test --package-path Packages/TaskOSCore` — 265 tests, 34 suites, pass
+    (was 263/34; +2).
+  - App tests (`xcodebuild ... test -only-testing:TaskOSTests`) — TEST SUCCEEDED.
+  - Debug and Release builds — BUILD SUCCEEDED.
+- Physical checks: pending (type a domain under `open` and accept the website
+  suggestion; export on one Mac and import elsewhere to confirm the display
+  selection resets).
+- Next eligible work package: Phase 3.1 system validation (gap 4 and the smaller
+  gaps 5–12 remain deferred).

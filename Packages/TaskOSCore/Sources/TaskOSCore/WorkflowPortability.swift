@@ -111,6 +111,13 @@ private enum PortableAction: Codable {
         }
     }
 
+    private static func portableDisplay(_ display: WindowDisplaySelection) -> WindowDisplaySelection {
+        if case .display = display {
+            return .current
+        }
+        return display
+    }
+
     func makeAction() -> ActionConfiguration {
         switch self {
         case .openApplication(let label):
@@ -131,7 +138,7 @@ private enum PortableAction: Codable {
                 ArrangeWindowAction(
                     application: .application(bundleIdentifier: "", label: label),
                     preset: preset,
-                    display: display
+                    display: Self.portableDisplay(display)
                 )
             )
         case .wait(let duration):

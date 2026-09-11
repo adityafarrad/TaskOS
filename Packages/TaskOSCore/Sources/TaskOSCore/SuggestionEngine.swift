@@ -19,6 +19,20 @@ public struct SuggestionEngine: Sendable {
 
         case .openApplication(let prefix):
             let matches = applicationSuggestions(applications, prefix: prefix)
+
+            if prefix.contains("."), ResourceNameHeuristics.isWebsite(prefix) {
+                let normalized = ResourceNameHeuristics.normalizedWebsiteURL(prefix)
+                let website = Suggestion(
+                    id: "website.\(normalized)",
+                    phrase: "Open \(normalized)",
+                    title: normalized,
+                    category: .parameter,
+                    requiresParameter: false,
+                    match: .exact
+                )
+                return rankAndLimit([website] + matches)
+            }
+
             if prefix.isEmpty {
                 return rankAndLimit(starters(openOnly: true) + matches)
             }

@@ -80,6 +80,30 @@ struct PortabilityTests {
         }
     }
 
+    @Test func importedSpecificDisplayBecomesCurrent() throws {
+        let definition = AutomationDefinition(
+            name: "Display",
+            trigger: .manual(ManualTrigger()),
+            actions: [
+                .arrangeWindow(
+                    ArrangeWindowAction(
+                        application: .application(bundleIdentifier: "com.apple.Safari", label: "Safari"),
+                        preset: .leftHalf,
+                        display: .display(identifier: "42")
+                    )
+                ),
+            ]
+        )
+        let data = try WorkflowPortability.export(definition)
+        let imported = try WorkflowPortability.importWorkflow(data)
+
+        if case .arrangeWindow(let action)? = imported.actions.first {
+            #expect(action.display == .current)
+        } else {
+            Issue.record("Expected an arrange window action")
+        }
+    }
+
     @Test func freshIdentityIsAssigned() throws {
         let data = try WorkflowPortability.export(sampleDefinition())
         let id = AutomationID()

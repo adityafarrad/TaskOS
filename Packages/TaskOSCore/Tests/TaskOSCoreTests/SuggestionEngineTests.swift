@@ -36,6 +36,12 @@ struct SuggestionEngineTests {
         #expect(suggestions.contains { $0.title == "Notes" })
     }
 
+    @Test func openDomainOffersWebsiteSuggestion() {
+        let suggestions = engine.suggestions(for: "open apple.com")
+        #expect(suggestions.contains { $0.id.hasPrefix("website.") })
+        #expect(suggestions.contains { $0.phrase == "Open https://apple.com" })
+    }
+
     @Test func openPrefixMatchesApplications() {
         let suggestions = engine.suggestions(for: "open Sa", applications: applications)
         #expect(suggestions.first?.title == "Safari")
