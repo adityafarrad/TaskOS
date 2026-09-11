@@ -2,16 +2,26 @@ import AppKit
 import TaskOSCore
 
 struct OpenApplicationExecutor: ActionExecutor {
+    let suppressor: LifecycleSuppressor?
+
+    init(suppressor: LifecycleSuppressor? = nil) {
+        self.suppressor = suppressor
+    }
+
     nonisolated var supportedID: ActionID { .openApplication }
 
     nonisolated func execute(_ action: ActionConfiguration) async -> ActionOutcome {
         guard case .openApplication(let configuration) = action else {
             return .failed(ActionFailure(message: "Open Application received an unsupported action."))
         }
-        return await open(
+        let outcome = await open(
             bundleIdentifier: configuration.application.identifier,
             label: configuration.application.label
         )
+        if case .succeeded = outcome {
+            await suppressor?.suppress(bundleIdentifier: configuration.application.identifier)
+        }
+        return outcome
     }
 
     @MainActor

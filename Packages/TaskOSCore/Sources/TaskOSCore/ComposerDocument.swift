@@ -21,6 +21,7 @@ public enum ComposerTriggerDraft: Hashable, Sendable {
     case relative(TimeInterval)
     case once(hour: Int, minute: Int)
     case oneTime(Date)
+    case applicationLifecycle(application: ResourceReference?, label: String, event: LifecycleEvent)
 }
 
 public struct ComposerAction: Hashable, Sendable, Identifiable {
@@ -144,6 +145,13 @@ public struct ComposerDocument: Sendable {
 
     public var hasUnresolvedActions: Bool {
         hasUnresolvedApplications || hasUnresolvedWebsites || hasUnresolvedCopyText || hasUnresolvedFiles
+    }
+
+    public var hasUnresolvedTrigger: Bool {
+        if case .applicationLifecycle(let application, let label, _) = trigger {
+            return application == nil || label.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        }
+        return false
     }
 
     public mutating func setText(_ newText: String) {
@@ -340,6 +348,10 @@ public struct ComposerDocument: Sendable {
             return .schedule(.oneTime(date))
         case .oneTime(let date):
             return .schedule(.oneTime(date))
+        case .applicationLifecycle(let application, let label, let event):
+            let reference = application
+                ?? ResourceReference(kind: .application, identifier: "", label: label)
+            return .applicationLifecycle(ApplicationLifecycleTrigger(application: reference, event: event))
         }
     }
 
@@ -386,6 +398,14 @@ public struct ComposerDocument: Sendable {
 
         for clause in parsed.clauses {
             switch clause.kind {
+            case .applicationLifecycle:
+                let name = (clause.lifecycleApplicationName ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+                if let event = clause.lifecycleEvent, !name.isEmpty {
+                    newTrigger = .applicationLifecycle(application: nil, label: name, event: event)
+                } else {
+                    newElements.append(.unresolved(clauseText(clause)))
+                }
+
             case .schedule:
                 switch clause.schedule {
                 case .daily(let hour, let minute):
@@ -620,6 +640,8 @@ public struct ComposerDocument: Sendable {
         case .oneTime(let date):
             let components = Calendar.current.dateComponents([.hour, .minute], from: date)
             return "Once at \(clockText(hour: components.hour ?? 0, minute: components.minute ?? 0))"
+        case .applicationLifecycle(_, let label, let event):
+            return label.isEmpty ? "" : "When \(label) \(event.displayName)"
         }
     }
 

@@ -11,6 +11,8 @@ final class AppComposition {
     let coordinator: RunCoordinator
     let scheduleCalculator: ScheduleCalculator
     let scheduleRegistry: ScheduleRegistry
+    let lifecycleSuppressor: LifecycleSuppressor
+    let eventTriggerRegistry: EventTriggerRegistry
     let preparer: CreationPreparer
     let approvals: ApprovalRegistry
     let suggestions: SuggestionEngine
@@ -21,6 +23,7 @@ final class AppComposition {
 
     private let catalog: WorkspaceResourceCatalog
     private let sessionObserver: SystemSessionObserver
+    private let lifecycleSource: ApplicationLifecycleSource
 
     init() {
         let clock = SystemClock()
@@ -39,12 +42,13 @@ final class AppComposition {
         }
 
         let runHistory = SwiftDataRunHistoryRepository(modelContainer: container)
+        let lifecycleSuppressor = LifecycleSuppressor(clock: clock)
         let runner = WorkflowRunner(
             clock: clock,
             executors: [
-                OpenApplicationExecutor(),
+                OpenApplicationExecutor(suppressor: lifecycleSuppressor),
                 HideApplicationExecutor(),
-                QuitApplicationExecutor(),
+                QuitApplicationExecutor(suppressor: lifecycleSuppressor),
                 OpenFileExecutor(),
                 RevealInFinderExecutor(),
                 OpenWebsiteExecutor(),
@@ -91,6 +95,13 @@ final class AppComposition {
             calculator: scheduleCalculator,
             coordinator: coordinator
         )
+        self.lifecycleSuppressor = lifecycleSuppressor
+        self.eventTriggerRegistry = EventTriggerRegistry(
+            clock: clock,
+            coordinator: coordinator,
+            suppressor: lifecycleSuppressor
+        )
+        self.lifecycleSource = ApplicationLifecycleSource()
 
         self.sessionObserver = SystemSessionObserver(coordinator: coordinator)
     }
@@ -103,12 +114,19 @@ final class AppComposition {
         await catalog.installedDisplays()
     }
 
-    func syncScheduleRegistrations() async {
+    func syncTriggerRegistrations() async {
         let workflows = (try? await repository.loadAll()) ?? []
-        let enabledSchedules = workflows
+        let enabled = workflows
             .filter { $0.isEnabled }
             .map(\.definition)
-        await scheduleRegistry.replaceAll(enabledSchedules)
+        await scheduleRegistry.replaceAll(enabled)
+        await eventTriggerRegistry.replaceAll(enabled)
+    }
+
+    func startEventTriggers() async {
+        _ = await lifecycleSource.start { [eventTriggerRegistry] event in
+            Task { await eventTriggerRegistry.handle(event) }
+        }
     }
 }
 

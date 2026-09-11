@@ -35,7 +35,7 @@ compressed into implementation plus per-increment physical smoke checks.
 | 2.1 | Add scheduling and runtime admission | done | Increments H1–H3 + fixes H3-d/H3-e | Schedule model, occurrence calc, admission/queue/pause/cancel, schedule grammar, runtime registry, trigger card + next-run preview + enable toggle; physical tests A–E passed |
 | 2.2 | Finish app, window, and utility actions | done | Increments I1–I3 | Copy Text, Hide, normal Quit, specific-display selection, window presets, and notification editing/presentation done; lifecycle loop suppression tracked in 2.4 |
 | 2.3 | Add selected files and portable workflows | done | Increments J1–J3 | File selection, Open/Reveal, durable references, repair, and portable export/import with rebinding done |
-| 2.4 | Add event-triggered workflows | in progress | Increment K1 | Typed event-trigger model + observation interface done; platform sources, UI, and per-family verticals pending |
+| 2.4 | Add event-triggered workflows | in progress | Increments K1 + K2 | Application-lifecycle trigger done end to end with suppression; wake/display/volume/power/battery pending |
 | 2.5 | Finish the template and discovery experience | not started | — | |
 | 2.6 | Complete everyday management and recovery | not started | — | |
 
@@ -1356,3 +1356,46 @@ Next eligible work package: 2.1 — scheduling and runtime admission.
 - Next eligible work package: 2.4 increment K2 — application lifecycle end to
   end (NSWorkspace source, registration, cards/parser, MacFlow-initiated change
   suppression).
+
+### Increment K2 — Application lifecycle trigger, end to end (plan 2.4, partial; plan T4)
+
+- Status: done
+- Behavior delivered: a workflow can run when a selected application launches
+  or quits, from text or cards, with lifecycle loop suppression. Typing
+  `when Safari opens` / `when Google Chrome quits` (or the When card's **App
+  event** family with an application picker and opens/quits selector) builds the
+  trigger and writes the canonical phrase. An enabled app-event workflow is
+  registered at launch and on save, and fires through the admission coordinator
+  when `NSWorkspace` reports the launch/quit. MacFlow's own Open/Quit actions
+  record the affected bundle identifier in a `LifecycleSuppressor`, so the
+  correlated lifecycle event is suppressed during the operation and a bounded
+  settling window instead of re-triggering a workflow.
+- Interfaces changed: added `LifecycleSuppressor` (actor) and
+  `EventTriggerRegistry` (actor) with register/unregister/replaceAll/handle and
+  suppression checks; `TriggerConfiguration.isEventTrigger`; parser
+  `ParsedClauseKind.applicationLifecycle` / `ParsedParameter.lifecycle`, the
+  `when` keyword, `lifecycleVerbs`, and `parseWhen`; `ComposerTriggerDraft
+  .applicationLifecycle` with reconciliation, resolution, rendering, and
+  `hasUnresolvedTrigger`; app `ApplicationLifecycleSource` (NSWorkspace
+  didLaunch/didTerminate), executor suppression injection,
+  `AppComposition` lifecycle suppressor/registry/source and
+  `syncTriggerRegistrations`/`startEventTriggers`, and a trigger **family**
+  picker (Manual / Schedule / App event) with a lifecycle card.
+- Tests performed:
+  - `swift test --package-path Packages/TaskOSCore` — 227 tests, 30 suites, pass
+    (was 216/29; +11). New coverage: the registry fires matching events through
+    the coordinator, ignores non-matching events and non-event registrations,
+    suppression blocks correlated events until the window elapses, unregister,
+    replaceAll, multiple workflows for one app; plus `when` parser cases and a
+    composer lifecycle definition.
+  - App tests (`xcodebuild ... test -only-testing:TaskOSTests`) — TEST SUCCEEDED.
+  - Debug build — BUILD SUCCEEDED.
+  - Release build — BUILD SUCCEEDED.
+- Physical checks: pending (create "when Safari opens" with a notification
+  action, enable it, quit and relaunch Safari to confirm it fires; confirm a
+  workflow that opens Safari does not immediately re-trigger itself).
+- Remaining/gaps: only the application-lifecycle family is wired and exposed in
+  the card; wake/display/volume/power/battery still map to manual when loaded
+  for editing; event-trigger suppression is keyed on bundle id and uses a fixed
+  3s window (conservative, not perfect attribution).
+- Next eligible work package: 2.4 increment K3 — Mac wake trigger.

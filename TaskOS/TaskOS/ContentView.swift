@@ -60,91 +60,140 @@ struct ContentView: View {
             Text("When")
                 .font(.headline)
 
+            Picker(
+                "Trigger",
+                selection: Binding(get: { model.triggerFamily }, set: { model.setTriggerFamily($0) })
+            ) {
+                Text("Manual").tag(ComposerViewModel.TriggerFamily.manual)
+                Text("Schedule").tag(ComposerViewModel.TriggerFamily.schedule)
+                Text("App event").tag(ComposerViewModel.TriggerFamily.applicationLifecycle)
+            }
+            .pickerStyle(.segmented)
+            .frame(maxWidth: 420)
+
             if model.isScheduled {
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack(spacing: 12) {
-                        Picker(
-                            "Repeat",
-                            selection: Binding(get: { model.triggerKind }, set: { model.setTriggerKind($0) })
-                        ) {
-                            Text("Daily").tag(ComposerViewModel.TriggerKind.daily)
-                            Text("Weekdays").tag(ComposerViewModel.TriggerKind.weekdays)
-                            Text("Interval").tag(ComposerViewModel.TriggerKind.interval)
-                            Text("Once").tag(ComposerViewModel.TriggerKind.once)
-                        }
-                        .pickerStyle(.segmented)
-                        .frame(maxWidth: 380)
-
-                        Button("Manual") { model.makeManual() }
-                    }
-
-                    switch model.triggerKind {
-                    case .daily:
-                        DatePicker(
-                            "Time",
-                            selection: timeBinding,
-                            displayedComponents: .hourAndMinute
-                        )
-                    case .weekdays:
-                        weekdayPicker
-                        DatePicker(
-                            "Time",
-                            selection: timeBinding,
-                            displayedComponents: .hourAndMinute
-                        )
-                    case .interval:
-                        Picker(
-                            "Every",
-                            selection: Binding(
-                                get: { model.scheduleIntervalSeconds },
-                                set: { model.setScheduleInterval($0) }
-                            )
-                        ) {
-                            ForEach(ComposerViewModel.intervalOptions, id: \.self) { seconds in
-                                Text(intervalLabel(seconds)).tag(seconds)
-                            }
-                        }
-                        .frame(maxWidth: 220)
-                    case .once:
-                        DatePicker(
-                            "Date and time",
-                            selection: Binding(
-                                get: { model.oneTimeDate },
-                                set: { model.setOneTimeDate($0) }
-                            ),
-                            displayedComponents: [.date, .hourAndMinute]
-                        )
-                    }
-
-                    if !model.upcomingOccurrences.isEmpty {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("Next runs")
-                                .font(.subheadline)
-                                .foregroundStyle(.secondary)
-                            ForEach(Array(model.upcomingOccurrences.enumerated()), id: \.offset) { _, date in
-                                Text(date.formatted(date: .abbreviated, time: .shortened))
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
-                    }
-
-                    Toggle(
-                        "Run automatically after saving",
-                        isOn: Binding(get: { model.autoRunEnabled }, set: { model.autoRunEnabled = $0 })
-                    )
-                    .disabled(!model.isScheduled)
-                }
-                .padding(10)
-                .background(RoundedRectangle(cornerRadius: 8).fill(Color.gray.opacity(0.08)))
+                scheduleCard
+            } else if model.isLifecycleTrigger {
+                lifecycleCard
             } else {
-                HStack(spacing: 12) {
-                    Text("Manual")
+                Text("Runs only when you start it from the app or menu bar.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            if model.supportsAutomaticRuns {
+                Toggle(
+                    "Run automatically after saving",
+                    isOn: Binding(get: { model.autoRunEnabled }, set: { model.autoRunEnabled = $0 })
+                )
+            }
+        }
+        .padding(10)
+        .background(RoundedRectangle(cornerRadius: 8).fill(Color.gray.opacity(0.08)))
+    }
+
+    @ViewBuilder
+    private var scheduleCard: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Picker(
+                "Repeat",
+                selection: Binding(get: { model.triggerKind }, set: { model.setTriggerKind($0) })
+            ) {
+                Text("Daily").tag(ComposerViewModel.TriggerKind.daily)
+                Text("Weekdays").tag(ComposerViewModel.TriggerKind.weekdays)
+                Text("Interval").tag(ComposerViewModel.TriggerKind.interval)
+                Text("Once").tag(ComposerViewModel.TriggerKind.once)
+            }
+            .pickerStyle(.segmented)
+            .frame(maxWidth: 380)
+
+            switch model.triggerKind {
+            case .daily:
+                DatePicker("Time", selection: timeBinding, displayedComponents: .hourAndMinute)
+            case .weekdays:
+                weekdayPicker
+                DatePicker("Time", selection: timeBinding, displayedComponents: .hourAndMinute)
+            case .interval:
+                Picker(
+                    "Every",
+                    selection: Binding(
+                        get: { model.scheduleIntervalSeconds },
+                        set: { model.setScheduleInterval($0) }
+                    )
+                ) {
+                    ForEach(ComposerViewModel.intervalOptions, id: \.self) { seconds in
+                        Text(intervalLabel(seconds)).tag(seconds)
+                    }
+                }
+                .frame(maxWidth: 220)
+            case .once:
+                DatePicker(
+                    "Date and time",
+                    selection: Binding(
+                        get: { model.oneTimeDate },
+                        set: { model.setOneTimeDate($0) }
+                    ),
+                    displayedComponents: [.date, .hourAndMinute]
+                )
+            }
+
+            if !model.upcomingOccurrences.isEmpty {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Next runs")
+                        .font(.subheadline)
                         .foregroundStyle(.secondary)
-                    Button("Add schedule") { model.addSchedule() }
+                    ForEach(Array(model.upcomingOccurrences.enumerated()), id: \.offset) { _, date in
+                        Text(date.formatted(date: .abbreviated, time: .shortened))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
                 }
             }
         }
+    }
+
+    @ViewBuilder
+    private var lifecycleCard: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 8) {
+                Picker("Application", selection: lifecycleApplicationBinding) {
+                    Text("Select...").tag("")
+                    ForEach(model.applications, id: \.bundleIdentifier) { application in
+                        Text(application.displayName).tag(application.bundleIdentifier)
+                    }
+                }
+                .labelsHidden()
+                .frame(width: 220)
+
+                Picker(
+                    "Event",
+                    selection: Binding(get: { model.lifecycleEvent }, set: { model.setLifecycleEvent($0) })
+                ) {
+                    Text("opens").tag(LifecycleEvent.launched)
+                    Text("quits").tag(LifecycleEvent.quit)
+                }
+                .pickerStyle(.segmented)
+                .frame(width: 160)
+            }
+
+            if model.lifecycleApplication == nil {
+                Label("Choose an application to watch.", systemImage: "exclamationmark.triangle")
+                    .font(.caption)
+                    .foregroundStyle(.orange)
+            }
+        }
+    }
+
+    private var lifecycleApplicationBinding: Binding<String> {
+        Binding(
+            get: { model.lifecycleApplication?.identifier ?? "" },
+            set: { newValue in
+                guard let application = model.applications.first(where: { $0.bundleIdentifier == newValue }) else {
+                    return
+                }
+                model.setLifecycleApplication(application)
+            }
+        )
     }
 
     private var timeBinding: Binding<Date> {

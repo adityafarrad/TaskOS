@@ -26,6 +26,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NotificationPresenter.shared.activate()
         MenuBarViewModel.shared.load()
         MenuBarViewModel.shared.refreshStatus()
-        Task { await AppComposition.shared.syncScheduleRegistrations() }
+        Task {
+            await AppComposition.shared.syncTriggerRegistrations()
+            await AppComposition.shared.startEventTriggers()
+        }
     }
 }

@@ -72,7 +72,7 @@ final class ComposerViewModel {
     var canRedo: Bool { document.canRedo }
 
     var hasUnresolved: Bool {
-        document.hasUnresolvedText || document.hasUnresolvedActions
+        document.hasUnresolvedText || document.hasUnresolvedActions || document.hasUnresolvedTrigger
     }
 
     var canPrepare: Bool {
@@ -114,9 +114,75 @@ final class ComposerViewModel {
         4 * 60 * 60, 8 * 60 * 60, 12 * 60 * 60, 24 * 60 * 60,
     ]
 
-    var isScheduled: Bool {
-        if case .manual = document.trigger { return false }
-        return true
+    enum TriggerFamily: Hashable {
+        case manual
+        case schedule
+        case applicationLifecycle
+    }
+
+    var triggerFamily: TriggerFamily {
+        switch document.trigger {
+        case .manual:
+            return .manual
+        case .applicationLifecycle:
+            return .applicationLifecycle
+        case .daily, .weekdays, .interval, .relative, .once, .oneTime:
+            return .schedule
+        }
+    }
+
+    var isScheduled: Bool { triggerFamily == .schedule }
+    var isLifecycleTrigger: Bool { triggerFamily == .applicationLifecycle }
+    var supportsAutomaticRuns: Bool { triggerFamily != .manual }
+
+    func setTriggerFamily(_ family: TriggerFamily) {
+        switch family {
+        case .manual:
+            document.setTrigger(.manual)
+            autoRunEnabled = false
+        case .schedule:
+            document.setTrigger(.daily(hour: 9, minute: 0))
+        case .applicationLifecycle:
+            document.setTrigger(.applicationLifecycle(application: nil, label: "", event: .launched))
+        }
+        afterEdit()
+    }
+
+    var lifecycleEvent: LifecycleEvent {
+        if case .applicationLifecycle(_, _, let event) = document.trigger {
+            return event
+        }
+        return .launched
+    }
+
+    var lifecycleApplication: ResourceReference? {
+        if case .applicationLifecycle(let application, _, _) = document.trigger {
+            return application
+        }
+        return nil
+    }
+
+    var lifecycleLabel: String {
+        if case .applicationLifecycle(_, let label, _) = document.trigger {
+            return label
+        }
+        return ""
+    }
+
+    func setLifecycleEvent(_ event: LifecycleEvent) {
+        document.setTrigger(.applicationLifecycle(application: lifecycleApplication, label: lifecycleLabel, event: event))
+        afterEdit()
+    }
+
+    func setLifecycleApplication(_ application: ApplicationResource) {
+        document.setTrigger(
+            .applicationLifecycle(
+                application: .application(bundleIdentifier: application.bundleIdentifier, label: application.displayName),
+                label: application.displayName,
+                event: lifecycleEvent
+            )
+        )
+        afterEdit()
     }
 
     var triggerKind: TriggerKind {
@@ -127,7 +193,7 @@ final class ComposerViewModel {
             return .interval
         case .once, .oneTime:
             return .once
-        case .daily, .manual:
+        case .daily, .manual, .applicationLifecycle:
             return .daily
         }
     }
@@ -149,7 +215,7 @@ final class ComposerViewModel {
             return calendar.date(bySettingHour: hour, minute: minute, second: 0, of: base) ?? base
         case .oneTime(let date):
             return date
-        case .relative, .interval, .manual:
+        case .relative, .interval, .manual, .applicationLifecycle:
             return calendar.date(bySettingHour: 9, minute: 0, second: 0, of: base) ?? base
         }
     }
@@ -540,7 +606,7 @@ final class ComposerViewModel {
             return
         }
 
-        let isAutomatic = autoRunEnabled && isScheduled
+        let isAutomatic = autoRunEnabled && supportsAutomaticRuns
         let workflow = SavedWorkflow(definition: definition, isEnabled: isAutomatic)
 
         Task { [weak self] in
@@ -552,6 +618,13 @@ final class ComposerViewModel {
                         await self.composition.scheduleRegistry.register(definition)
                     } else {
                         await self.composition.scheduleRegistry.unregister(definition.id)
+                    }
+                }
+                if definition.trigger.isEventTrigger {
+                    if isAutomatic {
+                        await self.composition.eventTriggerRegistry.register(definition)
+                    } else {
+                        await self.composition.eventTriggerRegistry.unregister(definition.id)
                     }
                 }
                 self.autosaveTask?.cancel()
@@ -614,6 +687,7 @@ final class ComposerViewModel {
                 try? await self.composition.repository.delete(id: workflow.id)
             }
             await self.composition.scheduleRegistry.replaceAll([])
+            await self.composition.eventTriggerRegistry.replaceAll([])
             self.loadLibrary()
             self.settingsNotice = "All saved workflows deleted."
         }
@@ -715,6 +789,7 @@ final class ComposerViewModel {
             guard let self else { return }
             try? await self.composition.repository.delete(id: workflow.id)
             await self.composition.scheduleRegistry.unregister(workflow.id)
+            await self.composition.eventTriggerRegistry.unregister(workflow.id)
             self.loadLibrary()
         }
     }
@@ -878,8 +953,13 @@ final class ComposerViewModel {
             case .oneTime(let date):
                 draft = .oneTime(date)
             }
-        case .applicationLifecycle, .wake, .displayConnection,
-             .externalVolume, .powerSource, .batteryThreshold:
+        case .applicationLifecycle(let trigger):
+            draft = .applicationLifecycle(
+                application: trigger.application.identifier.isEmpty ? nil : trigger.application,
+                label: trigger.application.label,
+                event: trigger.event
+            )
+        case .wake, .displayConnection, .externalVolume, .powerSource, .batteryThreshold:
             draft = .manual
         }
         if draft != .manual {
@@ -888,6 +968,19 @@ final class ComposerViewModel {
     }
 
     private func autoResolveApplications() {
+        if case .applicationLifecycle(let application, let label, let event) = document.trigger,
+           application == nil,
+           !label.isEmpty,
+           let match = applications.first(where: { $0.displayName.caseInsensitiveCompare(label) == .orderedSame }) {
+            document.setTrigger(
+                .applicationLifecycle(
+                    application: .application(bundleIdentifier: match.bundleIdentifier, label: match.displayName),
+                    label: match.displayName,
+                    event: event
+                )
+            )
+        }
+
         for action in document.actions {
             let name: String?
             let resolved: ResourceReference?

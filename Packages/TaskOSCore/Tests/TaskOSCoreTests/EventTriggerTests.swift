@@ -93,6 +93,43 @@ struct EventTriggerTests {
         #expect(CanonicalPhrase.text(for: .batteryThreshold(BatteryThresholdTrigger(comparator: .below, percentage: 20))) == "When the battery drops below 20%")
     }
 
+    @Test func parsesWhenApplicationOpens() {
+        let parsed = CommandParser().parse("when Safari opens")
+        #expect(parsed.outcome == .complete)
+        let clause = parsed.clauses.first { $0.kind == .applicationLifecycle }
+        #expect(clause?.lifecycleEvent == .launched)
+        #expect(clause?.lifecycleApplicationName == "Safari")
+    }
+
+    @Test func parsesWhenApplicationQuits() {
+        let parsed = CommandParser().parse("when Google Chrome quits")
+        let clause = parsed.clauses.first { $0.kind == .applicationLifecycle }
+        #expect(clause?.lifecycleEvent == .quit)
+        #expect(clause?.lifecycleApplicationName == "Google Chrome")
+    }
+
+    @Test func whenWithoutVerbNeedsInput() {
+        let parsed = CommandParser().parse("when Safari")
+        #expect(parsed.outcome == .needsInput)
+        #expect(parsed.diagnostics.contains { $0.severity == .error })
+    }
+
+    @Test func lifecycleComposerBuildsDefinition() {
+        var document = ComposerDocument(text: "when Safari opens, then show a notification")
+        #expect(document.trigger == .applicationLifecycle(application: nil, label: "Safari", event: .launched))
+        #expect(document.makeDefinition(name: "Watch") == nil)
+
+        document.setTrigger(
+            .applicationLifecycle(
+                application: safari,
+                label: "Safari",
+                event: .launched
+            )
+        )
+        let definition = document.makeDefinition(name: "Watch")
+        #expect(definition?.trigger.isEventTrigger == true)
+    }
+
     @Test func eventTriggerRoundTripsThroughCoding() throws {
         let definition = AutomationDefinition(
             name: "Display",

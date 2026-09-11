@@ -114,7 +114,15 @@ private struct ParserWorker {
     static let connectors: Set<String> = ["and", "then", "also", ","]
     static let clauseKeywords: Set<String> = [
         "open", "hide", "quit", "reveal", "wait", "show", "notify", "put",
-        "arrange", "maximize", "center", "copy", "every", "once", "in",
+        "arrange", "maximize", "center", "copy", "every", "once", "in", "when",
+    ]
+    static let lifecycleVerbs: [String: LifecycleEvent] = [
+        "opens": .launched,
+        "launches": .launched,
+        "launched": .launched,
+        "quits": .quit,
+        "exits": .quit,
+        "closes": .quit,
     ]
     static let timeUnits: Set<String> = ["second", "seconds", "sec", "secs", "s"]
     static let weekdayNames: [String: Weekday] = [
@@ -200,6 +208,9 @@ private struct ParserWorker {
             return clause.resourceNames.isEmpty
         case .openFile, .revealInFinder:
             return clause.fileSelectionKind == nil
+        case .applicationLifecycle:
+            let name = (clause.lifecycleApplicationName ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+            return clause.lifecycleEvent == nil || name.isEmpty
         case .arrangeWindow:
             let name = clause.arrangeApplicationName ?? ""
             return clause.arrangePreset == nil || name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
@@ -228,6 +239,16 @@ private struct ParserWorker {
                 return [.error("Choose a file or folder for this step.", span: clause.span)]
             }
             return []
+        case .applicationLifecycle:
+            var issues: [ParseDiagnostic] = []
+            let name = (clause.lifecycleApplicationName ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+            if name.isEmpty {
+                issues.append(.error("Name the application to watch.", span: clause.span))
+            }
+            if clause.lifecycleEvent == nil {
+                issues.append(.error("Say whether the app opens or quits.", span: clause.span))
+            }
+            return issues
         case .wait:
             guard let duration = clause.duration else {
                 return [.error("Wait needs a duration, for example 5 seconds.", span: clause.span)]
@@ -299,6 +320,8 @@ private struct ParserWorker {
             return parseArrangeWithFixedPreset(.center)
         case "every", "once", "in":
             return parseSchedule()
+        case "when":
+            return parseWhen()
         default:
             if let reason = Self.excluded[word] {
                 return parseUnsupported(reason: reason)
@@ -619,6 +642,36 @@ private struct ParserWorker {
             kind: .unrecognized,
             span: SourceSpan(start: startToken.span.start, end: end),
             parameter: .none,
+            detail: nil
+        )
+    }
+
+    private mutating func parseWhen() -> ParsedClause {
+        let keyword = tokens[position]
+        position += 1
+        var end = keyword.span.end
+        var words: [String] = []
+        var event: LifecycleEvent?
+
+        while position < tokens.count {
+            let token = tokens[position]
+            guard case .word(let word) = token.kind, !Self.connectors.contains(word) else { break }
+            if let verb = Self.lifecycleVerbs[word] {
+                event = verb
+                end = token.span.end
+                position += 1
+                break
+            }
+            words.append(token.original)
+            end = token.span.end
+            position += 1
+        }
+
+        let name = words.joined(separator: " ").trimmingCharacters(in: .whitespacesAndNewlines)
+        return ParsedClause(
+            kind: .applicationLifecycle,
+            span: SourceSpan(start: keyword.span.start, end: end),
+            parameter: .lifecycle(event: event, applicationName: name),
             detail: nil
         )
     }

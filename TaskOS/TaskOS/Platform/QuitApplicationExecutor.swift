@@ -2,16 +2,24 @@ import AppKit
 import TaskOSCore
 
 struct QuitApplicationExecutor: ActionExecutor {
+    let suppressor: LifecycleSuppressor?
+
+    init(suppressor: LifecycleSuppressor? = nil) {
+        self.suppressor = suppressor
+    }
+
     nonisolated var supportedID: ActionID { .quitApplication }
 
     nonisolated func execute(_ action: ActionConfiguration) async -> ActionOutcome {
         guard case .quitApplication(let configuration) = action else {
             return .failed(ActionFailure(message: "Quit Application received an unsupported action."))
         }
-        return await quit(
+        let outcome = await quit(
             bundleIdentifier: configuration.application.identifier,
             label: configuration.application.label
         )
+        await suppressor?.suppress(bundleIdentifier: configuration.application.identifier)
+        return outcome
     }
 
     @MainActor

@@ -41,4 +41,14 @@ public enum TriggerConfiguration: Codable, Hashable, Sendable {
         guard case .schedule(let schedule) = self else { return nil }
         return schedule
     }
+
+    public var isEventTrigger: Bool {
+        switch self {
+        case .manual, .schedule:
+            return false
+        case .applicationLifecycle, .wake, .displayConnection,
+             .externalVolume, .powerSource, .batteryThreshold:
+            return true
+        }
+    }
 }
