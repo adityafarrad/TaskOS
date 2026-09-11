@@ -16,6 +16,7 @@ struct ContentView: View {
                 stepsSection
                 addMenu
                 reviewSection
+                templatesSection
                 librarySection
                 historySection
                 settingsSection
@@ -29,6 +30,11 @@ struct ContentView: View {
             isPresented: Binding(get: { model.showOnboarding }, set: { model.showOnboarding = $0 })
         ) {
             OnboardingView { model.completeOnboarding() }
+        }
+        .sheet(
+            isPresented: Binding(get: { model.showDiscovery }, set: { model.showDiscovery = $0 })
+        ) {
+            DiscoveryView(model: model)
         }
     }
 
@@ -394,6 +400,7 @@ struct ContentView: View {
                     .disabled(!model.canUndo)
                 Button("Redo") { model.redo() }
                     .disabled(!model.canRedo)
+                Button("Browse supported actions") { model.showDiscovery = true }
             }
         }
     }
@@ -526,6 +533,43 @@ struct ContentView: View {
 
             if let preview = model.preview {
                 PreviewBox(preview: preview)
+            }
+        }
+    }
+
+    private var templatesSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Templates")
+                .font(.headline)
+
+            TextField(
+                "Search templates",
+                text: Binding(get: { model.templateSearch }, set: { model.templateSearch = $0 })
+            )
+            .textFieldStyle(.roundedBorder)
+            .frame(maxWidth: 320)
+
+            ForEach(model.filteredTemplates) { template in
+                HStack(alignment: .top, spacing: 12) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(template.name)
+                        Text(template.summary)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        if let limitations = template.limitations {
+                            Text(limitations)
+                                .font(.caption2)
+                                .foregroundStyle(.orange)
+                        }
+                    }
+                    Spacer()
+                    Button("Use") { model.loadTemplate(template) }
+                }
+            }
+
+            if model.filteredTemplates.isEmpty {
+                Text("No matching templates.")
+                    .foregroundStyle(.secondary)
             }
         }
     }
@@ -1153,5 +1197,70 @@ private struct RunResultView: View {
         case .cancelled: return "cancelled"
         case .notExecuted: return "not executed"
         }
+    }
+}
+
+private struct DiscoveryView: View {
+    let model: ComposerViewModel
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text("Supported actions and triggers")
+                    .font(.title2)
+                Spacer()
+                Button("Done") { model.showDiscovery = false }
+            }
+
+            TextField(
+                "Search",
+                text: Binding(get: { model.discoverySearch }, set: { model.discoverySearch = $0 })
+            )
+            .textFieldStyle(.roundedBorder)
+
+            ScrollView {
+                VStack(alignment: .leading, spacing: 10) {
+                    ForEach(model.filteredGuides) { guide in
+                        VStack(alignment: .leading, spacing: 3) {
+                            HStack(spacing: 8) {
+                                Text(guide.title)
+                                    .font(.headline)
+                                Text(guide.kind == .action ? "Action" : "Trigger")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                if !model.guideIsAvailable(guide) {
+                                    Text("Unavailable on this Mac")
+                                        .font(.caption)
+                                        .foregroundStyle(.orange)
+                                }
+                            }
+                            Text(guide.whatItDoes)
+                                .font(.caption)
+                            Text("Example: \(guide.example)")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            if !guide.parameters.isEmpty {
+                                Text("Parameters: \(guide.parameters.joined(separator: ", "))")
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                            }
+                            if !guide.permissions.isEmpty {
+                                Text("Permissions: \(guide.permissions.map(\.rawValue).joined(separator: ", "))")
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                            }
+                            if let limitations = guide.limitations {
+                                Text(limitations)
+                                    .font(.caption2)
+                                    .foregroundStyle(.orange)
+                            }
+                        }
+                        Divider()
+                    }
+                }
+            }
+        }
+        .padding()
+        .frame(minWidth: 580, minHeight: 540)
     }
 }

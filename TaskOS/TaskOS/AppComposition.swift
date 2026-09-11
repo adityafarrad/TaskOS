@@ -24,6 +24,7 @@ final class AppComposition {
     let preparer: CreationPreparer
     let approvals: ApprovalRegistry
     let suggestions: SuggestionEngine
+    let templates = TemplateCatalog.standard
     let repository: any AutomationRepository
     let runHistory: any RunHistoryRepository
     let drafts: any DraftRepository

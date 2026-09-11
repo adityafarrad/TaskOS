@@ -34,6 +34,9 @@ final class ComposerViewModel {
     private(set) var history: [RunRecord] = []
     private(set) var draftName = "Untitled"
     var librarySearch = ""
+    var templateSearch = ""
+    var discoverySearch = ""
+    var showDiscovery = false
     var autoRunEnabled = false
     var renameTarget: AutomationID?
     var renameText = ""
@@ -810,6 +813,61 @@ final class ComposerViewModel {
             self.loadLibrary()
             self.settingsNotice = "All saved workflows deleted."
         }
+    }
+
+    var capabilityGuides: [CapabilityGuide] {
+        CapabilityGuideCatalog.standard
+    }
+
+    var filteredGuides: [CapabilityGuide] {
+        let query = discoverySearch.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !query.isEmpty else { return capabilityGuides }
+        return capabilityGuides.filter {
+            $0.title.localizedCaseInsensitiveContains(query)
+                || $0.whatItDoes.localizedCaseInsensitiveContains(query)
+                || $0.example.localizedCaseInsensitiveContains(query)
+        }
+    }
+
+    func guideIsAvailable(_ guide: CapabilityGuide) -> Bool {
+        switch guide.id {
+        case "trigger.batteryThreshold":
+            return hardware.hasBattery
+        case "trigger.displayConnection":
+            return hardware.hasExternalDisplay
+        case "trigger.externalVolume":
+            return hardware.hasRemovableVolume
+        default:
+            return true
+        }
+    }
+
+    var templates: [AutomationTemplate] {
+        composition.templates.templates
+    }
+
+    var filteredTemplates: [AutomationTemplate] {
+        let query = templateSearch.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !query.isEmpty else { return templates }
+        return templates.filter {
+            $0.name.localizedCaseInsensitiveContains(query)
+                || $0.summary.localizedCaseInsensitiveContains(query)
+        }
+    }
+
+    func loadTemplate(_ template: AutomationTemplate) {
+        draftID = AutomationID()
+        editingWorkflowID = nil
+        lastSavedSignature = nil
+        lastSavedID = nil
+        startingRevision = WorkflowRevision(1)
+        draftName = template.name
+        autoRunEnabled = false
+        document = template.document()
+        autoResolveApplications()
+        refreshSuggestions()
+        resetPreview()
+        notice = "Loaded template \"\(template.name)\". Fill in the highlighted items, then Preview."
     }
 
     func newWorkflow() {

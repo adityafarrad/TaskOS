@@ -36,7 +36,7 @@ compressed into implementation plus per-increment physical smoke checks.
 | 2.2 | Finish app, window, and utility actions | done | Increments I1–I3 | Copy Text, Hide, normal Quit, specific-display selection, window presets, and notification editing/presentation done; lifecycle loop suppression tracked in 2.4 |
 | 2.3 | Add selected files and portable workflows | done | Increments J1–J3 | File selection, Open/Reveal, durable references, repair, and portable export/import with rebinding done |
 | 2.4 | Add event-triggered workflows | in progress | Increments K1–K6 | All six event families implemented end to end with discovery/availability; physical checks for wake/display/volume/power/battery pending hardware |
-| 2.5 | Finish the template and discovery experience | not started | — | |
+| 2.5 | Finish the template and discovery experience | in progress | Increments M1–M3 | Twelve templates, template picker, and capability discovery implemented; physical UI check pending |
 | 2.6 | Complete everyday management and recovery | not started | — | |
 
 ### Phase 3 — Qualify, beta-test, and distribute
@@ -1551,3 +1551,59 @@ Next eligible work package: 2.1 — scheduling and runtime admission.
   laptop battery). Recorded as the remaining evidence gap for 2.4.
 - Next eligible work package: 2.4 physical verification sweep, then 2.5 —
   templates and discovery.
+
+### Increment M1 — Core template catalog (plan 2.5, partial)
+
+- Status: done
+- Behavior delivered: twelve curated templates as structured drafts that use only
+  registered capabilities, each with a name, summary, trigger, ordered actions,
+  required parameters, and (where relevant) an explicit limitation. Added a
+  `ComposerDocument` initializer that loads a template's trigger and actions and
+  renders the canonical text; placeholders remain unresolved so the same
+  validation and preview path applies.
+- Interfaces changed: added `AutomationTemplate`, `TemplateParameter`,
+  `TemplateCatalog` (with `ComposerActionDraft.actionID` and
+  `ComposerTriggerDraft.triggerID` helpers); `ComposerDocument.init(trigger:actions:)`.
+- Tests performed:
+  - `swift test --package-path Packages/TaskOSCore` — 249 tests, 32 suites, pass
+    (was 242/31; +7). New coverage: twelve unique templates, capability
+    registration coverage, names/summaries, resolvable templates produce
+    definitions, placeholder templates stay unresolved, trigger phrase
+    rendering, and stated limitations.
+  - Debug build — BUILD SUCCEEDED.
+
+### Increment M2 — Template picker (plan 2.5, partial)
+
+- Status: done
+- Behavior delivered: a **Templates** section lists the twelve templates with
+  search; each shows its summary and any limitation, and **Use** loads the draft
+  into the composer (name, trigger, actions), clearing the editing identity and
+  leaving placeholders highlighted for selection before Preview/Save.
+- Interfaces changed: `AppComposition.templates`; `ComposerViewModel.templateSearch`,
+  `templates`, `filteredTemplates`, `loadTemplate`; new `templatesSection` UI.
+
+### Increment M3 — Capability discovery (plan 2.5, partial)
+
+- Status: done
+- Behavior delivered: **Browse supported actions** opens a searchable sheet
+  covering every trigger and action with what it does, a supported example, its
+  parameters, required permissions, limitations, and availability on the current
+  Mac (battery/display/volume). It lists only implemented capabilities.
+- Interfaces changed: added `CapabilityGuide`/`CapabilityGuideCatalog`;
+  `ComposerViewModel.discoverySearch`, `showDiscovery`, `capabilityGuides`,
+  `filteredGuides`, `guideIsAvailable`; `DiscoveryView` sheet.
+- Tests performed (M2+M3):
+  - `swift test --package-path Packages/TaskOSCore` — 255 tests, 33 suites, pass
+    (was 249/32; +6). New coverage: guide coverage of every capability id,
+    unique ids, examples present, action permissions match `requiredPermissions`,
+    hardware requirements stated, and limitations present for risky actions.
+  - App tests (`xcodebuild ... test -only-testing:TaskOSTests`) — TEST SUCCEEDED.
+  - Debug build — BUILD SUCCEEDED.
+  - Release build — BUILD SUCCEEDED.
+- Physical checks: pending (load a template, confirm unresolved items, fill them,
+  preview and save; search discovery and confirm unimplemented actions are not
+  advertised).
+- Remaining/gaps: templates that reference system apps still require the user to
+  confirm each application; the discovery sheet lists capabilities but does not
+  deep-link a missing resource into the relevant card control.
+- Next eligible work package: 2.6 — everyday management and recovery.
