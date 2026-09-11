@@ -5,6 +5,7 @@ struct CommandComposerView: View {
     let model: ComposerViewModel
     @FocusState.Binding var isFocused: Bool
     var onBrowseActions: () -> Void
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         VStack(alignment: .leading, spacing: TaskOSSpacing.xs) {
@@ -124,8 +125,8 @@ struct CommandComposerView: View {
                 .strokeBorder(Color(nsColor: .separatorColor), lineWidth: 1)
         )
         .shadow(color: .black.opacity(0.1), radius: 10, y: 4)
-        .transition(.opacity.combined(with: .move(edge: .top)))
-        .animation(.taskOSQuick, value: model.visibleSuggestions.count)
+        .transition(reduceMotion ? .opacity : .opacity.combined(with: .move(edge: .top)))
+        .animation(reduceMotion ? nil : .taskOSQuick, value: model.visibleSuggestions.count)
     }
 
     private func suggestionAccessibilityLabel(_ suggestion: Suggestion) -> String {

@@ -12,6 +12,7 @@ struct WorkflowEditorView: View {
     let onViewHistory: () -> Void
 
     @FocusState private var composerFocused: Bool
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var pendingDelete: SavedWorkflow?
 
     private var finishedRecord: RunRecord? {
@@ -149,14 +150,14 @@ struct WorkflowEditorView: View {
                                   let from = model.actions.firstIndex(where: { $0.id == draggedID }) else {
                                 return false
                             }
-                            withAnimation(.taskOSStandard) {
+                            withAnimation(reduceMotion ? nil : .taskOSStandard) {
                                 model.moveActions(fromOffsets: IndexSet(integer: from), toOffset: index)
                             }
                             return true
                         }
                     }
                 }
-                .animation(.taskOSStandard, value: model.actions.map(\.id))
+                .animation(reduceMotion ? nil : .taskOSStandard, value: model.actions.map(\.id))
             }
 
             addStepMenu
