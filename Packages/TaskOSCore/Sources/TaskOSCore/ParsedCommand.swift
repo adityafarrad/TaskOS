@@ -11,6 +11,8 @@ public enum ParsedClauseKind: Hashable, Sendable {
     case wake
     case displayConnection
     case externalVolume
+    case powerSource
+    case batteryThreshold
     case arrangeWindow
     case wait
     case showNotification
@@ -39,6 +41,8 @@ public enum ParsedParameter: Hashable, Sendable {
     case wake
     case display(DisplayEvent)
     case volume(VolumeEvent)
+    case power(PowerEvent)
+    case battery(comparator: ThresholdComparison, percentage: Int)
     case none
 }
 
@@ -131,6 +135,20 @@ public struct ParsedClause: Hashable, Sendable {
         }
         return nil
     }
+
+    public var powerEvent: PowerEvent? {
+        if case .power(let event) = parameter {
+            return event
+        }
+        return nil
+    }
+
+    public var batteryThreshold: (comparator: ThresholdComparison, percentage: Int)? {
+        if case .battery(let comparator, let percentage) = parameter {
+            return (comparator, percentage)
+        }
+        return nil
+    }
 }
 
 public enum ParseOutcome: String, Hashable, Sendable, Codable {
@@ -189,7 +207,8 @@ public struct ParsedCommand: Hashable, Sendable {
                  .showNotification, .copyText:
                 return true
             case .schedule, .applicationLifecycle, .wake, .displayConnection,
-                 .externalVolume, .unsupported, .unrecognized:
+                 .externalVolume, .powerSource, .batteryThreshold,
+                 .unsupported, .unrecognized:
                 return false
             }
         }

@@ -116,37 +116,82 @@ private struct ParserWorker {
         "open", "hide", "quit", "reveal", "wait", "show", "notify", "put",
         "arrange", "maximize", "center", "copy", "every", "once", "in", "when",
     ]
-    enum WhenVerb {
-        case lifecycle(LifecycleEvent)
-        case wake
-        case display(DisplayEvent)
-        case volume(VolumeEvent)
-    }
-
-    static let whenVerbs: [String: WhenVerb] = [
-        "opens": .lifecycle(.launched),
-        "launches": .lifecycle(.launched),
-        "launched": .lifecycle(.launched),
-        "quits": .lifecycle(.quit),
-        "exits": .lifecycle(.quit),
-        "closes": .lifecycle(.quit),
-        "wakes": .wake,
-        "woke": .wake,
-        "connects": .display(.connected),
-        "disconnects": .display(.disconnected),
-        "mounts": .volume(.mounted),
-        "unmounts": .volume(.unmounted),
+    static let lifecycleVerbs: [String: LifecycleEvent] = [
+        "opens": .launched,
+        "launches": .launched,
+        "launched": .launched,
+        "quits": .quit,
+        "exits": .quit,
+        "closes": .quit,
     ]
-    static let displayPhrases: Set<String> = [
+    static let displaySubjects = [
         "a display", "the display", "an external display", "the external display",
         "external display", "a monitor", "an external monitor", "the external monitor",
         "external monitor", "a screen", "an external screen", "the external screen",
     ]
-    static let volumePhrases: Set<String> = [
+    static let volumeSubjects = [
         "a drive", "the drive", "an external drive", "the external drive", "external drive",
         "a volume", "the volume", "an external volume", "the external volume", "external volume",
         "a disk", "the disk", "an external disk", "the external disk",
     ]
+    static let powerSubjects = ["the mac", "my mac", "this mac", "i"]
+
+    static func displayEvent(for phrase: String) -> DisplayEvent? {
+        for subject in displaySubjects {
+            if phrase == "\(subject) connects" { return .connected }
+            if phrase == "\(subject) disconnects" { return .disconnected }
+        }
+        return nil
+    }
+
+    static func volumeEvent(for phrase: String) -> VolumeEvent? {
+        for subject in volumeSubjects {
+            if phrase == "\(subject) mounts" { return .mounted }
+            if phrase == "\(subject) unmounts" { return .unmounted }
+        }
+        return nil
+    }
+
+    static func powerEvent(for phrase: String) -> PowerEvent? {
+        for subject in powerSubjects {
+            if phrase == "\(subject) switches to battery"
+                || phrase == "\(subject) switch to battery"
+                || phrase == "\(subject) switches to battery power"
+                || phrase == "\(subject) switch to battery power"
+                || phrase == "\(subject) is on battery" {
+                return .toBattery
+            }
+            if phrase == "\(subject) switches to power"
+                || phrase == "\(subject) switch to power"
+                || phrase == "\(subject) switches to external power"
+                || phrase == "\(subject) switch to external power"
+                || phrase == "\(subject) connects to power"
+                || phrase == "\(subject) connect to power"
+                || phrase == "\(subject) connects to external power"
+                || phrase == "\(subject) connect to external power" {
+                return .toExternalPower
+            }
+        }
+        return nil
+    }
+
+    static func batteryThreshold(for phrase: String) -> (comparator: ThresholdComparison, percentage: Int)? {
+        let subjects = ["the battery", "my battery", "battery"]
+        let belowWords = ["drops below", "falls below", "goes below", "drops to", "falls to"]
+        let aboveWords = ["rises above", "goes above", "rises to", "reaches"]
+
+        for subject in subjects {
+            for word in belowWords where phrase.hasPrefix("\(subject) \(word) ") {
+                let value = phrase.dropFirst("\(subject) \(word) ".count)
+                if let percentage = Int(value) { return (.below, percentage) }
+            }
+            for word in aboveWords where phrase.hasPrefix("\(subject) \(word) ") {
+                let value = phrase.dropFirst("\(subject) \(word) ".count)
+                if let percentage = Int(value) { return (.above, percentage) }
+            }
+        }
+        return nil
+    }
     static let timeUnits: Set<String> = ["second", "seconds", "sec", "secs", "s"]
     static let weekdayNames: [String: Weekday] = [
         "sunday": .sunday,
@@ -234,7 +279,7 @@ private struct ParserWorker {
         case .applicationLifecycle:
             let name = (clause.lifecycleApplicationName ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
             return clause.lifecycleEvent == nil || name.isEmpty
-        case .wake, .displayConnection, .externalVolume:
+        case .wake, .displayConnection, .externalVolume, .powerSource, .batteryThreshold:
             return false
         case .arrangeWindow:
             let name = clause.arrangeApplicationName ?? ""
@@ -675,55 +720,83 @@ private struct ParserWorker {
         let keyword = tokens[position]
         position += 1
         var end = keyword.span.end
-        var words: [String] = []
-        var verb: WhenVerb?
+        var originals: [String] = []
+        var lowerWords: [String] = []
 
         while position < tokens.count {
             let token = tokens[position]
-            guard case .word(let word) = token.kind, !Self.connectors.contains(word) else { break }
-            if let found = Self.whenVerbs[word] {
-                verb = found
-                end = token.span.end
-                position += 1
+
+            if isConnectorToken(token), isClauseStart(tokenAfterCurrent) {
                 break
             }
-            words.append(token.original)
-            end = token.span.end
-            position += 1
+
+            switch token.kind {
+            case .word(let word):
+                guard !Self.connectors.contains(word) else {
+                    return whenClause(originals: originals, lowerWords: lowerWords, start: keyword.span.start, end: end)
+                }
+                originals.append(token.original)
+                lowerWords.append(word)
+                end = token.span.end
+                position += 1
+            case .number(let value):
+                originals.append(String(Int(value)))
+                lowerWords.append(String(Int(value)))
+                end = token.span.end
+                position += 1
+                if position < tokens.count, case .punctuation("%") = tokens[position].kind {
+                    end = tokens[position].span.end
+                    position += 1
+                }
+            case .punctuation:
+                return whenClause(originals: originals, lowerWords: lowerWords, start: keyword.span.start, end: end)
+            }
         }
 
-        let name = words.joined(separator: " ").trimmingCharacters(in: .whitespacesAndNewlines)
-        let lower = name.lowercased()
-        let span = SourceSpan(start: keyword.span.start, end: end)
+        return whenClause(originals: originals, lowerWords: lowerWords, start: keyword.span.start, end: end)
+    }
 
-        switch verb {
-        case .wake:
-            if lower == "the mac" {
-                return ParsedClause(kind: .wake, span: span, parameter: .wake, detail: nil)
-            }
-        case .display(let event):
-            if Self.displayPhrases.contains(lower) {
-                return ParsedClause(kind: .displayConnection, span: span, parameter: .display(event), detail: nil)
-            }
-        case .volume(let event):
-            if Self.volumePhrases.contains(lower) {
-                return ParsedClause(kind: .externalVolume, span: span, parameter: .volume(event), detail: nil)
-            }
-        case .lifecycle(let event):
+    private func whenClause(originals: [String], lowerWords: [String], start: Int, end: Int) -> ParsedClause {
+        let span = SourceSpan(start: start, end: end)
+        let phrase = lowerWords.joined(separator: " ")
+        let displayName = originals.joined(separator: " ").trimmingCharacters(in: .whitespacesAndNewlines)
+
+        if phrase == "the mac wakes" || phrase == "the mac woke" || phrase == "my mac wakes" {
+            return ParsedClause(kind: .wake, span: span, parameter: .wake, detail: nil)
+        }
+
+        if let event = Self.displayEvent(for: phrase) {
+            return ParsedClause(kind: .displayConnection, span: span, parameter: .display(event), detail: nil)
+        }
+        if let event = Self.volumeEvent(for: phrase) {
+            return ParsedClause(kind: .externalVolume, span: span, parameter: .volume(event), detail: nil)
+        }
+        if let event = Self.powerEvent(for: phrase) {
+            return ParsedClause(kind: .powerSource, span: span, parameter: .power(event), detail: nil)
+        }
+        if let threshold = Self.batteryThreshold(for: phrase) {
+            return ParsedClause(
+                kind: .batteryThreshold,
+                span: span,
+                parameter: .battery(comparator: threshold.comparator, percentage: threshold.percentage),
+                detail: nil
+            )
+        }
+
+        if let last = lowerWords.last, let event = Self.lifecycleVerbs[last], originals.count >= 2 {
+            let name = originals.dropLast().joined(separator: " ")
             return ParsedClause(
                 kind: .applicationLifecycle,
                 span: span,
                 parameter: .lifecycle(event: event, applicationName: name),
                 detail: nil
             )
-        case .none:
-            break
         }
 
         return ParsedClause(
             kind: .applicationLifecycle,
             span: span,
-            parameter: .lifecycle(event: nil, applicationName: name),
+            parameter: .lifecycle(event: nil, applicationName: displayName),
             detail: nil
         )
     }

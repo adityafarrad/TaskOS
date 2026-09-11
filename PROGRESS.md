@@ -35,7 +35,7 @@ compressed into implementation plus per-increment physical smoke checks.
 | 2.1 | Add scheduling and runtime admission | done | Increments H1–H3 + fixes H3-d/H3-e | Schedule model, occurrence calc, admission/queue/pause/cancel, schedule grammar, runtime registry, trigger card + next-run preview + enable toggle; physical tests A–E passed |
 | 2.2 | Finish app, window, and utility actions | done | Increments I1–I3 | Copy Text, Hide, normal Quit, specific-display selection, window presets, and notification editing/presentation done; lifecycle loop suppression tracked in 2.4 |
 | 2.3 | Add selected files and portable workflows | done | Increments J1–J3 | File selection, Open/Reveal, durable references, repair, and portable export/import with rebinding done |
-| 2.4 | Add event-triggered workflows | in progress | Increments K1–K4 | App lifecycle, wake, display, and external-volume triggers done end to end; power/battery pending |
+| 2.4 | Add event-triggered workflows | in progress | Increments K1–K5 | All six event families done end to end; discovery/availability polish pending |
 | 2.5 | Finish the template and discovery experience | not started | — | |
 | 2.6 | Complete everyday management and recovery | not started | — | |
 
@@ -1472,3 +1472,45 @@ Next eligible work package: 2.1 — scheduling and runtime admission.
   stable per session but not across reboots.
 - Next eligible work package: 2.4 increment K5 — power source and battery
   threshold triggers.
+
+### Increment K5 — Power source and battery threshold triggers (plan 2.4, partial; plan T8 + T9)
+
+- Status: done
+- Behavior delivered: workflows can run when the Mac switches to battery /
+  connects to power, and when the built-in battery crosses below or above a
+  percentage. Text supports `when the Mac switches to battery`,
+  `when I connect to power`, `when the battery drops below 20%`,
+  `when the battery rises above 80%`; the When card gained **Power source** and
+  **Battery** families with event selectors and a percentage stepper. An
+  IOKit `IOPSNotificationCreateRunLoopSource` source emits power-source
+  transitions only on change and battery readings on updates. Battery crossing
+  uses a stateful `BatteryThresholdMonitor`: the first reading is a baseline
+  (never fires), a crossing fires once, and it rearms only after a two-point
+  margin past the threshold to prevent repeated firing near the boundary.
+  Unknown battery data is treated as unavailable and never fabricates a
+  percentage.
+- Interfaces changed: added `BatteryThresholdMonitor` (baseline/observe/rearm);
+  `EventTriggerRegistry` holds per-workflow battery monitors and handles
+  `.batteryChanged`; parser `ParsedClauseKind.powerSource`/`.batteryThreshold`,
+  `ParsedParameter.power`/`.battery`, phrase tables and matchers for power and
+  battery; `ComposerTriggerDraft` power/battery cases with rendering and
+  configuration; app `PowerBatteryTriggerSource`; `ComposerViewModel` power/
+  battery family state and controls; trigger family picker became a menu with
+  Power source and Battery; power/battery cards.
+- Tests performed:
+  - `swift test --package-path Packages/TaskOSCore` — 241 tests, 31 suites, pass
+    (was 233/30; +8). New coverage: baseline-then-crossing, fire-once,
+    two-point rearm for below and above, unknown-battery handling, registry
+    baseline/crossing flow, and power/battery parsing plus composer definitions.
+  - App tests (`xcodebuild ... test -only-testing:TaskOSTests`) — TEST SUCCEEDED.
+  - Debug build — BUILD SUCCEEDED.
+  - Release build — BUILD SUCCEEDED.
+- Physical checks: pending (on a MacBook: unplug/replug power and confirm one
+  transition each; run a below-threshold workflow near the threshold and confirm
+  it fires once and does not chatter). Requires laptop battery/power hardware.
+- Remaining/gaps: hardware-specific triggers are not yet described as
+  unavailable on Macs lacking the hardware (e.g., battery on a desktop); that
+  availability/discovery polish is K6. Power/battery registration is not
+  restarted on time-zone/hardware changes (not relevant).
+- Next eligible work package: 2.4 increment K6 — trigger discovery/availability
+  wording, suggestion entries, acceptance sweep, and phase close-out.

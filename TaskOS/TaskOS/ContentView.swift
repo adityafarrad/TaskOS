@@ -70,9 +70,11 @@ struct ContentView: View {
                 Text("Mac wakes").tag(ComposerViewModel.TriggerFamily.wake)
                 Text("Display").tag(ComposerViewModel.TriggerFamily.displayConnection)
                 Text("Drive").tag(ComposerViewModel.TriggerFamily.externalVolume)
+                Text("Power source").tag(ComposerViewModel.TriggerFamily.powerSource)
+                Text("Battery").tag(ComposerViewModel.TriggerFamily.batteryThreshold)
             }
-            .pickerStyle(.segmented)
-            .frame(maxWidth: 640)
+            .pickerStyle(.menu)
+            .frame(maxWidth: 260)
 
             if model.isScheduled {
                 scheduleCard
@@ -86,6 +88,10 @@ struct ContentView: View {
                 displayCard
             } else if model.isVolumeTrigger {
                 volumeCard
+            } else if model.isPowerTrigger {
+                powerCard
+            } else if model.isBatteryTrigger {
+                batteryCard
             } else {
                 Text("Runs only when you start it from the app or menu bar.")
                     .font(.caption)
@@ -265,6 +271,43 @@ struct ContentView: View {
             Text("Any external drive")
                 .font(.caption)
                 .foregroundStyle(.secondary)
+        }
+    }
+
+    @ViewBuilder
+    private var powerCard: some View {
+        Picker(
+            "Power event",
+            selection: Binding(get: { model.powerEvent }, set: { model.setPowerEvent($0) })
+        ) {
+            Text("switches to battery").tag(PowerEvent.toBattery)
+            Text("connects to power").tag(PowerEvent.toExternalPower)
+        }
+        .pickerStyle(.segmented)
+        .frame(width: 340)
+    }
+
+    @ViewBuilder
+    private var batteryCard: some View {
+        HStack(spacing: 8) {
+            Picker(
+                "Battery event",
+                selection: Binding(get: { model.batteryComparator }, set: { model.setBatteryComparator($0) })
+            ) {
+                Text("drops below").tag(ThresholdComparison.below)
+                Text("rises above").tag(ThresholdComparison.above)
+            }
+            .pickerStyle(.segmented)
+            .frame(width: 230)
+
+            Stepper(
+                value: Binding(get: { model.batteryPercentage }, set: { model.setBatteryPercentage($0) }),
+                in: 1...99
+            ) {
+                Text("\(model.batteryPercentage)%")
+                    .monospacedDigit()
+            }
+            .frame(width: 150)
         }
     }
 

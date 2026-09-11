@@ -121,6 +121,8 @@ final class ComposerViewModel {
         case wake
         case displayConnection
         case externalVolume
+        case powerSource
+        case batteryThreshold
     }
 
     var triggerFamily: TriggerFamily {
@@ -135,6 +137,10 @@ final class ComposerViewModel {
             return .displayConnection
         case .externalVolume:
             return .externalVolume
+        case .powerSource:
+            return .powerSource
+        case .batteryThreshold:
+            return .batteryThreshold
         case .daily, .weekdays, .interval, .relative, .once, .oneTime:
             return .schedule
         }
@@ -145,6 +151,8 @@ final class ComposerViewModel {
     var isWakeTrigger: Bool { triggerFamily == .wake }
     var isDisplayTrigger: Bool { triggerFamily == .displayConnection }
     var isVolumeTrigger: Bool { triggerFamily == .externalVolume }
+    var isPowerTrigger: Bool { triggerFamily == .powerSource }
+    var isBatteryTrigger: Bool { triggerFamily == .batteryThreshold }
     var supportsAutomaticRuns: Bool { triggerFamily != .manual }
 
     func setTriggerFamily(_ family: TriggerFamily) {
@@ -162,7 +170,49 @@ final class ComposerViewModel {
             document.setTrigger(.displayConnection(event: .connected, selection: .anyExternal))
         case .externalVolume:
             document.setTrigger(.externalVolume(event: .mounted, selection: .anyExternal))
+        case .powerSource:
+            document.setTrigger(.powerSource(.toBattery))
+        case .batteryThreshold:
+            document.setTrigger(.batteryThreshold(comparator: .below, percentage: 20))
         }
+        afterEdit()
+    }
+
+    var powerEvent: PowerEvent {
+        if case .powerSource(let event) = document.trigger {
+            return event
+        }
+        return .toBattery
+    }
+
+    func setPowerEvent(_ event: PowerEvent) {
+        document.setTrigger(.powerSource(event))
+        afterEdit()
+    }
+
+    var batteryComparator: ThresholdComparison {
+        if case .batteryThreshold(let comparator, _) = document.trigger {
+            return comparator
+        }
+        return .below
+    }
+
+    var batteryPercentage: Int {
+        if case .batteryThreshold(_, let percentage) = document.trigger {
+            return percentage
+        }
+        return 20
+    }
+
+    func setBatteryComparator(_ comparator: ThresholdComparison) {
+        document.setTrigger(.batteryThreshold(comparator: comparator, percentage: batteryPercentage))
+        afterEdit()
+    }
+
+    func setBatteryPercentage(_ percentage: Int) {
+        let clamped = min(max(percentage, BatteryThresholdTrigger.allowedRange.lowerBound),
+                          BatteryThresholdTrigger.allowedRange.upperBound)
+        document.setTrigger(.batteryThreshold(comparator: batteryComparator, percentage: clamped))
         afterEdit()
     }
 
@@ -254,7 +304,8 @@ final class ComposerViewModel {
             return .interval
         case .once, .oneTime:
             return .once
-        case .daily, .manual, .applicationLifecycle, .wake, .displayConnection, .externalVolume:
+        case .daily, .manual, .applicationLifecycle, .wake, .displayConnection,
+             .externalVolume, .powerSource, .batteryThreshold:
             return .daily
         }
     }
@@ -277,7 +328,7 @@ final class ComposerViewModel {
         case .oneTime(let date):
             return date
         case .relative, .interval, .manual, .applicationLifecycle, .wake,
-             .displayConnection, .externalVolume:
+             .displayConnection, .externalVolume, .powerSource, .batteryThreshold:
             return calendar.date(bySettingHour: 9, minute: 0, second: 0, of: base) ?? base
         }
     }
@@ -1027,8 +1078,10 @@ final class ComposerViewModel {
             draft = .displayConnection(event: trigger.event, selection: trigger.selection)
         case .externalVolume(let trigger):
             draft = .externalVolume(event: trigger.event, selection: trigger.selection)
-        case .powerSource, .batteryThreshold:
-            draft = .manual
+        case .powerSource(let trigger):
+            draft = .powerSource(trigger.event)
+        case .batteryThreshold(let trigger):
+            draft = .batteryThreshold(comparator: trigger.comparator, percentage: trigger.percentage)
         }
         if draft != .manual {
             document.setTrigger(draft)

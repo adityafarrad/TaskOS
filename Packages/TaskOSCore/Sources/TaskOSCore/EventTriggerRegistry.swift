@@ -5,6 +5,7 @@ public actor EventTriggerRegistry {
     private let coordinator: RunCoordinator
     private let suppressor: LifecycleSuppressor
     private var entries: [AutomationID: AutomationDefinition] = [:]
+    private var batteryMonitors: [AutomationID: BatteryThresholdMonitor] = [:]
 
     public init(clock: CoreClock, coordinator: RunCoordinator, suppressor: LifecycleSuppressor) {
         self.clock = clock
@@ -20,6 +21,7 @@ public actor EventTriggerRegistry {
 
     public func unregister(_ id: AutomationID) {
         entries.removeValue(forKey: id)
+        batteryMonitors.removeValue(forKey: id)
     }
 
     public func replaceAll(_ definitions: [AutomationDefinition]) {
@@ -29,6 +31,7 @@ public actor EventTriggerRegistry {
             next[definition.id] = definition
         }
         entries = next
+        batteryMonitors = batteryMonitors.filter { next[$0.key] != nil }
     }
 
     public func registeredCount() -> Int {
@@ -45,6 +48,10 @@ public actor EventTriggerRegistry {
             await coordinator.updateSessionReadiness(true)
         }
 
+        if case .batteryChanged(let value) = event {
+            return await handleBattery(value)
+        }
+
         let now = clock.now()
         var fired: [AutomationID] = []
 
@@ -59,6 +66,34 @@ public actor EventTriggerRegistry {
             let outcome = await coordinator.submit(definition, source: .automatic(definition.trigger.id))
             if outcome == .started || outcome == .queued {
                 fired.append(id)
+            }
+        }
+
+        return fired
+    }
+
+    private func handleBattery(_ value: Int?) async -> [AutomationID] {
+        var fired: [AutomationID] = []
+
+        for (id, definition) in entries {
+            guard case .batteryThreshold(let trigger) = definition.trigger else { continue }
+
+            if var monitor = batteryMonitors[id] {
+                let shouldFire = monitor.observe(value)
+                batteryMonitors[id] = monitor
+                guard shouldFire else { continue }
+
+                let outcome = await coordinator.submit(definition, source: .automatic(definition.trigger.id))
+                if outcome == .started || outcome == .queued {
+                    fired.append(id)
+                }
+            } else {
+                var monitor = BatteryThresholdMonitor(
+                    comparator: trigger.comparator,
+                    percentage: trigger.percentage
+                )
+                monitor.establishBaseline(value)
+                batteryMonitors[id] = monitor
             }
         }
 

@@ -25,6 +25,8 @@ public enum ComposerTriggerDraft: Hashable, Sendable {
     case wake
     case displayConnection(event: DisplayEvent, selection: DisplaySelection)
     case externalVolume(event: VolumeEvent, selection: VolumeSelection)
+    case powerSource(PowerEvent)
+    case batteryThreshold(comparator: ThresholdComparison, percentage: Int)
 }
 
 public struct ComposerAction: Hashable, Sendable, Identifiable {
@@ -361,6 +363,10 @@ public struct ComposerDocument: Sendable {
             return .displayConnection(DisplayConnectionTrigger(selection: selection, event: event))
         case .externalVolume(let event, let selection):
             return .externalVolume(ExternalVolumeTrigger(selection: selection, event: event))
+        case .powerSource(let event):
+            return .powerSource(PowerSourceTrigger(event: event))
+        case .batteryThreshold(let comparator, let percentage):
+            return .batteryThreshold(BatteryThresholdTrigger(comparator: comparator, percentage: percentage))
         }
     }
 
@@ -428,6 +434,20 @@ public struct ComposerDocument: Sendable {
             case .externalVolume:
                 if let event = clause.volumeEvent {
                     newTrigger = .externalVolume(event: event, selection: .anyExternal)
+                } else {
+                    newElements.append(.unresolved(clauseText(clause)))
+                }
+
+            case .powerSource:
+                if let event = clause.powerEvent {
+                    newTrigger = .powerSource(event)
+                } else {
+                    newElements.append(.unresolved(clauseText(clause)))
+                }
+
+            case .batteryThreshold:
+                if let threshold = clause.batteryThreshold {
+                    newTrigger = .batteryThreshold(comparator: threshold.comparator, percentage: threshold.percentage)
                 } else {
                     newElements.append(.unresolved(clauseText(clause)))
                 }
@@ -676,6 +696,11 @@ public struct ComposerDocument: Sendable {
         case .externalVolume(let event, let selection):
             let noun = selection == .anyExternal ? "an external drive" : selection.displayName
             return event == .mounted ? "When \(noun) mounts" : "When \(noun) unmounts"
+        case .powerSource(let event):
+            return "When the Mac \(event.displayName)"
+        case .batteryThreshold(let comparator, let percentage):
+            let direction = comparator == .below ? "drops below" : "rises above"
+            return "When the battery \(direction) \(percentage)%"
         }
     }
 

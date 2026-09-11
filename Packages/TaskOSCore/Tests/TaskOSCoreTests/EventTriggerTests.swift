@@ -187,6 +187,36 @@ struct EventTriggerTests {
         #expect(volume.makeDefinition(name: "Drive")?.trigger == .externalVolume(ExternalVolumeTrigger(selection: .anyExternal, event: .mounted)))
     }
 
+    @Test func parsesPowerAndBatteryPhrases() {
+        let parser = CommandParser()
+
+        let batteryPower = parser.parse("when the Mac switches to battery")
+        #expect(batteryPower.outcome == .complete)
+        #expect(batteryPower.clauses.first?.kind == .powerSource)
+        #expect(batteryPower.clauses.first?.powerEvent == .toBattery)
+
+        let externalPower = parser.parse("when I connect to power")
+        #expect(externalPower.clauses.first?.powerEvent == .toExternalPower)
+
+        let below = parser.parse("when the battery drops below 20%")
+        #expect(below.outcome == .complete)
+        #expect(below.clauses.first?.kind == .batteryThreshold)
+        #expect(below.clauses.first?.batteryThreshold?.comparator == .below)
+        #expect(below.clauses.first?.batteryThreshold?.percentage == 20)
+
+        let above = parser.parse("when the battery rises above 80%")
+        #expect(above.clauses.first?.batteryThreshold?.comparator == .above)
+        #expect(above.clauses.first?.batteryThreshold?.percentage == 80)
+    }
+
+    @Test func powerAndBatteryComposerBuildDefinitions() {
+        let power = ComposerDocument(text: "when the Mac switches to battery, then show a notification")
+        #expect(power.makeDefinition(name: "Power")?.trigger == .powerSource(PowerSourceTrigger(event: .toBattery)))
+
+        let battery = ComposerDocument(text: "when the battery drops below 20%, then show a notification")
+        #expect(battery.makeDefinition(name: "Battery")?.trigger == .batteryThreshold(BatteryThresholdTrigger(comparator: .below, percentage: 20)))
+    }
+
     @Test func eventTriggerRoundTripsThroughCoding() throws {
         let definition = AutomationDefinition(
             name: "Display",
