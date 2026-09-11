@@ -1707,7 +1707,8 @@ Next eligible work package: 2.1 — scheduling and runtime admission.
   33 suites, pass (Core purity test still enforced).
 - App tests: `xcodebuild ... test -only-testing:TaskOSTests` — passed (SwiftData
   workflow, run-history, and draft repositories, including retention).
-- Release build: BUILD SUCCEEDED.
+- Clean Release build: `xcodebuild ... -configuration Release clean build` — BUILD
+  SUCCEEDED.
 - Implemented and exercised: scheduling and admission (2.1, verified A–E); all
   eight in-scope action/utility capabilities (2.2); selected files and portable
   export/import (2.3); all six event-trigger families (2.4, physically verified);
