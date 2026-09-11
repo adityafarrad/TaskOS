@@ -1757,7 +1757,9 @@ Next eligible work package: 2.1 — scheduling and runtime admission.
   bumps a `scrollToTopToken`; `ContentView` wraps the form in a `ScrollViewReader`
   and scrolls to the top on Fix/Edit. The menu-bar pause/resume posts a
   `.taskOSRuntimeStateDidChange` notification that the composer observes, so the
-  paused banner updates live.
+  paused banner updates live. `refreshAll` also reloads connected displays and
+  hardware availability, so the Arrange Window display picker and discovery
+  availability update when a display is connected while the app is open.
 - Tests performed:
   - `swift test --package-path Packages/TaskOSCore` — 255 tests, 33 suites, pass.
   - App tests (`xcodebuild ... test -only-testing:TaskOSTests`) — TEST SUCCEEDED.

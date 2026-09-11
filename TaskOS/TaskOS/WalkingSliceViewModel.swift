@@ -1001,6 +1001,11 @@ final class ComposerViewModel {
         loadHistory()
         refreshRuntimeActivity()
         refreshPermissions()
+        Task { [weak self] in
+            guard let self else { return }
+            self.displays = await self.composition.loadDisplays()
+            self.hardware = self.composition.hardwareAvailability()
+        }
     }
 
     func refreshRuntimeActivity() {
