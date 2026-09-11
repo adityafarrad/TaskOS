@@ -3,6 +3,12 @@ import Foundation
 public enum TriggerID: String, Codable, Sendable, CaseIterable, Hashable {
     case manual
     case schedule
+    case applicationLifecycle
+    case wake
+    case displayConnection
+    case externalVolume
+    case powerSource
+    case batteryThreshold
 
     public var stableID: String { rawValue }
 }

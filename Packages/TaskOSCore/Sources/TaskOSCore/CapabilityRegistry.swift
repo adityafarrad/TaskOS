@@ -59,6 +59,30 @@ public struct CapabilityRegistry: Sendable {
                 title: "Schedule",
                 summary: "Run once, daily, on selected weekdays, or on a fixed interval."
             ),
+            .applicationLifecycle: CapabilityDescriptor(
+                title: "Application lifecycle",
+                summary: "Run when a selected application launches or quits."
+            ),
+            .wake: CapabilityDescriptor(
+                title: "Mac wakes",
+                summary: "Run after the Mac wakes, when the session is ready."
+            ),
+            .displayConnection: CapabilityDescriptor(
+                title: "Display connection",
+                summary: "Run when a display connects or disconnects."
+            ),
+            .externalVolume: CapabilityDescriptor(
+                title: "External volume",
+                summary: "Run when an external storage volume mounts or unmounts."
+            ),
+            .powerSource: CapabilityDescriptor(
+                title: "Power source",
+                summary: "Run when the Mac switches between battery and external power."
+            ),
+            .batteryThreshold: CapabilityDescriptor(
+                title: "Battery threshold",
+                summary: "Run when the battery crosses above or below a percentage."
+            ),
         ],
         actions: [
             .openApplication: CapabilityDescriptor(

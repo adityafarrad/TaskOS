@@ -32,6 +32,21 @@ public enum CanonicalPhrase {
             return "Manually"
         case .schedule(let schedule):
             return text(for: schedule)
+        case .applicationLifecycle(let trigger):
+            return "When \(trigger.application.label) \(trigger.event.displayName)"
+        case .wake:
+            return "When the Mac wakes"
+        case .displayConnection(let trigger):
+            let noun = trigger.selection == .anyExternal ? "an external display" : trigger.selection.displayName
+            return trigger.event == .connected ? "When \(noun) connects" : "When \(noun) disconnects"
+        case .externalVolume(let trigger):
+            let noun = trigger.selection == .anyExternal ? "an external drive" : trigger.selection.displayName
+            return trigger.event == .mounted ? "When \(noun) mounts" : "When \(noun) unmounts"
+        case .powerSource(let trigger):
+            return "When the Mac \(trigger.event.displayName)"
+        case .batteryThreshold(let trigger):
+            let direction = trigger.comparator == .below ? "drops below" : "rises above"
+            return "When the battery \(direction) \(trigger.percentage)%"
         }
     }
 

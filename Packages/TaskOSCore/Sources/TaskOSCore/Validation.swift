@@ -52,6 +52,22 @@ extension TriggerConfiguration {
             return .valid
         case .schedule(let schedule):
             return schedule.validate(relativeTo: now)
+        case .applicationLifecycle(let trigger):
+            var issues: [ValidationIssue] = []
+            if trigger.application.kind != .application {
+                issues.append(.error("Application trigger requires an application resource."))
+            }
+            if trigger.application.identifier.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                issues.append(.error("Choose an application to watch."))
+            }
+            return ValidationResult(issues: issues)
+        case .wake, .displayConnection, .externalVolume, .powerSource:
+            return .valid
+        case .batteryThreshold(let trigger):
+            if !BatteryThresholdTrigger.allowedRange.contains(trigger.percentage) {
+                return ValidationResult(issues: [.error("Battery threshold must be between 1 and 99 percent.")])
+            }
+            return .valid
         }
     }
 }

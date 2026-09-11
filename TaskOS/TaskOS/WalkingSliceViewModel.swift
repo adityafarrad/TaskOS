@@ -878,6 +878,9 @@ final class ComposerViewModel {
             case .oneTime(let date):
                 draft = .oneTime(date)
             }
+        case .applicationLifecycle, .wake, .displayConnection,
+             .externalVolume, .powerSource, .batteryThreshold:
+            draft = .manual
         }
         if draft != .manual {
             document.setTrigger(draft)

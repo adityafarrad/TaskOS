@@ -35,7 +35,7 @@ compressed into implementation plus per-increment physical smoke checks.
 | 2.1 | Add scheduling and runtime admission | done | Increments H1–H3 + fixes H3-d/H3-e | Schedule model, occurrence calc, admission/queue/pause/cancel, schedule grammar, runtime registry, trigger card + next-run preview + enable toggle; physical tests A–E passed |
 | 2.2 | Finish app, window, and utility actions | done | Increments I1–I3 | Copy Text, Hide, normal Quit, specific-display selection, window presets, and notification editing/presentation done; lifecycle loop suppression tracked in 2.4 |
 | 2.3 | Add selected files and portable workflows | done | Increments J1–J3 | File selection, Open/Reveal, durable references, repair, and portable export/import with rebinding done |
-| 2.4 | Add event-triggered workflows | not started | — | |
+| 2.4 | Add event-triggered workflows | in progress | Increment K1 | Typed event-trigger model + observation interface done; platform sources, UI, and per-family verticals pending |
 | 2.5 | Finish the template and discovery experience | not started | — | |
 | 2.6 | Complete everyday management and recovery | not started | — | |
 
@@ -1321,3 +1321,38 @@ Next eligible work package: 2.1 — scheduling and runtime admission.
   identifier (specific displays may need re-selection on another Mac); imported
   scheduled triggers are not registered because imports start disabled.
 - Next eligible work package: 2.4 — event-triggered workflows.
+
+### Increment K1 — Event-trigger model and observation interface (plan 2.4, partial)
+
+- Status: done
+- Behavior delivered: the typed domain for all six event trigger families and a
+  source-agnostic observation interface. Added application lifecycle
+  (launch/quit), Mac wake, display connect/disconnect (any external or a
+  specific display), external volume mount/unmount (any external or a specific
+  volume), power-source transitions, and battery-threshold crossings with
+  validation. Triggers can statelessly match a typed observation via
+  `TriggerConfiguration.matches(_:)`; battery crossing is intentionally not a
+  stateless match (it needs rearm state, delivered in K5). All configs persist
+  and round-trip.
+- Interfaces changed: added `TriggerID` cases and `TriggerConfiguration` cases;
+  configs `ApplicationLifecycleTrigger`, `WakeTrigger`,
+  `DisplayConnectionTrigger`/`DisplaySelection`, `ExternalVolumeTrigger`/
+  `VolumeSelection`, `PowerSourceTrigger`, `BatteryThresholdTrigger`; added
+  `ObservedTriggerEvent`, `TriggerRegistrationID`, and the `TriggerSource`
+  protocol; registry descriptors, validation, `matches`, and canonical phrases.
+- Tests performed:
+  - `swift test --package-path Packages/TaskOSCore` — 216 tests, 29 suites, pass
+    (was 205/28; +11). New coverage: registry consistency, lifecycle/battery
+    validation, launch/quit match, wake match, display any/specific match,
+    volume any/specific match, power transition match, non-event triggers not
+    matching, canonical phrases, and coding round-trip.
+  - App tests (`xcodebuild ... test -only-testing:TaskOSTests`) — TEST SUCCEEDED.
+  - Debug build — BUILD SUCCEEDED.
+  - Release build — BUILD SUCCEEDED.
+- Physical checks: none (no platform source or UI yet).
+- Remaining/gaps: loading an event-triggered workflow for editing currently maps
+  the trigger to manual (the composer has no event-trigger card yet); the app
+  does not observe or register event triggers yet.
+- Next eligible work package: 2.4 increment K2 — application lifecycle end to
+  end (NSWorkspace source, registration, cards/parser, MacFlow-initiated change
+  suppression).
