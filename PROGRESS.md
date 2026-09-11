@@ -33,7 +33,7 @@ compressed into implementation plus per-increment physical smoke checks.
 | ID | Work package | Status | Evidence | Notes |
 |---|---|---|---|---|
 | 2.1 | Add scheduling and runtime admission | in progress | Increments H1–H3 | Schedule model, occurrence calc, admission/queue/pause/cancel, schedule grammar, runtime registry, trigger card + next-run preview + enable toggle all implemented; physical verification of the schedule UI pending |
-| 2.2 | Finish app, window, and utility actions | not started | — | |
+| 2.2 | Finish app, window, and utility actions | in progress | Increment I1 | Copy Text (A10) done end to end; Hide/Quit and display selection pending |
 | 2.3 | Add selected files and portable workflows | not started | — | |
 | 2.4 | Add event-triggered workflows | not started | — | |
 | 2.5 | Finish the template and discovery experience | not started | — | |
@@ -1066,3 +1066,36 @@ Next eligible work package: 2.1 — scheduling and runtime admission.
     catch-up by design (missed runs skipped).
 - With H1–H3 complete, plan 2.1 is functionally implemented pending the physical
   schedule verification above.
+
+### Increment I1 — Copy Text (plan 2.2, partial; plan A10)
+
+- Status: done
+- Behavior delivered: a workflow can replace the clipboard with configured
+  literal text, through text and cards. Typing `copy "meeting agenda"` (or
+  `copy text "..."`) produces a Copy Text step with an editable text field and a
+  note that it replaces clipboard contents; preview shows the text and that it
+  replaces the clipboard; test writes to `NSPasteboard`. Copy text requires no
+  permissions and the clipboard is only written, never read.
+- Interfaces changed: added `ActionID.copyText` and `CopyTextAction` (with
+  `maximumLength`); `ActionConfiguration.copyText`; registry descriptor;
+  validation (non-empty, bounded length); `requiredPermissions`; parser
+  `ParsedClauseKind.copyText` / `ParsedParameter.copyText` and a `copy`
+  production; `CanonicalPhrase`; `ComposerActionDraft.copyText`,
+  `updateCopyText`, unresolved handling; `SuggestionEngine` starter;
+  `CreationPreparer` preview; app `CopyTextExecutor` registered in
+  `AppComposition`; `ActionCard` UI and Add-action entry.
+- Tests performed:
+  - `swift test --package-path Packages/TaskOSCore` — 175 tests, 25 suites, pass
+    (was 167/24; +8). New coverage: quoted/keyword parsing, missing text needs
+    input, canonical round-trip, composer definition, empty text blocks
+    completion, validation bounds, and no required permissions.
+  - App tests (`xcodebuild ... test -only-testing:TaskOSTests`) — TEST SUCCEEDED.
+  - Debug build — BUILD SUCCEEDED.
+  - Release build — BUILD SUCCEEDED.
+- Physical checks: pending (copy a workflow's literal text and paste to confirm;
+  confirm the app never reads the clipboard).
+- Remaining in plan 2.2: Hide Application (A2), normal Quit Application (A3) with
+  protected-app rejection, specific-display selection for Arrange Window, and
+  complete notification editing/permission handling review.
+- Next eligible work package: 2.2 increment I2 — Hide and Quit Application with
+  normal-quit safeguards.

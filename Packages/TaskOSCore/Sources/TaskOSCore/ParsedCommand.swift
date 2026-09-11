@@ -6,6 +6,7 @@ public enum ParsedClauseKind: Hashable, Sendable {
     case arrangeWindow
     case wait
     case showNotification
+    case copyText
     case unsupported
     case unrecognized
 }
@@ -24,6 +25,7 @@ public enum ParsedParameter: Hashable, Sendable {
     case duration(TimeInterval)
     case arrange(preset: WindowPreset?, applicationName: String)
     case schedule(ParsedSchedule)
+    case copyText(String)
     case none
 }
 
@@ -70,6 +72,13 @@ public struct ParsedClause: Hashable, Sendable {
 
     public var schedule: ParsedSchedule? {
         if case .schedule(let value) = parameter {
+            return value
+        }
+        return nil
+    }
+
+    public var copyText: String? {
+        if case .copyText(let value) = parameter {
             return value
         }
         return nil
@@ -127,7 +136,7 @@ public struct ParsedCommand: Hashable, Sendable {
     public var recognizedActionClauses: [ParsedClause] {
         clauses.filter { clause in
             switch clause.kind {
-            case .openApplication, .arrangeWindow, .wait, .showNotification:
+            case .openApplication, .arrangeWindow, .wait, .showNotification, .copyText:
                 return true
             case .schedule, .unsupported, .unrecognized:
                 return false

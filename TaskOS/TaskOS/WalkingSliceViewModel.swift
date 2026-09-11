@@ -359,6 +359,11 @@ final class ComposerViewModel {
         afterEdit()
     }
 
+    func updateCopyText(id: UUID, text: String) {
+        document.updateAction(id: id, draft: .copyText(text))
+        afterEdit()
+    }
+
     func undo() {
         document.undo()
         afterEdit()

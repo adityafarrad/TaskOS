@@ -50,12 +50,23 @@ public struct ShowNotificationAction: Codable, Hashable, Sendable {
     }
 }
 
+public struct CopyTextAction: Codable, Hashable, Sendable {
+    public static let maximumLength = 10_000
+
+    public var text: String
+
+    public init(text: String) {
+        self.text = text
+    }
+}
+
 public enum ActionConfiguration: Codable, Hashable, Sendable {
     case openApplication(OpenApplicationAction)
     case openWebsite(OpenWebsiteAction)
     case arrangeWindow(ArrangeWindowAction)
     case wait(WaitAction)
     case showNotification(ShowNotificationAction)
+    case copyText(CopyTextAction)
 
     public var id: ActionID {
         switch self {
@@ -69,6 +80,8 @@ public enum ActionConfiguration: Codable, Hashable, Sendable {
             return .wait
         case .showNotification:
             return .showNotification
+        case .copyText:
+            return .copyText
         }
     }
 }

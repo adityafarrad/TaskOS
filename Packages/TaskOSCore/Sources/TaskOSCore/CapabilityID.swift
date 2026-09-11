@@ -13,6 +13,7 @@ public enum ActionID: String, Codable, Sendable, CaseIterable, Hashable {
     case arrangeWindow
     case wait
     case showNotification
+    case copyText
 
     public var stableID: String { rawValue }
 }

@@ -13,6 +13,8 @@ public enum CanonicalPhrase {
             return "Wait \(durationText(wait.duration)) seconds"
         case .showNotification:
             return "Show a notification"
+        case .copyText(let copy):
+            return "Copy \"\(copy.text)\""
         }
     }
 

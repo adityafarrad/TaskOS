@@ -81,6 +81,10 @@ public struct CapabilityRegistry: Sendable {
                 title: "Show Notification",
                 summary: "Submit a notification with a configured title and message."
             ),
+            .copyText: CapabilityDescriptor(
+                title: "Copy Text",
+                summary: "Replace the clipboard with configured literal text."
+            ),
         ]
     )
 }

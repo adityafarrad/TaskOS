@@ -149,6 +149,16 @@ public struct SuggestionEngine: Sendable {
                     match: .grammarPosition
                 )
             )
+            suggestions.append(
+                Suggestion(
+                    id: "action.copyText",
+                    phrase: "Copy \"text\"",
+                    title: "Copy text",
+                    category: .action,
+                    requiresParameter: true,
+                    match: .grammarPosition
+                )
+            )
         }
 
         return suggestions

@@ -157,6 +157,18 @@ public struct CreationPreparer: Sendable {
                     )
                 )
 
+            case .copyText(let copy):
+                actionPreviews.append(
+                    ActionPreview(
+                        index: index,
+                        actionID: .copyText,
+                        title: title(for: .copyText),
+                        targetLabel: String(copy.text.prefix(40)),
+                        status: .ready,
+                        detail: "Replaces the clipboard contents."
+                    )
+                )
+
             case .showNotification:
                 let state = await permissions.state(for: .notifications)
                 switch state {

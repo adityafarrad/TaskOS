@@ -46,6 +46,7 @@ final class AppComposition {
                 OpenWebsiteExecutor(),
                 ArrangeWindowExecutor(),
                 NotificationExecutor(),
+                CopyTextExecutor(),
             ]
         )
 

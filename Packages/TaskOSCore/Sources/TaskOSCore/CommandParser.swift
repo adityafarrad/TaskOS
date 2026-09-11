@@ -114,7 +114,7 @@ private struct ParserWorker {
     static let connectors: Set<String> = ["and", "then", "also", ","]
     static let clauseKeywords: Set<String> = [
         "open", "wait", "show", "notify", "put", "arrange", "maximize", "center",
-        "every", "once", "in",
+        "copy", "every", "once", "in",
     ]
     static let timeUnits: Set<String> = ["second", "seconds", "sec", "secs", "s"]
     static let weekdayNames: [String: Weekday] = [
@@ -204,6 +204,8 @@ private struct ParserWorker {
             return !WaitAction.allowedRange.contains(duration)
         case .schedule:
             return clause.schedule == .incomplete
+        case .copyText:
+            return (clause.copyText ?? "").isEmpty
         case .showNotification, .unsupported, .unrecognized:
             return false
         }
@@ -236,6 +238,11 @@ private struct ParserWorker {
                 return [.error("Specify a time, for example every day at 9 am, or in 30 minutes.", span: clause.span)]
             }
             return []
+        case .copyText:
+            if (clause.copyText ?? "").isEmpty {
+                return [.error("Copy needs the text to place on the clipboard.", span: clause.span)]
+            }
+            return []
         case .unsupported:
             return [.error(clause.detail ?? "This capability is not supported in this release.", span: clause.span)]
         case .unrecognized:
@@ -263,6 +270,8 @@ private struct ParserWorker {
             return parseWait()
         case "show", "notify":
             return parseNotification()
+        case "copy":
+            return parseCopy()
         case "put", "arrange":
             return parseArrange()
         case "maximize":
@@ -536,6 +545,45 @@ private struct ParserWorker {
             parameter: .none,
             detail: nil
         )
+    }
+
+    private mutating func parseCopy() -> ParsedClause {
+        let startToken = tokens[position]
+        position += 1
+        var end = startToken.span.end
+
+        if position < tokens.count, case .word(let word) = tokens[position].kind, word == "text" {
+            end = tokens[position].span.end
+            position += 1
+        }
+
+        guard position < tokens.count else {
+            return ParsedClause(
+                kind: .copyText,
+                span: SourceSpan(start: startToken.span.start, end: end),
+                parameter: .copyText(""),
+                detail: nil
+            )
+        }
+
+        let literalStart = tokens[position].span.start
+        let literalEnd = consumeClauseRemainder()
+        let raw = (text.substring(in: SourceSpan(start: literalStart, end: literalEnd)) ?? "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+
+        return ParsedClause(
+            kind: .copyText,
+            span: SourceSpan(start: startToken.span.start, end: literalEnd),
+            parameter: .copyText(Self.stripQuotes(raw)),
+            detail: nil
+        )
+    }
+
+    private static func stripQuotes(_ value: String) -> String {
+        if value.count >= 2, value.hasPrefix("\""), value.hasSuffix("\"") {
+            return String(value.dropFirst().dropLast())
+        }
+        return value
     }
 
     private mutating func parseSchedule() -> ParsedClause {

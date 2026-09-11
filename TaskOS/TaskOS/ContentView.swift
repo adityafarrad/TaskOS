@@ -299,6 +299,9 @@ struct ContentView: View {
             Button("Show a notification") {
                 model.add(.showNotification(title: "TaskOS", message: ""))
             }
+            Button("Copy text") {
+                model.add(.copyText(""))
+            }
         }
         .frame(maxWidth: 160)
     }
@@ -545,6 +548,7 @@ private struct ActionCard: View {
         case .arrangeWindow: return "Arrange Window"
         case .wait: return "Wait"
         case .showNotification: return "Show Notification"
+        case .copyText: return "Copy Text"
         }
     }
 
@@ -674,6 +678,20 @@ private struct ActionCard: View {
                         set: { model.updateNotification(id: action.id, title: notificationTitle, message: $0) }
                     )
                 )
+            }
+
+        case .copyText(let value):
+            VStack(alignment: .leading, spacing: 4) {
+                TextField(
+                    "Text to copy",
+                    text: Binding(
+                        get: { value },
+                        set: { model.updateCopyText(id: action.id, text: $0) }
+                    )
+                )
+                Label("Replaces the clipboard contents.", systemImage: "doc.on.clipboard")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
         }
     }
@@ -856,6 +874,7 @@ private struct RunResultView: View {
         case .arrangeWindow: return "Arrange Window"
         case .wait: return "Wait"
         case .showNotification: return "Show Notification"
+        case .copyText: return "Copy Text"
         }
     }
 

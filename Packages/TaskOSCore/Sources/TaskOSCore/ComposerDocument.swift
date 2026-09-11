@@ -6,6 +6,7 @@ public enum ComposerActionDraft: Hashable, Sendable {
     case arrangeWindow(name: String, resolved: ResourceReference?, preset: WindowPreset, display: WindowDisplaySelection)
     case wait(TimeInterval)
     case showNotification(title: String, message: String)
+    case copyText(String)
 }
 
 public enum ComposerTriggerDraft: Hashable, Sendable {
@@ -113,8 +114,17 @@ public struct ComposerDocument: Sendable {
         }
     }
 
+    public var hasUnresolvedCopyText: Bool {
+        actions.contains { action in
+            if case .copyText(let value) = action.draft {
+                return value.isEmpty
+            }
+            return false
+        }
+    }
+
     public var hasUnresolvedActions: Bool {
-        hasUnresolvedApplications || hasUnresolvedWebsites
+        hasUnresolvedApplications || hasUnresolvedWebsites || hasUnresolvedCopyText
     }
 
     public mutating func setText(_ newText: String) {
@@ -241,6 +251,9 @@ public struct ComposerDocument: Sendable {
                 result.append(.wait(WaitAction(duration: duration)))
             case .showNotification(let title, let message):
                 result.append(.showNotification(ShowNotificationAction(title: title, message: message)))
+            case .copyText(let value):
+                guard !value.isEmpty else { return nil }
+                result.append(.copyText(CopyTextAction(text: value)))
             }
         }
         return result
@@ -397,6 +410,14 @@ public struct ComposerDocument: Sendable {
                     )
                 )
 
+            case .copyText:
+                let literal = clause.copyText ?? ""
+                if literal.isEmpty {
+                    newElements.append(.unresolved(clauseText(clause)))
+                } else {
+                    newElements.append(.action(reusedAction(for: .copyText(literal), from: previousActions, cursor: &cursor)))
+                }
+
             case .unsupported, .unrecognized:
                 newElements.append(.unresolved(clauseText(clause)))
             }
@@ -495,6 +516,8 @@ public struct ComposerDocument: Sendable {
             return "Wait \(CanonicalPhrase.durationText(duration)) seconds"
         case .showNotification:
             return "Show a notification"
+        case .copyText(let value):
+            return "Copy \"\(value)\""
         }
     }
 

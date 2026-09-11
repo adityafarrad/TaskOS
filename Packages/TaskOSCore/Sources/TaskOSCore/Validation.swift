@@ -69,6 +69,8 @@ extension ActionConfiguration {
             return action.validate()
         case .showNotification(let action):
             return action.validate()
+        case .copyText(let action):
+            return action.validate()
         }
     }
 }
@@ -154,5 +156,17 @@ extension ShowNotificationAction {
             issues.append(.warning("Notification has no message."))
         }
         return ValidationResult(issues: issues)
+    }
+}
+
+extension CopyTextAction {
+    public func validate() -> ValidationResult {
+        if text.isEmpty {
+            return ValidationResult(issues: [.error("Copy Text requires literal text.")])
+        }
+        if text.count > Self.maximumLength {
+            return ValidationResult(issues: [.error("Copied text must be at most \(Self.maximumLength) characters.")])
+        }
+        return .valid
     }
 }
