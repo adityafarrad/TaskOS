@@ -35,7 +35,7 @@ compressed into implementation plus per-increment physical smoke checks.
 | 2.1 | Add scheduling and runtime admission | done | Increments H1–H3 + fixes H3-d/H3-e | Schedule model, occurrence calc, admission/queue/pause/cancel, schedule grammar, runtime registry, trigger card + next-run preview + enable toggle; physical tests A–E passed |
 | 2.2 | Finish app, window, and utility actions | done | Increments I1–I3 | Copy Text, Hide, normal Quit, specific-display selection, window presets, and notification editing/presentation done; lifecycle loop suppression tracked in 2.4 |
 | 2.3 | Add selected files and portable workflows | done | Increments J1–J3 | File selection, Open/Reveal, durable references, repair, and portable export/import with rebinding done |
-| 2.4 | Add event-triggered workflows | in progress | Increments K1–K6 | All six event families implemented end to end with discovery/availability; physical checks for wake/display/volume/power/battery pending hardware |
+| 2.4 | Add event-triggered workflows | done | Increments K1–K6 | All six event families implemented end to end with discovery/availability; user-confirmed physical checks complete |
 | 2.5 | Finish the template and discovery experience | in progress | Increments M1–M3 | Twelve templates, template picker, and capability discovery implemented; physical UI check pending |
 | 2.6 | Complete everyday management and recovery | in progress | Increment N1 | Skipped/queue event visibility added; status badges, repair, retention, onboarding polish pending |
 
@@ -1545,12 +1545,11 @@ Next eligible work package: 2.1 — scheduling and runtime admission.
   registrations cannot start a run (the registry only evaluates current
   entries); event triggers require no permissions, so there is no background
   prompt loop.
-- Physical checks: app lifecycle verified by the user. Wake, display, volume,
-  power, and battery are implemented and unit-tested but not yet physically
-  verified (need sleep/wake, an external display, removable storage, and a
-  laptop battery). Recorded as the remaining evidence gap for 2.4.
-- Next eligible work package: 2.4 physical verification sweep, then 2.5 —
-  templates and discovery.
+- Physical checks: complete. User-confirmed the full event-trigger set —
+  app lifecycle, wake, display connect/disconnect, external volume
+  mount/unmount, power-source transitions, and battery threshold — each firing
+  once per real event.
+- Next eligible work package: 2.5 — templates and discovery (done), then 2.6.
 
 ### Increment M1 — Core template catalog (plan 2.5, partial)
 
