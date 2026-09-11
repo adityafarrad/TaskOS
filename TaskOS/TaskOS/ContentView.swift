@@ -19,6 +19,7 @@ struct ContentView: View {
                 templatesSection
                 librarySection
                 historySection
+                runtimeActivitySection
                 settingsSection
                 resultSection
             }
@@ -689,6 +690,31 @@ struct ContentView: View {
         case .timedOut: return .orange
         case .cancelled: return .gray
         case .interrupted: return .orange
+        }
+    }
+
+    private var runtimeActivitySection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Skipped and queue events")
+                .font(.headline)
+
+            if model.admissionEvents.isEmpty {
+                Text("No suppressed, expired, or queued automatic events.")
+                    .foregroundStyle(.secondary)
+            }
+
+            ForEach(Array(model.admissionEvents.suffix(10).reversed().enumerated()), id: \.offset) { _, event in
+                HStack(spacing: 12) {
+                    Text(event.automationName)
+                    Text(event.kind.displayName)
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                    Spacer()
+                    Text(event.occurredAt.formatted(date: .abbreviated, time: .shortened))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
         }
     }
 

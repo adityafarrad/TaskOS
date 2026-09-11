@@ -37,7 +37,7 @@ compressed into implementation plus per-increment physical smoke checks.
 | 2.3 | Add selected files and portable workflows | done | Increments J1–J3 | File selection, Open/Reveal, durable references, repair, and portable export/import with rebinding done |
 | 2.4 | Add event-triggered workflows | in progress | Increments K1–K6 | All six event families implemented end to end with discovery/availability; physical checks for wake/display/volume/power/battery pending hardware |
 | 2.5 | Finish the template and discovery experience | in progress | Increments M1–M3 | Twelve templates, template picker, and capability discovery implemented; physical UI check pending |
-| 2.6 | Complete everyday management and recovery | not started | — | |
+| 2.6 | Complete everyday management and recovery | in progress | Increment N1 | Skipped/queue event visibility added; status badges, repair, retention, onboarding polish pending |
 
 ### Phase 3 — Qualify, beta-test, and distribute
 
@@ -1607,3 +1607,26 @@ Next eligible work package: 2.1 — scheduling and runtime admission.
   confirm each application; the discovery sheet lists capabilities but does not
   deep-link a missing resource into the relevant card control.
 - Next eligible work package: 2.6 — everyday management and recovery.
+
+### Increment N1 — Skipped and queue event visibility (plan 2.6, partial)
+
+- Status: done
+- Behavior delivered: the main window shows a **Skipped and queue events**
+  section listing the coordinator's recent admission events (duplicate
+  suppression, cooldown suppression, queue overflow, expiration, cleared while
+  paused, interrupted by sleep) with the workflow name and time. It refreshes on
+  window load, after runs, and on history changes.
+- Interfaces changed: `AdmissionEventKind.displayName`; `ComposerViewModel
+  .admissionEvents` and `refreshRuntimeActivity()`; `runtimeActivitySection` UI.
+- Tests performed:
+  - `swift test --package-path Packages/TaskOSCore` — 255 tests, 33 suites, pass.
+  - Debug build — BUILD SUCCEEDED.
+- Physical checks: pending (trigger a duplicate/suppressed automatic event and
+  confirm it appears).
+- Remaining/gaps: admission events are in-memory only (lost on relaunch); no
+  persistence yet. Remaining in 2.6: clear enabled/paused/unavailable/attention
+  states in the Library, action-level history detail, permission recheck and
+  resource repair affordances, history retention limits, and onboarding/help
+  refinement.
+- Next eligible work package: 2.6 increment N2 — library status badges,
+  attention/repair, and action-level history detail.

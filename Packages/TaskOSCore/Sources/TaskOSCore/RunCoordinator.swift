@@ -28,6 +28,17 @@ public enum AdmissionEventKind: String, Sendable, Codable, Equatable {
     case expired
     case pausedCleared
     case sleepInterrupted
+
+    public var displayName: String {
+        switch self {
+        case .duplicateSuppressed: return "Duplicate suppressed"
+        case .cooldownSuppressed: return "Cooldown suppressed"
+        case .queueOverflow: return "Queue was full"
+        case .expired: return "Expired before running"
+        case .pausedCleared: return "Cleared while paused"
+        case .sleepInterrupted: return "Interrupted by sleep"
+        }
+    }
 }
 
 public struct AdmissionEvent: Sendable, Equatable, Hashable {

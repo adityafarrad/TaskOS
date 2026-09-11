@@ -32,6 +32,7 @@ final class ComposerViewModel {
     private(set) var savedWorkflows: [SavedWorkflow] = []
     private(set) var libraryError: String?
     private(set) var history: [RunRecord] = []
+    private(set) var admissionEvents: [AdmissionEvent] = []
     private(set) var draftName = "Untitled"
     var librarySearch = ""
     var templateSearch = ""
@@ -69,6 +70,7 @@ final class ComposerViewModel {
         ) { [weak self] _ in
             Task { @MainActor in
                 self?.loadHistory()
+                self?.refreshRuntimeActivity()
             }
         }
     }
@@ -456,6 +458,7 @@ final class ComposerViewModel {
         recoverInterruptedRuns()
         loadLibrary()
         loadHistory()
+        refreshRuntimeActivity()
         refreshPermissions()
         Task { [weak self] in
             guard let self else { return }
@@ -945,6 +948,13 @@ final class ComposerViewModel {
             } catch {
                 self.libraryError = "Could not load run history: \(error.localizedDescription)"
             }
+        }
+    }
+
+    func refreshRuntimeActivity() {
+        Task { [weak self] in
+            guard let self else { return }
+            self.admissionEvents = await self.composition.coordinator.status().recentEvents
         }
     }
 
