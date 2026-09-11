@@ -712,23 +712,13 @@ final class ComposerViewModel {
 
         Task { [weak self] in
             guard let self else { return }
-            guard await self.coordinatorIsIdle() else { return }
-            let runID = UUID()
-            try? await self.composition.runHistory.append(self.runningRecord(for: definition, id: runID))
-            let record = await self.composition.runner.run(definition, id: runID)
+            guard let record = await self.composition.coordinator.submitAndWait(definition, source: .manual) else {
+                self.stage = .composing
+                self.notice = "Could not start the test run. Try again in a moment."
+                return
+            }
             self.stage = .finished(record)
-            await self.record(record)
         }
-    }
-
-    private func coordinatorIsIdle() async -> Bool {
-        let status = await composition.coordinator.status()
-        guard !status.isRunning, status.queuedCount == 0 else {
-            stage = .composing
-            notice = "A run is already in progress. Try again when it finishes."
-            return false
-        }
-        return true
     }
 
     func requestAccessibilityPermission() {
@@ -971,12 +961,12 @@ final class ComposerViewModel {
         stage = .running
         Task { [weak self] in
             guard let self else { return }
-            guard await self.coordinatorIsIdle() else { return }
-            let runID = UUID()
-            try? await self.composition.runHistory.append(self.runningRecord(for: workflow.definition, id: runID))
-            let record = await self.composition.runner.run(workflow.definition, id: runID)
+            guard let record = await self.composition.coordinator.submitAndWait(workflow.definition, source: .manual) else {
+                self.stage = .composing
+                self.notice = "Could not start this workflow."
+                return
+            }
             self.stage = .finished(record)
-            await self.record(record)
         }
     }
 
@@ -1052,19 +1042,6 @@ final class ComposerViewModel {
             let status = await self.composition.coordinator.status()
             self.admissionEvents = status.recentEvents
             self.automaticTriggersPaused = status.isPaused
-        }
-    }
-
-    private func runningRecord(for definition: AutomationDefinition, id: UUID) -> RunRecord {
-        RunRecord.starting(definition, id: id)
-    }
-
-    private func record(_ run: RunRecord) async {
-        do {
-            try await composition.runHistory.update(run)
-            history = try await composition.runHistory.recentRuns(limit: 50)
-        } catch {
-            libraryError = "Could not save run history: \(error.localizedDescription)"
         }
     }
 

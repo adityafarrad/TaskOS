@@ -1858,3 +1858,29 @@ record isolation/recovery) is deferred to Phase 3 with the migration fixtures.
 - Physical checks: pending (edit a workflow with a chosen browser and custom
   notification text; confirm both are still set).
 - Next eligible work package: P2 — route manual runs through admission.
+
+### Increment P2 — Route manual runs through admission (gap 2)
+
+- Status: done
+- Behavior delivered: Composer "Test now" and Library "Run" now execute through
+  the admission coordinator instead of the runner directly. They queue behind an
+  in-flight run (one workflow at a time), appear in the queue count, and are
+  cancelable from the menu bar. History is recorded once by the coordinator's
+  execution path.
+- Interfaces changed: `RunCoordinator.submitAndWait(_:source:id:)` returns the
+  run's final `RunRecord` (nil when not admitted), backed by pending
+  continuations; `processQueue` resumes the matching continuation with the
+  record; `cancelAll`, `pauseAutomaticTriggers`, and `updateSessionReadiness`
+  resume continuations for cleared queued runs with a synthesized `.cancelled`
+  record so waiters never hang. `ComposerViewModel.test()`/`runSaved()` use
+  `submitAndWait`; removed `coordinatorIsIdle`, `runningRecord`, and `record`.
+- Tests performed:
+  - `swift test --package-path Packages/TaskOSCore` — 262 tests, 34 suites, pass
+    (was 259/34; +3). New coverage: `submitAndWait` returns the record, queues
+    behind an active run in order, and `cancelAll` resumes a queued waiter as
+    cancelled rather than hanging.
+  - App tests (`xcodebuild ... test -only-testing:TaskOSTests`) — TEST SUCCEEDED.
+  - Debug and Release builds — BUILD SUCCEEDED.
+- Physical checks: pending (Test now / Library Run still work; queued behind a
+  long automatic run; menu Cancel stops it).
+- Next eligible work package: P3 — persist admission/skipped events.

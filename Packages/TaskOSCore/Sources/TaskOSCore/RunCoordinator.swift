@@ -130,6 +130,7 @@ public actor RunCoordinator {
     private var eventLog: [AdmissionEvent] = []
     private var processTask: Task<Void, Never>?
     private var idleWaiters: [CheckedContinuation<Void, Never>] = []
+    private var pendingContinuations: [UUID: CheckedContinuation<RunRecord, Never>] = [:]
 
     public init(
         clock: CoreClock,
@@ -188,6 +189,22 @@ public actor RunCoordinator {
         return wasIdle ? .started : .queued
     }
 
+    public func submitAndWait(
+        _ definition: AutomationDefinition,
+        source: RunRequestSource = .manual,
+        id: UUID = UUID()
+    ) async -> RunRecord? {
+        let outcome = submit(definition, source: source, id: id)
+        switch outcome {
+        case .started, .queued:
+            return await withCheckedContinuation { continuation in
+                pendingContinuations[id] = continuation
+            }
+        default:
+            return nil
+        }
+    }
+
     public func pauseAutomaticTriggers() {
         isPaused = true
         let now = clock.now()
@@ -196,6 +213,7 @@ public actor RunCoordinator {
         for run in cleared {
             appendEvent(.pausedCleared, run: run, at: now)
         }
+        resumeCancelled(cleared)
     }
 
     public func resumeAutomaticTriggers() {
@@ -212,11 +230,14 @@ public actor RunCoordinator {
         for run in cleared {
             appendEvent(.sleepInterrupted, run: run, at: now)
         }
+        resumeCancelled(cleared)
         processTask?.cancel()
     }
 
     public func cancelAll() {
+        let cleared = queue
         queue.removeAll()
+        resumeCancelled(cleared)
         processTask?.cancel()
         resumeIdleWaitersIfNeeded()
     }
@@ -270,8 +291,9 @@ public actor RunCoordinator {
                 name: next.definition.name,
                 isAutomatic: next.source.isAutomatic
             )
-            _ = await execution(next.definition, next.id)
+            let record = await execution(next.definition, next.id)
             activeRun = nil
+            pendingContinuations.removeValue(forKey: next.id)?.resume(returning: record)
         }
 
         isProcessing = false
@@ -285,6 +307,26 @@ public actor RunCoordinator {
         idleWaiters.removeAll()
         for waiter in waiters {
             waiter.resume()
+        }
+    }
+
+    private func resumeCancelled(_ runs: [QueuedRun]) {
+        guard !runs.isEmpty else { return }
+        for run in runs {
+            guard let continuation = pendingContinuations.removeValue(forKey: run.id) else { continue }
+            let now = clock.now()
+            continuation.resume(
+                returning: RunRecord(
+                    id: run.id,
+                    automationID: run.definition.id,
+                    revision: run.definition.revision,
+                    automationName: run.definition.name,
+                    status: .cancelled,
+                    startedAt: now,
+                    finishedAt: now,
+                    actions: []
+                )
+            )
         }
     }
 

@@ -431,4 +431,64 @@ struct RunCoordinatorTests {
         await coordinator.waitUntilIdle()
         #expect(!(await coordinator.status().isRunning))
     }
+
+    @Test func submitAndWaitReturnsTheRecord() async {
+        let clock = TestClock()
+        let probe = ExecutionProbe()
+        let coordinator = makeCoordinator(clock: clock, probe: probe)
+        let definition = workflow("Await")
+
+        let record = await coordinator.submitAndWait(definition, source: .manual)
+        #expect(record?.status == .succeeded)
+        #expect(record?.automationID == definition.id)
+        #expect(probe.started == [definition.id])
+    }
+
+    @Test func submitAndWaitQueuesBehindActiveRun() async {
+        let clock = TestClock()
+        let probe = ExecutionProbe()
+        probe.blocking = true
+        let coordinator = makeCoordinator(clock: clock, probe: probe)
+        let first = workflow("First")
+        let second = workflow("Second")
+
+        #expect(await coordinator.submit(first, source: .manual) == .started)
+        await probe.awaitStarted(1)
+
+        let secondTask = Task { await coordinator.submitAndWait(second, source: .manual) }
+        while await coordinator.status().queuedCount == 0 {
+            await Task.yield()
+        }
+
+        probe.open()
+        let record = await secondTask.value
+        #expect(record?.automationID == second.id)
+        #expect(record?.status == .succeeded)
+        #expect(probe.started == [first.id, second.id])
+    }
+
+    @Test func cancelAllResumesQueuedWaiterAsCancelled() async {
+        let clock = TestClock()
+        let probe = ExecutionProbe()
+        probe.blocking = true
+        let coordinator = makeCoordinator(clock: clock, probe: probe)
+        let first = workflow("First")
+        let second = workflow("Second")
+
+        #expect(await coordinator.submit(first, source: .manual) == .started)
+        await probe.awaitStarted(1)
+
+        let secondTask = Task { await coordinator.submitAndWait(second, source: .manual) }
+        while await coordinator.status().queuedCount == 0 {
+            await Task.yield()
+        }
+
+        await coordinator.cancelAll()
+        let record = await secondTask.value
+        #expect(record?.status == .cancelled)
+        #expect(record?.automationID == second.id)
+
+        probe.open()
+        await coordinator.waitUntilIdle()
+    }
 }
