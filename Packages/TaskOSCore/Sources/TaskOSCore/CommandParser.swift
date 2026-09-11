@@ -211,6 +211,8 @@ private struct ParserWorker {
         case .applicationLifecycle:
             let name = (clause.lifecycleApplicationName ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
             return clause.lifecycleEvent == nil || name.isEmpty
+        case .wake:
+            return false
         case .arrangeWindow:
             let name = clause.arrangeApplicationName ?? ""
             return clause.arrangePreset == nil || name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
@@ -652,10 +654,17 @@ private struct ParserWorker {
         var end = keyword.span.end
         var words: [String] = []
         var event: LifecycleEvent?
+        var isWake = false
 
         while position < tokens.count {
             let token = tokens[position]
             guard case .word(let word) = token.kind, !Self.connectors.contains(word) else { break }
+            if word == "wakes" || word == "woke" {
+                isWake = true
+                end = token.span.end
+                position += 1
+                break
+            }
             if let verb = Self.lifecycleVerbs[word] {
                 event = verb
                 end = token.span.end
@@ -668,6 +677,15 @@ private struct ParserWorker {
         }
 
         let name = words.joined(separator: " ").trimmingCharacters(in: .whitespacesAndNewlines)
+        if isWake, name.lowercased() == "the mac" {
+            return ParsedClause(
+                kind: .wake,
+                span: SourceSpan(start: keyword.span.start, end: end),
+                parameter: .wake,
+                detail: nil
+            )
+        }
+
         return ParsedClause(
             kind: .applicationLifecycle,
             span: SourceSpan(start: keyword.span.start, end: end),

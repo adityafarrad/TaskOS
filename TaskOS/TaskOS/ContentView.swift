@@ -67,14 +67,19 @@ struct ContentView: View {
                 Text("Manual").tag(ComposerViewModel.TriggerFamily.manual)
                 Text("Schedule").tag(ComposerViewModel.TriggerFamily.schedule)
                 Text("App event").tag(ComposerViewModel.TriggerFamily.applicationLifecycle)
+                Text("Mac wakes").tag(ComposerViewModel.TriggerFamily.wake)
             }
             .pickerStyle(.segmented)
-            .frame(maxWidth: 420)
+            .frame(maxWidth: 520)
 
             if model.isScheduled {
                 scheduleCard
             } else if model.isLifecycleTrigger {
                 lifecycleCard
+            } else if model.isWakeTrigger {
+                Text("Runs after the Mac wakes, once the session is ready.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             } else {
                 Text("Runs only when you start it from the app or menu bar.")
                     .font(.caption)

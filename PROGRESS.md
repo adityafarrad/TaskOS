@@ -35,7 +35,7 @@ compressed into implementation plus per-increment physical smoke checks.
 | 2.1 | Add scheduling and runtime admission | done | Increments H1–H3 + fixes H3-d/H3-e | Schedule model, occurrence calc, admission/queue/pause/cancel, schedule grammar, runtime registry, trigger card + next-run preview + enable toggle; physical tests A–E passed |
 | 2.2 | Finish app, window, and utility actions | done | Increments I1–I3 | Copy Text, Hide, normal Quit, specific-display selection, window presets, and notification editing/presentation done; lifecycle loop suppression tracked in 2.4 |
 | 2.3 | Add selected files and portable workflows | done | Increments J1–J3 | File selection, Open/Reveal, durable references, repair, and portable export/import with rebinding done |
-| 2.4 | Add event-triggered workflows | in progress | Increments K1 + K2 | Application-lifecycle trigger done end to end with suppression; wake/display/volume/power/battery pending |
+| 2.4 | Add event-triggered workflows | in progress | Increments K1–K3 | Application-lifecycle and Mac-wake triggers done end to end; display/volume/power/battery pending |
 | 2.5 | Finish the template and discovery experience | not started | — | |
 | 2.6 | Complete everyday management and recovery | not started | — | |
 
@@ -1399,3 +1399,36 @@ Next eligible work package: 2.1 — scheduling and runtime admission.
   for editing; event-trigger suppression is keyed on bundle id and uses a fixed
   3s window (conservative, not perfect attribution).
 - Next eligible work package: 2.4 increment K3 — Mac wake trigger.
+
+### Increment K3 — Mac wake trigger (plan 2.4, partial; plan T5)
+
+- Status: done
+- Behavior delivered: a workflow can run after the Mac wakes. Typing `when the
+  Mac wakes` (or the When card's **Mac wakes** family) builds the wake trigger.
+  A `WakeTriggerSource` observes `NSWorkspace.didWakeNotification`; the event
+  registry fires it through the admission coordinator. Because wake follows
+  sleep, the registry restores session readiness before submitting, so the wake
+  event is not rejected by the session-readiness gate. Enabled wake workflows
+  register at launch and on save.
+- Interfaces changed: parser `ParsedClauseKind.wake` / `ParsedParameter.wake`
+  and `parseWhen` wake detection; `ComposerTriggerDraft.wake` with reconciliation,
+  rendering, and configuration; `EventTriggerRegistry.handle` restores session
+  readiness on `.woke`; `ComposerViewModel.TriggerFamily.wake` and
+  `isWakeTrigger`; app `WakeTriggerSource` and `AppComposition.startEventTriggers`
+  wiring; trigger family picker gained **Mac wakes**.
+- Tests performed:
+  - `swift test --package-path Packages/TaskOSCore` — 230 tests, 30 suites, pass
+    (was 227/30; +3). New coverage: wake phrase parsing, wake composer
+    definition, and a wake event firing after session readiness was cleared
+    while restoring readiness.
+  - App tests (`xcodebuild ... test -only-testing:TaskOSTests`) — TEST SUCCEEDED.
+  - Debug build — BUILD SUCCEEDED.
+  - Release build — BUILD SUCCEEDED.
+- Physical checks: pending (create "when the Mac wakes" with a notification
+  action, enable it, sleep and wake the Mac, confirm it fires once and that a
+  run interrupted by sleep does not resume after wake).
+- Remaining/gaps: wake is subject to a genuine event; no fabricated wake on
+  launch. Display/volume/power/battery still map to manual when loaded for
+  editing.
+- Next eligible work package: 2.4 increment K4 — display connection and external
+  volume triggers with baseline reconciliation.

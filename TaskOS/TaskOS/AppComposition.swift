@@ -24,6 +24,7 @@ final class AppComposition {
     private let catalog: WorkspaceResourceCatalog
     private let sessionObserver: SystemSessionObserver
     private let lifecycleSource: ApplicationLifecycleSource
+    private let wakeSource: WakeTriggerSource
 
     init() {
         let clock = SystemClock()
@@ -102,6 +103,7 @@ final class AppComposition {
             suppressor: lifecycleSuppressor
         )
         self.lifecycleSource = ApplicationLifecycleSource()
+        self.wakeSource = WakeTriggerSource()
 
         self.sessionObserver = SystemSessionObserver(coordinator: coordinator)
     }
@@ -125,6 +127,9 @@ final class AppComposition {
 
     func startEventTriggers() async {
         _ = await lifecycleSource.start { [eventTriggerRegistry] event in
+            Task { await eventTriggerRegistry.handle(event) }
+        }
+        _ = await wakeSource.start { [eventTriggerRegistry] event in
             Task { await eventTriggerRegistry.handle(event) }
         }
     }

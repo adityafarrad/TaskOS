@@ -22,6 +22,7 @@ public enum ComposerTriggerDraft: Hashable, Sendable {
     case once(hour: Int, minute: Int)
     case oneTime(Date)
     case applicationLifecycle(application: ResourceReference?, label: String, event: LifecycleEvent)
+    case wake
 }
 
 public struct ComposerAction: Hashable, Sendable, Identifiable {
@@ -352,6 +353,8 @@ public struct ComposerDocument: Sendable {
             let reference = application
                 ?? ResourceReference(kind: .application, identifier: "", label: label)
             return .applicationLifecycle(ApplicationLifecycleTrigger(application: reference, event: event))
+        case .wake:
+            return .wake(WakeTrigger())
         }
     }
 
@@ -405,6 +408,9 @@ public struct ComposerDocument: Sendable {
                 } else {
                     newElements.append(.unresolved(clauseText(clause)))
                 }
+
+            case .wake:
+                newTrigger = .wake
 
             case .schedule:
                 switch clause.schedule {
@@ -642,6 +648,8 @@ public struct ComposerDocument: Sendable {
             return "Once at \(clockText(hour: components.hour ?? 0, minute: components.minute ?? 0))"
         case .applicationLifecycle(_, let label, let event):
             return label.isEmpty ? "" : "When \(label) \(event.displayName)"
+        case .wake:
+            return "When the Mac wakes"
         }
     }
 

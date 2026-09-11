@@ -118,6 +118,7 @@ final class ComposerViewModel {
         case manual
         case schedule
         case applicationLifecycle
+        case wake
     }
 
     var triggerFamily: TriggerFamily {
@@ -126,6 +127,8 @@ final class ComposerViewModel {
             return .manual
         case .applicationLifecycle:
             return .applicationLifecycle
+        case .wake:
+            return .wake
         case .daily, .weekdays, .interval, .relative, .once, .oneTime:
             return .schedule
         }
@@ -133,6 +136,7 @@ final class ComposerViewModel {
 
     var isScheduled: Bool { triggerFamily == .schedule }
     var isLifecycleTrigger: Bool { triggerFamily == .applicationLifecycle }
+    var isWakeTrigger: Bool { triggerFamily == .wake }
     var supportsAutomaticRuns: Bool { triggerFamily != .manual }
 
     func setTriggerFamily(_ family: TriggerFamily) {
@@ -144,6 +148,8 @@ final class ComposerViewModel {
             document.setTrigger(.daily(hour: 9, minute: 0))
         case .applicationLifecycle:
             document.setTrigger(.applicationLifecycle(application: nil, label: "", event: .launched))
+        case .wake:
+            document.setTrigger(.wake)
         }
         afterEdit()
     }
@@ -193,7 +199,7 @@ final class ComposerViewModel {
             return .interval
         case .once, .oneTime:
             return .once
-        case .daily, .manual, .applicationLifecycle:
+        case .daily, .manual, .applicationLifecycle, .wake:
             return .daily
         }
     }
@@ -215,7 +221,7 @@ final class ComposerViewModel {
             return calendar.date(bySettingHour: hour, minute: minute, second: 0, of: base) ?? base
         case .oneTime(let date):
             return date
-        case .relative, .interval, .manual, .applicationLifecycle:
+        case .relative, .interval, .manual, .applicationLifecycle, .wake:
             return calendar.date(bySettingHour: 9, minute: 0, second: 0, of: base) ?? base
         }
     }
@@ -959,7 +965,9 @@ final class ComposerViewModel {
                 label: trigger.application.label,
                 event: trigger.event
             )
-        case .wake, .displayConnection, .externalVolume, .powerSource, .batteryThreshold:
+        case .wake:
+            draft = .wake
+        case .displayConnection, .externalVolume, .powerSource, .batteryThreshold:
             draft = .manual
         }
         if draft != .manual {

@@ -130,6 +130,19 @@ struct EventTriggerTests {
         #expect(definition?.trigger.isEventTrigger == true)
     }
 
+    @Test func parsesWakePhrase() {
+        let parsed = CommandParser().parse("when the Mac wakes")
+        #expect(parsed.outcome == .complete)
+        #expect(parsed.clauses.first?.kind == .wake)
+    }
+
+    @Test func wakeComposerBuildsDefinition() {
+        let document = ComposerDocument(text: "when the Mac wakes, then show a notification")
+        #expect(document.trigger == .wake)
+        let definition = document.makeDefinition(name: "Wake")
+        #expect(definition?.trigger == .wake(WakeTrigger()))
+    }
+
     @Test func eventTriggerRoundTripsThroughCoding() throws {
         let definition = AutomationDefinition(
             name: "Display",

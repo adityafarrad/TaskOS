@@ -73,6 +73,24 @@ struct EventTriggerRegistryTests {
         await coordinator.waitUntilIdle()
     }
 
+    @Test func wakeEventFiresAndRestoresSessionReadiness() async {
+        let (_, probe, coordinator, _, registry) = context()
+        let definition = AutomationDefinition(
+            name: "Wake",
+            trigger: .wake(WakeTrigger()),
+            actions: [.showNotification(ShowNotificationAction(title: "TaskOS", message: ""))]
+        )
+        await registry.register(definition)
+
+        await coordinator.updateSessionReadiness(false)
+        let fired = await registry.handle(.woke)
+        #expect(fired == [definition.id])
+
+        await probe.awaitStarted(1)
+        await coordinator.waitUntilIdle()
+        #expect(await coordinator.status().isSessionReady)
+    }
+
     @Test func unregisterStopsFiring() async {
         let (_, _, _, _, registry) = context()
         let definition = appTrigger(.quit)

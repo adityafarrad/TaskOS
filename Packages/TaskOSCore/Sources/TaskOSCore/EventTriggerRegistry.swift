@@ -41,6 +41,10 @@ public actor EventTriggerRegistry {
 
     @discardableResult
     public func handle(_ event: ObservedTriggerEvent) async -> [AutomationID] {
+        if case .woke = event {
+            await coordinator.updateSessionReadiness(true)
+        }
+
         let now = clock.now()
         var fired: [AutomationID] = []
 
