@@ -22,6 +22,14 @@ unit of work.
 After a work package passes its focused tests, update `PROGRESS.md` and commit
 without asking.
 
+### Commit and push cadence (agreed)
+
+- Commit locally after each bounded sub-increment (e.g. H1, I2, J3) for safety
+  and clean history. Local commits are cheap and reversible.
+- Push to `origin` and create the annotated phase tag only when a numbered
+  sub-phase (2.1, 2.2, 2.3, …) is complete and verified.
+- Ask before every push, even at a phase boundary.
+
 Never run without explicit authorization:
 
 - `git push --force`, `git push --force-with-lease`
@@ -35,13 +43,15 @@ without repeated approval.
 
 ## Milestones and named history
 
-`main` is the integration branch. Each completed work package gets an annotated
-tag so history is understandable later:
+`main` is the integration branch. Each completed numbered sub-phase gets an
+annotated tag so history is understandable later:
 
 - Format: `wp-<plan-id>-<short-slug>` (e.g. `wp-0.4-foundation`,
-  `wp-1.1-domain-registry`).
-- Tag is created after the work package's commit passes its focused tests.
-- Push tags explicitly: `git push origin <tag>` (`git push` is ask-first).
+  `wp-2.3-complete`).
+- Tag is created when the sub-phase's work is committed, tested, and verified.
+  Sub-increment commits before that remain as untagged local history.
+- Push tags explicitly at the phase boundary: `git push origin --tags`
+  (`git push` is ask-first).
 
 ## Build and test
 
