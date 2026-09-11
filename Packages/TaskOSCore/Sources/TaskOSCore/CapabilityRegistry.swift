@@ -65,6 +65,14 @@ public struct CapabilityRegistry: Sendable {
                 title: "Open Application",
                 summary: "Launch the selected app if necessary, then activate it."
             ),
+            .hideApplication: CapabilityDescriptor(
+                title: "Hide Application",
+                summary: "Hide a selected running app."
+            ),
+            .quitApplication: CapabilityDescriptor(
+                title: "Quit Application",
+                summary: "Request a normal quit of a selected running app."
+            ),
             .openWebsite: CapabilityDescriptor(
                 title: "Open Website",
                 summary: "Open an absolute HTTP(S) URL in the default or a selected browser."

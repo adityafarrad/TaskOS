@@ -33,7 +33,7 @@ compressed into implementation plus per-increment physical smoke checks.
 | ID | Work package | Status | Evidence | Notes |
 |---|---|---|---|---|
 | 2.1 | Add scheduling and runtime admission | in progress | Increments H1–H3 | Schedule model, occurrence calc, admission/queue/pause/cancel, schedule grammar, runtime registry, trigger card + next-run preview + enable toggle all implemented; physical verification of the schedule UI pending |
-| 2.2 | Finish app, window, and utility actions | in progress | Increment I1 | Copy Text (A10) done end to end; Hide/Quit and display selection pending |
+| 2.2 | Finish app, window, and utility actions | in progress | Increments I1 + I2 | Copy Text, Hide Application, and normal Quit Application done end to end; specific-display selection and notification-editing review pending |
 | 2.3 | Add selected files and portable workflows | not started | — | |
 | 2.4 | Add event-triggered workflows | not started | — | |
 | 2.5 | Finish the template and discovery experience | not started | — | |
@@ -1099,3 +1099,43 @@ Next eligible work package: 2.1 — scheduling and runtime admission.
   complete notification editing/permission handling review.
 - Next eligible work package: 2.2 increment I2 — Hide and Quit Application with
   normal-quit safeguards.
+
+### Increment I2 — Hide and Quit Application (plan 2.2, partial; plan A2 + A3)
+
+- Status: done
+- Behavior delivered: workflows can hide a running app and request a normal quit
+  of a running app, through text and cards. Typing `hide Safari` or
+  `quit Safari and Notes` produces the matching step with an application picker;
+  `Hide an application` / `Quit an application` are available from Add action and
+  as starters. Preview resolves the app, notes that Hide only works when running,
+  and warns that Quit may wait on a dialog. The Quit executor never force-quits:
+  it sends `terminate()`, waits up to 10s for the app to exit, then reports
+  failure if a prompt is blocking. Hide/Quit reject (and skip at execution)
+  TaskOS itself, Finder, and system infrastructure (Dock, loginwindow,
+  SystemUIServer); both require no Accessibility permission.
+- Interfaces changed: added `ActionID.hideApplication` / `.quitApplication`,
+  `HideApplicationAction`, `QuitApplicationAction` (with
+  `protectedBundleIdentifiers`), `ActionConfiguration` cases; registry
+  descriptors; validation; `requiredPermissions`; parser
+  `ParsedClauseKind.hideApplication`/`.quitApplication` and
+  `hide`/`quit` productions (shared application-list collection refactored out of
+  `parseOpen`); `CanonicalPhrase`; `ComposerActionDraft` cases with resolution and
+  reconciliation; `SuggestionEngine` starters; `CreationPreparer` previews; app
+  `HideApplicationExecutor` and `QuitApplicationExecutor` registered in
+  `AppComposition`; `ActionCard` UI, Add-action entries, and preview titles.
+- Tests performed:
+  - `swift test --package-path Packages/TaskOSCore` — 183 tests, 26 suites, pass
+    (was 175/25; +8). New coverage: hide parse, quit list parse, missing app
+    needs input, canonical round-trips, composer hide definition, protected quit
+    rejection (Finder and TaskOS), hide validation, and no required permissions.
+  - App tests (`xcodebuild ... test -only-testing:TaskOSTests`) — TEST SUCCEEDED.
+  - Debug build — BUILD SUCCEEDED.
+  - Release build — BUILD SUCCEEDED.
+- Physical checks: pending (hide a running app; quit an app with unsaved changes
+  and confirm TaskOS reports the prompt instead of force-quitting; confirm a
+  workflow cannot quit TaskOS/Finder).
+- Remaining in plan 2.2: selectable specific display for Arrange Window (model
+  exists; UI offers current/main), and a review of complete notification editing
+  and permission handling. Lifecycle feedback-loop suppression belongs to 2.4.
+- Next eligible work package: 2.2 increment I3 — specific-display selection and
+  notification editing/permission review.

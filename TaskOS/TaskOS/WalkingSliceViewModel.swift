@@ -809,6 +809,12 @@ final class ComposerViewModel {
             case .openApplication(let value, let reference):
                 name = value
                 resolved = reference
+            case .hideApplication(let value, let reference):
+                name = value
+                resolved = reference
+            case .quitApplication(let value, let reference):
+                name = value
+                resolved = reference
             case .arrangeWindow(let value, let reference, _, _):
                 name = value
                 resolved = reference

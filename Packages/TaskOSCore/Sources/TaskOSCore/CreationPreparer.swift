@@ -51,6 +51,72 @@ public struct CreationPreparer: Sendable {
                     issues.append(.error("Action \(index + 1): \(label) is not available on this Mac."))
                 }
 
+            case .hideApplication(let configuration):
+                let label = configuration.application.label
+                if await catalog.application(bundleIdentifier: configuration.application.identifier) != nil {
+                    actionPreviews.append(
+                        ActionPreview(
+                            index: index,
+                            actionID: .hideApplication,
+                            title: title(for: .hideApplication),
+                            targetLabel: label,
+                            status: .ready,
+                            detail: "Hides only if it is running."
+                        )
+                    )
+                } else {
+                    actionPreviews.append(
+                        ActionPreview(
+                            index: index,
+                            actionID: .hideApplication,
+                            title: title(for: .hideApplication),
+                            targetLabel: label,
+                            status: .missingResource,
+                            detail: "Not installed or unavailable."
+                        )
+                    )
+                    issues.append(.error("Action \(index + 1): \(label) is not available on this Mac."))
+                }
+
+            case .quitApplication(let configuration):
+                let label = configuration.application.label
+                if QuitApplicationAction.protectedBundleIdentifiers.contains(configuration.application.identifier) {
+                    actionPreviews.append(
+                        ActionPreview(
+                            index: index,
+                            actionID: .quitApplication,
+                            title: title(for: .quitApplication),
+                            targetLabel: label,
+                            status: .missingResource,
+                            detail: "TaskOS cannot quit this app."
+                        )
+                    )
+                    issues.append(.error("Action \(index + 1): TaskOS cannot quit itself, Finder, or system infrastructure."))
+                } else if await catalog.application(bundleIdentifier: configuration.application.identifier) != nil {
+                    actionPreviews.append(
+                        ActionPreview(
+                            index: index,
+                            actionID: .quitApplication,
+                            title: title(for: .quitApplication),
+                            targetLabel: label,
+                            status: .ready,
+                            detail: "May wait for an unsaved-document prompt."
+                        )
+                    )
+                } else {
+                    actionPreviews.append(
+                        ActionPreview(
+                            index: index,
+                            actionID: .quitApplication,
+                            title: title(for: .quitApplication),
+                            targetLabel: label,
+                            status: .missingResource,
+                            detail: "Not installed or unavailable."
+                        )
+                    )
+                    issues.append(.error("Action \(index + 1): \(label) is not available on this Mac."))
+                }
+
             case .openWebsite(let configuration):
                 if let browser = configuration.browser,
                    await catalog.application(bundleIdentifier: browser.identifier) == nil {

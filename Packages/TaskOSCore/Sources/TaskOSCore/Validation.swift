@@ -61,6 +61,10 @@ extension ActionConfiguration {
         switch self {
         case .openApplication(let action):
             return action.validate()
+        case .hideApplication(let action):
+            return action.validate()
+        case .quitApplication(let action):
+            return action.validate()
         case .openWebsite(let action):
             return action.validate()
         case .arrangeWindow(let action):
@@ -86,6 +90,41 @@ extension ArrangeWindowAction {
         }
         if application.label.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             issues.append(.error("Arrange Window requires a display name for the selected application."))
+        }
+        return ValidationResult(issues: issues)
+    }
+}
+
+extension HideApplicationAction {
+    public func validate() -> ValidationResult {
+        var issues: [ValidationIssue] = []
+        if application.kind != .application {
+            issues.append(.error("Hide Application requires an application resource."))
+        }
+        if application.identifier.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            issues.append(.error("Hide Application requires a selected application."))
+        }
+        if application.label.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            issues.append(.error("Hide Application requires a display name for the selected application."))
+        }
+        return ValidationResult(issues: issues)
+    }
+}
+
+extension QuitApplicationAction {
+    public func validate() -> ValidationResult {
+        var issues: [ValidationIssue] = []
+        if application.kind != .application {
+            issues.append(.error("Quit Application requires an application resource."))
+        }
+        if application.identifier.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            issues.append(.error("Quit Application requires a selected application."))
+        }
+        if application.label.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            issues.append(.error("Quit Application requires a display name for the selected application."))
+        }
+        if Self.protectedBundleIdentifiers.contains(application.identifier) {
+            issues.append(.error("TaskOS cannot quit itself, Finder, or system infrastructure."))
         }
         return ValidationResult(issues: issues)
     }

@@ -3,6 +3,8 @@ import Foundation
 public enum ParsedClauseKind: Hashable, Sendable {
     case schedule
     case openApplication
+    case hideApplication
+    case quitApplication
     case arrangeWindow
     case wait
     case showNotification
@@ -136,7 +138,8 @@ public struct ParsedCommand: Hashable, Sendable {
     public var recognizedActionClauses: [ParsedClause] {
         clauses.filter { clause in
             switch clause.kind {
-            case .openApplication, .arrangeWindow, .wait, .showNotification, .copyText:
+            case .openApplication, .hideApplication, .quitApplication,
+                 .arrangeWindow, .wait, .showNotification, .copyText:
                 return true
             case .schedule, .unsupported, .unrecognized:
                 return false

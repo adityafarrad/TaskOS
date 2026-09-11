@@ -121,6 +121,26 @@ public struct SuggestionEngine: Sendable {
         if !openOnly {
             suggestions.append(
                 Suggestion(
+                    id: "action.hideApplication",
+                    phrase: "Hide Safari",
+                    title: "Hide an application",
+                    category: .action,
+                    requiresParameter: true,
+                    match: .grammarPosition
+                )
+            )
+            suggestions.append(
+                Suggestion(
+                    id: "action.quitApplication",
+                    phrase: "Quit Safari",
+                    title: "Quit an application",
+                    category: .action,
+                    requiresParameter: true,
+                    match: .grammarPosition
+                )
+            )
+            suggestions.append(
+                Suggestion(
                     id: "action.arrangeWindow",
                     phrase: "Put an application on the left half",
                     title: "Arrange a window",

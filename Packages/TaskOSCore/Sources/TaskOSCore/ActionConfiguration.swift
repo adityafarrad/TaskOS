@@ -8,6 +8,30 @@ public struct OpenApplicationAction: Codable, Hashable, Sendable {
     }
 }
 
+public struct HideApplicationAction: Codable, Hashable, Sendable {
+    public var application: ResourceReference
+
+    public init(application: ResourceReference) {
+        self.application = application
+    }
+}
+
+public struct QuitApplicationAction: Codable, Hashable, Sendable {
+    public static let protectedBundleIdentifiers: Set<String> = [
+        "usuals.com.TaskOS",
+        "com.apple.finder",
+        "com.apple.dock",
+        "com.apple.loginwindow",
+        "com.apple.systemuiserver",
+    ]
+
+    public var application: ResourceReference
+
+    public init(application: ResourceReference) {
+        self.application = application
+    }
+}
+
 public struct OpenWebsiteAction: Codable, Hashable, Sendable {
     public var url: String
     public var browser: ResourceReference?
@@ -62,6 +86,8 @@ public struct CopyTextAction: Codable, Hashable, Sendable {
 
 public enum ActionConfiguration: Codable, Hashable, Sendable {
     case openApplication(OpenApplicationAction)
+    case hideApplication(HideApplicationAction)
+    case quitApplication(QuitApplicationAction)
     case openWebsite(OpenWebsiteAction)
     case arrangeWindow(ArrangeWindowAction)
     case wait(WaitAction)
@@ -72,6 +98,10 @@ public enum ActionConfiguration: Codable, Hashable, Sendable {
         switch self {
         case .openApplication:
             return .openApplication
+        case .hideApplication:
+            return .hideApplication
+        case .quitApplication:
+            return .quitApplication
         case .openWebsite:
             return .openWebsite
         case .arrangeWindow:

@@ -291,6 +291,8 @@ struct ContentView: View {
     private var addMenu: some View {
         Menu("Add action") {
             Button("Open a website") { model.add(.openWebsite(url: "https://", browser: nil)) }
+            Button("Hide an application") { model.add(.hideApplication(name: "", resolved: nil)) }
+            Button("Quit an application") { model.add(.quitApplication(name: "", resolved: nil)) }
             Button("Arrange a window") {
                 model.add(.arrangeWindow(name: "", resolved: nil, preset: .leftHalf, display: .current))
             }
@@ -544,6 +546,8 @@ private struct ActionCard: View {
     private var title: String {
         switch action.draft {
         case .openApplication: return "Open Application"
+        case .hideApplication: return "Hide Application"
+        case .quitApplication: return "Quit Application"
         case .openWebsite: return "Open Website"
         case .arrangeWindow: return "Arrange Window"
         case .wait: return "Wait"
@@ -562,6 +566,27 @@ private struct ActionCard: View {
                         .foregroundStyle(.green)
                 } else {
                     Label("Unresolved: \(name)", systemImage: "exclamationmark.triangle")
+                        .foregroundStyle(.orange)
+                }
+                Spacer()
+                Picker("Application", selection: applicationSelection) {
+                    Text("Select...").tag("")
+                    ForEach(model.applications, id: \.bundleIdentifier) { application in
+                        Text(application.displayName).tag(application.bundleIdentifier)
+                    }
+                }
+                .labelsHidden()
+                .frame(width: 220)
+            }
+
+        case .hideApplication(let hideName, let hideResolved),
+             .quitApplication(let hideName, let hideResolved):
+            HStack(spacing: 8) {
+                if let hideResolved {
+                    Label(hideResolved.label, systemImage: "checkmark.circle.fill")
+                        .foregroundStyle(.green)
+                } else {
+                    Label("Unresolved: \(hideName)", systemImage: "exclamationmark.triangle")
                         .foregroundStyle(.orange)
                 }
                 Spacer()
@@ -701,6 +726,10 @@ private struct ActionCard: View {
             get: {
                 switch action.draft {
                 case .openApplication(_, let resolved):
+                    return resolved?.identifier ?? ""
+                case .hideApplication(_, let resolved):
+                    return resolved?.identifier ?? ""
+                case .quitApplication(_, let resolved):
                     return resolved?.identifier ?? ""
                 case .arrangeWindow(_, let resolved, _, _):
                     return resolved?.identifier ?? ""
@@ -870,6 +899,8 @@ private struct RunResultView: View {
     private func title(for id: ActionID) -> String {
         switch id {
         case .openApplication: return "Open Application"
+        case .hideApplication: return "Hide Application"
+        case .quitApplication: return "Quit Application"
         case .openWebsite: return "Open Website"
         case .arrangeWindow: return "Arrange Window"
         case .wait: return "Wait"

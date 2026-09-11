@@ -5,6 +5,10 @@ public enum CanonicalPhrase {
         switch action {
         case .openApplication(let configuration):
             return "Open \(configuration.application.label)"
+        case .hideApplication(let configuration):
+            return "Hide \(configuration.application.label)"
+        case .quitApplication(let configuration):
+            return "Quit \(configuration.application.label)"
         case .openWebsite(let configuration):
             return "Open \(configuration.url)"
         case .arrangeWindow(let configuration):

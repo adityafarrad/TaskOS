@@ -2,6 +2,8 @@ import Foundation
 
 public enum ComposerActionDraft: Hashable, Sendable {
     case openApplication(name: String, resolved: ResourceReference?)
+    case hideApplication(name: String, resolved: ResourceReference?)
+    case quitApplication(name: String, resolved: ResourceReference?)
     case openWebsite(url: String, browser: ResourceReference?)
     case arrangeWindow(name: String, resolved: ResourceReference?, preset: WindowPreset, display: WindowDisplaySelection)
     case wait(TimeInterval)
@@ -97,6 +99,10 @@ public struct ComposerDocument: Sendable {
             switch action.draft {
             case .openApplication(_, let resolved):
                 return resolved == nil
+            case .hideApplication(_, let resolved):
+                return resolved == nil
+            case .quitApplication(_, let resolved):
+                return resolved == nil
             case .arrangeWindow(_, let resolved, _, _):
                 return resolved == nil
             default:
@@ -181,6 +187,10 @@ public struct ComposerDocument: Sendable {
         switch action.draft {
         case .openApplication(let name, _):
             updateAction(id: id, draft: .openApplication(name: name, resolved: reference))
+        case .hideApplication(let name, _):
+            updateAction(id: id, draft: .hideApplication(name: name, resolved: reference))
+        case .quitApplication(let name, _):
+            updateAction(id: id, draft: .quitApplication(name: name, resolved: reference))
         case .arrangeWindow(let name, _, let preset, let display):
             updateAction(id: id, draft: .arrangeWindow(name: name, resolved: reference, preset: preset, display: display))
         default:
@@ -241,6 +251,12 @@ public struct ComposerDocument: Sendable {
             case .openApplication(_, let resolved):
                 guard let resolved else { return nil }
                 result.append(.openApplication(OpenApplicationAction(application: resolved)))
+            case .hideApplication(_, let resolved):
+                guard let resolved else { return nil }
+                result.append(.hideApplication(HideApplicationAction(application: resolved)))
+            case .quitApplication(_, let resolved):
+                guard let resolved else { return nil }
+                result.append(.quitApplication(QuitApplicationAction(application: resolved)))
             case .openWebsite(let url, let browser):
                 guard OpenWebsiteAction.isAbsoluteHTTPURL(url) else { return nil }
                 result.append(.openWebsite(OpenWebsiteAction(url: url, browser: browser)))
@@ -378,6 +394,20 @@ public struct ComposerDocument: Sendable {
                     newElements.append(.action(reusedAction(for: draft, from: previousActions, cursor: &cursor)))
                 }
 
+            case .hideApplication:
+                for name in clause.resourceNames {
+                    newElements.append(
+                        .action(reusedAction(for: .hideApplication(name: name, resolved: nil), from: previousActions, cursor: &cursor))
+                    )
+                }
+
+            case .quitApplication:
+                for name in clause.resourceNames {
+                    newElements.append(
+                        .action(reusedAction(for: .quitApplication(name: name, resolved: nil), from: previousActions, cursor: &cursor))
+                    )
+                }
+
             case .arrangeWindow:
                 let name = (clause.arrangeApplicationName ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
                 if let preset = clause.arrangePreset, !name.isEmpty {
@@ -448,6 +478,18 @@ public struct ComposerDocument: Sendable {
             }
             return new
 
+        case (.hideApplication(let oldName, let resolved), .hideApplication(let newName, _)):
+            if oldName.caseInsensitiveCompare(newName) == .orderedSame {
+                return .hideApplication(name: newName, resolved: resolved)
+            }
+            return new
+
+        case (.quitApplication(let oldName, let resolved), .quitApplication(let newName, _)):
+            if oldName.caseInsensitiveCompare(newName) == .orderedSame {
+                return .quitApplication(name: newName, resolved: resolved)
+            }
+            return new
+
         case (.showNotification(let title, let message), .showNotification):
             return .showNotification(title: title, message: message)
 
@@ -501,6 +543,10 @@ public struct ComposerDocument: Sendable {
         switch draft {
         case .openApplication(let name, _):
             return "Open \(name)"
+        case .hideApplication(let name, _):
+            return "Hide \(name)"
+        case .quitApplication(let name, _):
+            return "Quit \(name)"
         case .openWebsite(let url, _):
             return "Open \(url)"
         case .arrangeWindow(let name, _, let preset, _):

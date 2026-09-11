@@ -9,6 +9,8 @@ public enum TriggerID: String, Codable, Sendable, CaseIterable, Hashable {
 
 public enum ActionID: String, Codable, Sendable, CaseIterable, Hashable {
     case openApplication
+    case hideApplication
+    case quitApplication
     case openWebsite
     case arrangeWindow
     case wait

@@ -113,8 +113,8 @@ private struct ParserWorker {
 
     static let connectors: Set<String> = ["and", "then", "also", ","]
     static let clauseKeywords: Set<String> = [
-        "open", "wait", "show", "notify", "put", "arrange", "maximize", "center",
-        "copy", "every", "once", "in",
+        "open", "hide", "quit", "wait", "show", "notify", "put", "arrange",
+        "maximize", "center", "copy", "every", "once", "in",
     ]
     static let timeUnits: Set<String> = ["second", "seconds", "sec", "secs", "s"]
     static let weekdayNames: [String: Weekday] = [
@@ -196,6 +196,8 @@ private struct ParserWorker {
         switch clause.kind {
         case .openApplication:
             return clause.resourceNames.isEmpty
+        case .hideApplication, .quitApplication:
+            return clause.resourceNames.isEmpty
         case .arrangeWindow:
             let name = clause.arrangeApplicationName ?? ""
             return clause.arrangePreset == nil || name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
@@ -215,6 +217,10 @@ private struct ParserWorker {
         switch clause.kind {
         case .openApplication where clause.resourceNames.isEmpty:
             return [.error("Open needs an application name.", span: clause.span)]
+        case .hideApplication where clause.resourceNames.isEmpty:
+            return [.error("Hide needs an application name.", span: clause.span)]
+        case .quitApplication where clause.resourceNames.isEmpty:
+            return [.error("Quit needs an application name.", span: clause.span)]
         case .wait:
             guard let duration = clause.duration else {
                 return [.error("Wait needs a duration, for example 5 seconds.", span: clause.span)]
@@ -266,6 +272,10 @@ private struct ParserWorker {
         switch word {
         case "open":
             return parseOpen()
+        case "hide":
+            return parseApplicationListClause(kind: .hideApplication)
+        case "quit":
+            return parseApplicationListClause(kind: .quitApplication)
         case "wait":
             return parseWait()
         case "show", "notify":
@@ -291,10 +301,31 @@ private struct ParserWorker {
     private mutating func parseOpen() -> ParsedClause {
         let openToken = tokens[position]
         position += 1
+        let (names, end) = collectApplicationNames(after: openToken)
+        return ParsedClause(
+            kind: .openApplication,
+            span: SourceSpan(start: openToken.span.start, end: end),
+            parameter: .resourceNames(names),
+            detail: nil
+        )
+    }
 
+    private mutating func parseApplicationListClause(kind: ParsedClauseKind) -> ParsedClause {
+        let keyword = tokens[position]
+        position += 1
+        let (names, end) = collectApplicationNames(after: keyword)
+        return ParsedClause(
+            kind: kind,
+            span: SourceSpan(start: keyword.span.start, end: end),
+            parameter: .resourceNames(names),
+            detail: nil
+        )
+    }
+
+    private mutating func collectApplicationNames(after keyword: CommandToken) -> ([String], Int) {
         var names: [String] = []
         var currentWords: [String] = []
-        var end = openToken.span.end
+        var end = keyword.span.end
 
         func flush() {
             let joined = currentWords.joined(separator: " ")
@@ -314,7 +345,7 @@ private struct ParserWorker {
                 if Self.connectors.contains(word) {
                     if isClauseStart(tokenAfterCurrent) {
                         flush()
-                        return openClause(names: names, start: openToken.span.start, end: end)
+                        return (names, end)
                     }
                     flush()
                     end = token.span.end
@@ -333,7 +364,7 @@ private struct ParserWorker {
                     continue
                 }
                 flush()
-                return openClause(names: names, start: openToken.span.start, end: end)
+                return (names, end)
 
             case .number:
                 currentWords.append(token.original)
@@ -343,16 +374,7 @@ private struct ParserWorker {
         }
 
         flush()
-        return openClause(names: names, start: openToken.span.start, end: end)
-    }
-
-    private func openClause(names: [String], start: Int, end: Int) -> ParsedClause {
-        ParsedClause(
-            kind: .openApplication,
-            span: SourceSpan(start: start, end: end),
-            parameter: .resourceNames(names),
-            detail: nil
-        )
+        return (names, end)
     }
 
     private mutating func parseArrange() -> ParsedClause {

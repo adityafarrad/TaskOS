@@ -43,6 +43,8 @@ final class AppComposition {
             clock: clock,
             executors: [
                 OpenApplicationExecutor(),
+                HideApplicationExecutor(),
+                QuitApplicationExecutor(),
                 OpenWebsiteExecutor(),
                 ArrangeWindowExecutor(),
                 NotificationExecutor(),
