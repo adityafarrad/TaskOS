@@ -782,6 +782,10 @@ struct ContentView: View {
                         model.requestAccessibilityPermission()
                         model.refreshPermissions()
                     }
+                    Button("Accessibility Settings") { model.openAccessibilitySettings() }
+                }
+                if model.notificationPermission != .granted {
+                    Button("Notification Settings") { model.openNotificationSettings() }
                 }
             }
 

@@ -37,7 +37,7 @@ compressed into implementation plus per-increment physical smoke checks.
 | 2.3 | Add selected files and portable workflows | done | Increments J1–J3 | File selection, Open/Reveal, durable references, repair, and portable export/import with rebinding done |
 | 2.4 | Add event-triggered workflows | done | Increments K1–K6 | All six event families implemented end to end with discovery/availability; user-confirmed physical checks complete |
 | 2.5 | Finish the template and discovery experience | in progress | Increments M1–M3 | Twelve templates, template picker, and capability discovery implemented; physical UI check pending |
-| 2.6 | Complete everyday management and recovery | in progress | Increments N1–N3 | Visibility, attention/repair, action-level history, and retention added; permission-recheck/onboarding polish pending |
+| 2.6 | Complete everyday management and recovery | done | Increments N1–N4 | Visibility, attention/repair, action-level history, retention, permission settings links, and onboarding polish complete |
 
 ### Phase 3 — Qualify, beta-test, and distribute
 
@@ -1682,3 +1682,42 @@ Next eligible work package: 2.1 — scheduling and runtime admission.
   refinement. Admission-event persistence remains a gap.
 - Next eligible work package: 2.6 increment N4 — permission recheck/resource
   repair polish and onboarding/help refinement, then Phase 2 exit gate.
+
+### Increment N4 — Permission settings links and onboarding polish (plan 2.6, partial)
+
+- Status: done
+- Behavior delivered: Settings now offers direct **Accessibility Settings** and
+  **Notification Settings** buttons whenever the corresponding permission is not
+  granted, alongside Recheck and Grant. Onboarding mentions starting from a
+  template or a trigger phrase and using Browse supported actions. The resource
+  repair path (attention badge → Fix) is already in place from N2.
+- Interfaces changed: `ComposerViewModel.openNotificationSettings()` /
+  `openAccessibilitySettings()`; Settings buttons; expanded onboarding copy.
+- Tests performed:
+  - `swift test --package-path Packages/TaskOSCore` — 255 tests, 33 suites, pass.
+  - App tests (`xcodebuild ... test -only-testing:TaskOSTests`) — TEST SUCCEEDED.
+  - Debug build — BUILD SUCCEEDED.
+  - Release build — BUILD SUCCEEDED.
+- Physical checks: pending (deny a permission and confirm the settings buttons
+  open the right pane; confirm the onboarding copy and Fix flow).
+
+## Phase 2 exit gate
+
+- Core tests: `swift test --package-path Packages/TaskOSCore` — 255 tests,
+  33 suites, pass (Core purity test still enforced).
+- App tests: `xcodebuild ... test -only-testing:TaskOSTests` — passed (SwiftData
+  workflow, run-history, and draft repositories, including retention).
+- Release build: BUILD SUCCEEDED.
+- Implemented and exercised: scheduling and admission (2.1, verified A–E); all
+  eight in-scope action/utility capabilities (2.2); selected files and portable
+  export/import (2.3); all six event-trigger families (2.4, physically verified);
+  the twelve templates and capability discovery (2.5); and management/recovery
+  (2.6).
+- Deferred by plan/user decision: global hotkey (T2), which would add the
+  KeyboardShortcuts package; full-screen/space window operations; specific
+  volume selection in the card.
+- Known gaps recorded: admission events are in-memory only; the composer
+  "Test now"/Library "Run" execute outside the admission queue (busy-guarded);
+  a stale file bookmark is resolved but not refreshed into storage.
+- Phase 2 is functionally complete pending the user's physical verification of
+  the N2–N4 UI affordances and any remaining hardware spot-checks.

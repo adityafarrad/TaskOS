@@ -803,6 +803,18 @@ final class ComposerViewModel {
         }
     }
 
+    func openNotificationSettings() {
+        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.notifications") {
+            NSWorkspace.shared.open(url)
+        }
+    }
+
+    func openAccessibilitySettings() {
+        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") {
+            NSWorkspace.shared.open(url)
+        }
+    }
+
     func setLaunchAtLogin(_ enabled: Bool) {
         if LaunchAtLogin.setEnabled(enabled) {
             launchAtLogin = LaunchAtLogin.isEnabled

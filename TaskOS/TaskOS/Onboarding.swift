@@ -31,6 +31,8 @@ struct OnboardingView: View {
             VStack(alignment: .leading, spacing: 8) {
                 Label("Choose suggestions and edit the live step cards.", systemImage: "text.cursor")
                 Label("Preview and test the exact steps before you save.", systemImage: "play.circle")
+                Label("Start with a Template, or type a trigger like \"every weekday at 9\" or \"when Safari opens\".", systemImage: "square.grid.2x2")
+                Label("Choose \"Browse supported actions\" to see examples, permissions, and limitations.", systemImage: "magnifyingglass")
                 Label("TaskOS keeps running in the menu bar after you close the window.", systemImage: "menubar.rectangle")
                 Label("Arranging windows needs Accessibility permission, granted from Preview or Settings.", systemImage: "lock.shield")
             }
