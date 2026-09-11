@@ -1765,3 +1765,23 @@ Next eligible work package: 2.1 — scheduling and runtime admission.
   - App tests (`xcodebuild ... test -only-testing:TaskOSTests`) — TEST SUCCEEDED.
   - Debug and Release builds — BUILD SUCCEEDED.
 - Next eligible work package: Phase 2 physical UI verification, then Phase 3.
+
+### Fix N-c — Filesystem watch for real-time missing-resource detection
+
+- Status: done
+- Defect (reported during physical checks): moving or deleting a selected file in
+  Finder did not mark the saved workflow as needing attention until the user
+  triggered another action (Preview/Run) or relaunched; activation-based refresh
+  only covered leaving and returning to the app, not changes made while it stayed
+  active.
+- Fix: added `FileSystemChangeMonitor` (app target) that watches the parent
+  directories of selected file/folder targets with `DispatchSource` vnode events
+  (no polling) and debounces a refresh. `ComposerViewModel` updates the watched
+  directories on every library load and reloads the library on a change, so the
+  Needs attention badge appears as soon as the file is removed.
+- Tests performed:
+  - `swift test --package-path Packages/TaskOSCore` — 255 tests, 33 suites, pass.
+  - App tests (`xcodebuild ... test -only-testing:TaskOSTests`) — TEST SUCCEEDED.
+  - Debug and Release builds — BUILD SUCCEEDED.
+- Physical checks: pending (delete/move a selected file and confirm the badge
+  appears with no interaction).

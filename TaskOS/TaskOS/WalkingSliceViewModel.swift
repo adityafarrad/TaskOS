@@ -51,6 +51,7 @@ final class ComposerViewModel {
     var showOnboarding = !OnboardingStore.hasCompleted
 
     private let composition: AppComposition
+    private let fileMonitor = FileSystemChangeMonitor()
     private var draftID = AutomationID()
     private var startingRevision = WorkflowRevision(1)
     private var editingWorkflowID: AutomationID?
@@ -85,6 +86,32 @@ final class ComposerViewModel {
                 self?.refreshRuntimeActivity()
             }
         }
+        fileMonitor.onChange = { [weak self] in
+            self?.loadLibrary()
+        }
+    }
+
+    private static func watchedDirectories(for workflows: [SavedWorkflow]) -> Set<String> {
+        var directories: Set<String> = []
+        for workflow in workflows {
+            for action in workflow.definition.actions {
+                switch action {
+                case .openFile(let value):
+                    directories.insert(directory(for: value.target))
+                case .revealInFinder(let value):
+                    directories.insert(directory(for: value.target))
+                default:
+                    break
+                }
+            }
+        }
+        directories.remove("")
+        return directories
+    }
+
+    private static func directory(for target: FileTarget) -> String {
+        guard !target.path.isEmpty else { return "" }
+        return target.kind == .folder ? target.path : (target.path as NSString).deletingLastPathComponent
     }
 
     var text: String { document.text }
@@ -718,6 +745,7 @@ final class ComposerViewModel {
                 self.savedWorkflows = workflows
                 self.libraryError = nil
                 self.workflowAttention = await self.computeAttention(for: workflows)
+                self.fileMonitor.update(directories: Self.watchedDirectories(for: workflows))
             } catch {
                 self.libraryError = "Could not load saved workflows: \(error.localizedDescription)"
             }
