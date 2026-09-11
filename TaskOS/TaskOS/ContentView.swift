@@ -9,6 +9,7 @@ struct ContentView: View {
             VStack(alignment: .leading, spacing: 16) {
                 header
                 nameField
+                triggerSection
                 commandField
                 suggestionsSection
                 unresolvedNotice
@@ -51,6 +52,124 @@ struct ContentView: View {
 
             Button("New") { model.newWorkflow() }
         }
+    }
+
+    @ViewBuilder
+    private var triggerSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("When")
+                .font(.headline)
+
+            if model.isScheduled {
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(spacing: 12) {
+                        Picker(
+                            "Repeat",
+                            selection: Binding(get: { model.triggerKind }, set: { model.setTriggerKind($0) })
+                        ) {
+                            Text("Daily").tag(ComposerViewModel.TriggerKind.daily)
+                            Text("Weekdays").tag(ComposerViewModel.TriggerKind.weekdays)
+                            Text("Interval").tag(ComposerViewModel.TriggerKind.interval)
+                            Text("Once").tag(ComposerViewModel.TriggerKind.once)
+                        }
+                        .pickerStyle(.segmented)
+                        .frame(maxWidth: 380)
+
+                        Button("Manual") { model.makeManual() }
+                    }
+
+                    switch model.triggerKind {
+                    case .daily:
+                        DatePicker(
+                            "Time",
+                            selection: timeBinding,
+                            displayedComponents: .hourAndMinute
+                        )
+                    case .weekdays:
+                        weekdayPicker
+                        DatePicker(
+                            "Time",
+                            selection: timeBinding,
+                            displayedComponents: .hourAndMinute
+                        )
+                    case .interval:
+                        Picker(
+                            "Every",
+                            selection: Binding(
+                                get: { model.scheduleIntervalSeconds },
+                                set: { model.setScheduleInterval($0) }
+                            )
+                        ) {
+                            ForEach(ComposerViewModel.intervalOptions, id: \.self) { seconds in
+                                Text(intervalLabel(seconds)).tag(seconds)
+                            }
+                        }
+                        .frame(maxWidth: 220)
+                    case .once:
+                        DatePicker(
+                            "Date and time",
+                            selection: Binding(
+                                get: { model.oneTimeDate },
+                                set: { model.setOneTimeDate($0) }
+                            ),
+                            displayedComponents: [.date, .hourAndMinute]
+                        )
+                    }
+
+                    if !model.upcomingOccurrences.isEmpty {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Next runs")
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                            ForEach(Array(model.upcomingOccurrences.enumerated()), id: \.offset) { _, date in
+                                Text(date.formatted(date: .abbreviated, time: .shortened))
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+
+                    Toggle(
+                        "Run automatically after saving",
+                        isOn: Binding(get: { model.autoRunEnabled }, set: { model.autoRunEnabled = $0 })
+                    )
+                    .disabled(!model.isScheduled)
+                }
+                .padding(10)
+                .background(RoundedRectangle(cornerRadius: 8).fill(Color.gray.opacity(0.08)))
+            } else {
+                HStack(spacing: 12) {
+                    Text("Manual")
+                        .foregroundStyle(.secondary)
+                    Button("Add schedule") { model.addSchedule() }
+                }
+            }
+        }
+    }
+
+    private var timeBinding: Binding<Date> {
+        Binding(get: { model.timeDate }, set: { model.setTimeDate($0) })
+    }
+
+    private var weekdayPicker: some View {
+        HStack(spacing: 6) {
+            ForEach(Weekday.allCases) { day in
+                Button(String(day.displayName.prefix(3))) {
+                    model.toggleWeekday(day)
+                }
+                .buttonStyle(.bordered)
+                .tint(model.scheduleWeekdays.contains(day) ? .accentColor : .gray)
+            }
+        }
+    }
+
+    private func intervalLabel(_ seconds: TimeInterval) -> String {
+        let minutes = Int(seconds / 60)
+        if minutes >= 60, minutes % 60 == 0 {
+            let hours = minutes / 60
+            return hours == 1 ? "1 hour" : "\(hours) hours"
+        }
+        return "\(minutes) minutes"
     }
 
     private var commandField: some View {
@@ -257,6 +376,22 @@ struct ContentView: View {
                         Text(workflow.definition.actions.count == 1 ? "1 step" : "\(workflow.definition.actions.count) steps")
                             .font(.caption)
                             .foregroundStyle(.secondary)
+                        if workflow.definition.trigger.schedule != nil {
+                            Toggle(
+                                "Auto",
+                                isOn: Binding(
+                                    get: { workflow.isEnabled },
+                                    set: { model.setEnabled(workflow, enabled: $0) }
+                                )
+                            )
+                            .toggleStyle(.switch)
+                            .labelsHidden()
+                            .help("Run automatically on its schedule")
+                        } else {
+                            Text("Manual")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
                         Spacer()
                         Text(workflow.updatedAt.formatted(date: .abbreviated, time: .shortened))
                             .font(.caption)

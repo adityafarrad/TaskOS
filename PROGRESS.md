@@ -32,7 +32,7 @@ compressed into implementation plus per-increment physical smoke checks.
 
 | ID | Work package | Status | Evidence | Notes |
 |---|---|---|---|---|
-| 2.1 | Add scheduling and runtime admission | in progress | Increments H1 + H2 | Schedule model + occurrence calculations in Core; run admission/queue/pause/cancel wired into menu-bar runtime; schedule UI, registration, and enable toggle pending |
+| 2.1 | Add scheduling and runtime admission | in progress | Increments H1–H3 | Schedule model, occurrence calc, admission/queue/pause/cancel, schedule grammar, runtime registry, trigger card + next-run preview + enable toggle all implemented; physical verification of the schedule UI pending |
 | 2.2 | Finish app, window, and utility actions | not started | — | |
 | 2.3 | Add selected files and portable workflows | not started | — | |
 | 2.4 | Add event-triggered workflows | not started | — | |
@@ -1017,3 +1017,52 @@ Next eligible work package: 2.1 — scheduling and runtime admission.
 - Next eligible work package: H3c — trigger card, next three-occurrence preview,
   automatic-run enablement, app startup registration/registration updates, and
   routing composer/library run paths through the coordinator.
+
+### Increment H3c — Schedule UI, enablement, and runtime wiring (plan 2.1)
+
+- Status: done
+- Behavior delivered: a scheduling vertical the user can drive from the app.
+  The composer has a **When** card: with no schedule it shows `Manual` plus
+  **Add schedule**; a schedule shows a Daily/Weekdays/Interval/Once picker,
+  the matching controls (time picker, weekday toggles, interval picker, or
+  date-and-time picker), the **next three runs**, and a **Run automatically
+  after saving** toggle. Choosing a schedule also writes the canonical phrase
+  into the command field, and editing the text updates the card. Saved
+  workflows: scheduled ones can be enabled/disabled from the Library (Auto
+  switch) and register/unregister with the runtime registry; deletion and
+  "delete all" unregister; loading a workflow for editing restores its trigger
+  and enabled state. Enabled schedules are re-registered from storage at launch
+  and fire through the admission coordinator. Preview now reports
+  `willRunAutomatically` for schedule triggers. Composer test/run paths check
+  the coordinator and refuse to start while another run is active.
+- Interfaces changed: `AppComposition` owns `ScheduleCalculator` (current time
+  zone) and `ScheduleRegistry`, and has `syncScheduleRegistrations()`;
+  `AppDelegate` calls it at launch. `ComposerViewModel` gained `autoRunEnabled`,
+  `TriggerKind`, `isScheduled`, `triggerKind`, `upcomingOccurrences`, `timeDate`,
+  `scheduleWeekdays`, `scheduleIntervalSeconds`, `oneTimeDate`, `addSchedule`,
+  `makeManual`, `setTriggerKind`, `setTimeDate`, `toggleWeekday`,
+  `setScheduleInterval`, `setOneTimeDate`, `setEnabled`, `applyTrigger`, and a
+  coordinator-idle guard; save/delete/clear/new/load-for-editing updated.
+  `ContentView` gained the `triggerSection` card and a Library Auto toggle.
+  `CreationPreparer` sets `willRunAutomatically` from the trigger.
+- Tests performed:
+  - `swift test --package-path Packages/TaskOSCore` — 167 tests, 24 suites, pass
+    (+1 preview test for schedule automatic-run reporting).
+  - App tests (`xcodebuild ... test -only-testing:TaskOSTests`) — TEST SUCCEEDED.
+  - Debug build — BUILD SUCCEEDED.
+  - Release build — BUILD SUCCEEDED.
+- Physical checks: pending. To verify: create a schedule whose next run is 1–2
+  minutes out, enable it, leave the app running, and confirm the run fires (menu
+  status + history) with the window closed; also confirm the next-three preview
+  matches, disabling stops it, and relaunching re-registers an enabled schedule.
+- Remaining defects / gaps:
+  - The composer "Test now" and Library "Run" still execute via `WorkflowRunner`
+    directly (with a coordinator busy-guard) rather than through admission; they
+    are not queued/cancellable. Unify in 2.6.
+  - The schedule calculator time zone is captured at launch; a time-zone change
+    while running is not re-applied to existing registrations.
+  - Card-set one-time dates remain card-only (text re-parse keeps only the time).
+  - The registry wakes on the exact occurrence; there is no grace period or
+    catch-up by design (missed runs skipped).
+- With H1–H3 complete, plan 2.1 is functionally implemented pending the physical
+  schedule verification above.

@@ -26,6 +26,7 @@ final class ComposerViewModel {
     private(set) var history: [RunRecord] = []
     private(set) var draftName = "Untitled"
     var librarySearch = ""
+    var autoRunEnabled = false
     var renameTarget: AutomationID?
     var renameText = ""
     private(set) var notificationPermission: PermissionState = .notDetermined
@@ -96,6 +97,167 @@ final class ComposerViewModel {
             return false
         }
         return approvedRevision == currentRevision
+    }
+
+    enum TriggerKind: Int, CaseIterable {
+        case daily
+        case weekdays
+        case interval
+        case once
+    }
+
+    static let intervalOptions: [TimeInterval] = [
+        15 * 60, 30 * 60, 45 * 60, 60 * 60, 2 * 60 * 60,
+        4 * 60 * 60, 8 * 60 * 60, 12 * 60 * 60, 24 * 60 * 60,
+    ]
+
+    var isScheduled: Bool {
+        if case .manual = document.trigger { return false }
+        return true
+    }
+
+    var triggerKind: TriggerKind {
+        switch document.trigger {
+        case .weekdays:
+            return .weekdays
+        case .interval, .relative:
+            return .interval
+        case .once, .oneTime:
+            return .once
+        case .daily, .manual:
+            return .daily
+        }
+    }
+
+    var upcomingOccurrences: [Date] {
+        let now = composition.clock.now()
+        guard let configuration = document.triggerConfiguration(relativeTo: now),
+              case .schedule(let schedule) = configuration else {
+            return []
+        }
+        return composition.scheduleCalculator.nextOccurrences(of: schedule, after: now, count: 3)
+    }
+
+    var timeDate: Date {
+        let calendar = Calendar.current
+        let base = composition.clock.now()
+        switch document.trigger {
+        case .daily(let hour, let minute), .weekdays(_, let hour, let minute), .once(let hour, let minute):
+            return calendar.date(bySettingHour: hour, minute: minute, second: 0, of: base) ?? base
+        case .oneTime(let date):
+            return date
+        case .relative, .interval, .manual:
+            return calendar.date(bySettingHour: 9, minute: 0, second: 0, of: base) ?? base
+        }
+    }
+
+    var scheduleWeekdays: Set<Weekday> {
+        if case .weekdays(let days, _, _) = document.trigger {
+            return days
+        }
+        return []
+    }
+
+    var scheduleIntervalSeconds: TimeInterval {
+        switch document.trigger {
+        case .interval(let seconds), .relative(let seconds):
+            return seconds
+        default:
+            return 30 * 60
+        }
+    }
+
+    var oneTimeDate: Date {
+        switch document.trigger {
+        case .oneTime(let date):
+            return date
+        case .once(let hour, let minute):
+            let base = composition.clock.now()
+            return Calendar.current.date(bySettingHour: hour, minute: minute, second: 0, of: base) ?? base
+        default:
+            return composition.clock.now().addingTimeInterval(3600)
+        }
+    }
+
+    func addSchedule() {
+        document.setTrigger(.daily(hour: 9, minute: 0))
+        afterEdit()
+    }
+
+    func makeManual() {
+        document.setTrigger(.manual)
+        autoRunEnabled = false
+        afterEdit()
+    }
+
+    func setTriggerKind(_ kind: TriggerKind) {
+        switch kind {
+        case .daily:
+            document.setTrigger(.daily(hour: 9, minute: 0))
+        case .weekdays:
+            document.setTrigger(.weekdays(Weekday.weekdays, hour: 9, minute: 0))
+        case .interval:
+            document.setTrigger(.interval(30 * 60))
+        case .once:
+            document.setTrigger(.oneTime(composition.clock.now().addingTimeInterval(3600)))
+        }
+        afterEdit()
+    }
+
+    func setTimeDate(_ date: Date) {
+        let components = Calendar.current.dateComponents([.hour, .minute], from: date)
+        let hour = components.hour ?? 9
+        let minute = components.minute ?? 0
+
+        switch document.trigger {
+        case .weekdays(let days, _, _):
+            document.setTrigger(.weekdays(days, hour: hour, minute: minute))
+        case .once:
+            document.setTrigger(.once(hour: hour, minute: minute))
+        case .oneTime(let existing):
+            let merged = Calendar.current.date(bySettingHour: hour, minute: minute, second: 0, of: existing) ?? existing
+            document.setTrigger(.oneTime(merged))
+        default:
+            document.setTrigger(.daily(hour: hour, minute: minute))
+        }
+        afterEdit()
+    }
+
+    func toggleWeekday(_ day: Weekday) {
+        var days = scheduleWeekdays
+        if days.contains(day) {
+            days.remove(day)
+        } else {
+            days.insert(day)
+        }
+        if days.isEmpty {
+            days = [day]
+        }
+        let (hour, minute) = triggerClock
+        document.setTrigger(.weekdays(days, hour: hour, minute: minute))
+        afterEdit()
+    }
+
+    func setScheduleInterval(_ seconds: TimeInterval) {
+        document.setTrigger(.interval(seconds))
+        afterEdit()
+    }
+
+    func setOneTimeDate(_ date: Date) {
+        document.setTrigger(.oneTime(date))
+        afterEdit()
+    }
+
+    private var triggerClock: (hour: Int, minute: Int) {
+        switch document.trigger {
+        case .daily(let hour, let minute), .weekdays(_, let hour, let minute), .once(let hour, let minute):
+            return (hour, minute)
+        case .oneTime(let date):
+            let components = Calendar.current.dateComponents([.hour, .minute], from: date)
+            return (components.hour ?? 9, components.minute ?? 0)
+        default:
+            return (9, 0)
+        }
     }
 
     func loadApplicationsIfNeeded() {
@@ -232,12 +394,23 @@ final class ComposerViewModel {
 
         Task { [weak self] in
             guard let self else { return }
+            guard await self.coordinatorIsIdle() else { return }
             let runID = UUID()
             try? await self.composition.runHistory.append(self.runningRecord(for: definition, id: runID))
             let record = await self.composition.runner.run(definition, id: runID)
             self.stage = .finished(record)
             await self.record(record)
         }
+    }
+
+    private func coordinatorIsIdle() async -> Bool {
+        let status = await composition.coordinator.status()
+        guard !status.isRunning, status.queuedCount == 0 else {
+            stage = .composing
+            notice = "A run is already in progress. Try again when it finishes."
+            return false
+        }
+        return true
     }
 
     func requestAccessibilityPermission() {
@@ -279,12 +452,20 @@ final class ComposerViewModel {
             return
         }
 
-        let workflow = SavedWorkflow(definition: definition, isEnabled: false)
+        let isAutomatic = autoRunEnabled && isScheduled
+        let workflow = SavedWorkflow(definition: definition, isEnabled: isAutomatic)
 
         Task { [weak self] in
             guard let self else { return }
             do {
                 try await self.composition.repository.save(workflow)
+                if definition.trigger.schedule != nil {
+                    if isAutomatic {
+                        await self.composition.scheduleRegistry.register(definition)
+                    } else {
+                        await self.composition.scheduleRegistry.unregister(definition.id)
+                    }
+                }
                 self.autosaveTask?.cancel()
                 try? await self.composition.drafts.clearDraft()
                 self.editingWorkflowID = nil
@@ -344,6 +525,7 @@ final class ComposerViewModel {
             for workflow in self.savedWorkflows {
                 try? await self.composition.repository.delete(id: workflow.id)
             }
+            await self.composition.scheduleRegistry.replaceAll([])
             self.loadLibrary()
             self.settingsNotice = "All saved workflows deleted."
         }
@@ -356,6 +538,7 @@ final class ComposerViewModel {
         lastSavedID = nil
         startingRevision = WorkflowRevision(1)
         draftName = "Untitled"
+        autoRunEnabled = false
         document = ComposerDocument()
         suggestions = []
         autosaveTask?.cancel()
@@ -378,6 +561,7 @@ final class ComposerViewModel {
         stage = .running
         Task { [weak self] in
             guard let self else { return }
+            guard await self.coordinatorIsIdle() else { return }
             let runID = UUID()
             try? await self.composition.runHistory.append(self.runningRecord(for: workflow.definition, id: runID))
             let record = await self.composition.runner.run(workflow.definition, id: runID)
@@ -399,6 +583,8 @@ final class ComposerViewModel {
         editingWorkflowID = workflow.id
         lastSavedID = workflow.id
         document = ComposerDocument(text: CanonicalPhrase.command(for: workflow.definition.actions))
+        applyTrigger(workflow.definition.trigger)
+        autoRunEnabled = workflow.isEnabled
         autoResolveApplications()
         lastSavedSignature = currentSignature
         refreshSuggestions()
@@ -440,6 +626,25 @@ final class ComposerViewModel {
         Task { [weak self] in
             guard let self else { return }
             try? await self.composition.repository.delete(id: workflow.id)
+            await self.composition.scheduleRegistry.unregister(workflow.id)
+            self.loadLibrary()
+        }
+    }
+
+    func setEnabled(_ workflow: SavedWorkflow, enabled: Bool) {
+        guard workflow.definition.trigger.schedule != nil else { return }
+        var updated = workflow
+        updated.isEnabled = enabled
+        updated.updatedAt = Date()
+
+        Task { [weak self] in
+            guard let self else { return }
+            try? await self.composition.repository.save(updated)
+            if updated.isEnabled {
+                await self.composition.scheduleRegistry.register(updated.definition)
+            } else {
+                await self.composition.scheduleRegistry.unregister(updated.id)
+            }
             self.loadLibrary()
         }
     }
@@ -567,6 +772,28 @@ final class ComposerViewModel {
 
     func dismissSuggestions() {
         suggestionsDismissed = true
+    }
+
+    private func applyTrigger(_ trigger: TriggerConfiguration) {
+        let draft: ComposerTriggerDraft
+        switch trigger {
+        case .manual:
+            draft = .manual
+        case .schedule(let schedule):
+            switch schedule {
+            case .daily(let hour, let minute):
+                draft = .daily(hour: hour, minute: minute)
+            case .weekdays(let days, let hour, let minute):
+                draft = .weekdays(days, hour: hour, minute: minute)
+            case .interval(let every, _):
+                draft = .interval(every)
+            case .oneTime(let date):
+                draft = .oneTime(date)
+            }
+        }
+        if draft != .manual {
+            document.setTrigger(draft)
+        }
     }
 
     private func autoResolveApplications() {

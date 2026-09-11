@@ -100,4 +100,17 @@ struct CreationPreparerTests {
         #expect(preview.willRunAutomatically == false)
         #expect(preview.actions.map(\.actionID) == [.openApplication, .wait])
     }
+
+    @Test func previewReportsAutomaticRunsForSchedule() async {
+        let subject = preparer(installed: [:], permission: .granted)
+        let definition = AutomationDefinition(
+            name: "Scheduled",
+            trigger: .schedule(.daily(hour: 9, minute: 0)),
+            actions: [.showNotification(ShowNotificationAction(title: "Done", message: "Finished"))]
+        )
+        let preview = await subject.prepare(definition)
+
+        #expect(preview.triggerTitle == "Schedule")
+        #expect(preview.willRunAutomatically)
+    }
 }

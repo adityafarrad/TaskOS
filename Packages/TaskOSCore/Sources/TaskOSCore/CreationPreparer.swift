@@ -206,7 +206,7 @@ public struct CreationPreparer: Sendable {
             actions: actionPreviews,
             requiredPermissions: requiredPermissions,
             issues: issues,
-            willRunAutomatically: false
+            willRunAutomatically: definition.trigger.schedule != nil
         )
     }
 

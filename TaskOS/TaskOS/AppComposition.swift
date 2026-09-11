@@ -9,6 +9,8 @@ final class AppComposition {
     let clock: any CoreClock
     let runner: WorkflowRunner
     let coordinator: RunCoordinator
+    let scheduleCalculator: ScheduleCalculator
+    let scheduleRegistry: ScheduleRegistry
     let preparer: CreationPreparer
     let approvals: ApprovalRegistry
     let suggestions: SuggestionEngine
@@ -74,11 +76,30 @@ final class AppComposition {
             return record
         }
         self.coordinator = coordinator
+
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = .current
+        let scheduleCalculator = ScheduleCalculator(calendar: calendar)
+        self.scheduleCalculator = scheduleCalculator
+        self.scheduleRegistry = ScheduleRegistry(
+            clock: clock,
+            calculator: scheduleCalculator,
+            coordinator: coordinator
+        )
+
         self.sessionObserver = SystemSessionObserver(coordinator: coordinator)
     }
 
     func loadApplications() async -> [ApplicationResource] {
         await catalog.installedApplications()
+    }
+
+    func syncScheduleRegistrations() async {
+        let workflows = (try? await repository.loadAll()) ?? []
+        let enabledSchedules = workflows
+            .filter { $0.isEnabled }
+            .map(\.definition)
+        await scheduleRegistry.replaceAll(enabledSchedules)
     }
 }
 
