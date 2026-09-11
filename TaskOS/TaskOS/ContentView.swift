@@ -17,7 +17,6 @@ struct ContentView: View {
             detail
                 .id(sidebarSelection)
         }
-        .navigationSplitViewStyle(.balanced)
         .inspector(isPresented: $selection.isInspectorPresented) {
             InspectorView(model: model, selection: selection)
                 .inspectorColumnWidth(

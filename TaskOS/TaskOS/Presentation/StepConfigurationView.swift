@@ -25,19 +25,24 @@ struct StepConfigurationView: View {
             fileRow(target: fileTarget)
 
         case .openWebsite(let websiteURL, let websiteBrowser):
-            VStack(alignment: .leading, spacing: TaskOSSpacing.xs) {
-                TextField(
-                    "https://example.com",
-                    text: Binding(
-                        get: { websiteURL },
-                        set: { model.updateWebsiteURL(id: action.id, url: $0) }
+            VStack(alignment: .leading, spacing: TaskOSSpacing.sm) {
+                TaskOSInspectorField(title: "Address") {
+                    TextField(
+                        "https://example.com",
+                        text: Binding(
+                            get: { websiteURL },
+                            set: { model.updateWebsiteURL(id: action.id, url: $0) }
+                        )
                     )
-                )
-                Picker("Browser", selection: websiteBrowserSelection) {
-                    Text("Default browser").tag("")
-                    ForEach(model.applications, id: \.bundleIdentifier) { application in
-                        Text(application.displayName).tag(application.bundleIdentifier)
+                }
+                TaskOSInspectorField(title: "Browser") {
+                    Picker("Browser", selection: websiteBrowserSelection) {
+                        Text("Default browser").tag("")
+                        ForEach(model.applications, id: \.bundleIdentifier) { application in
+                            Text(application.displayName).tag(application.bundleIdentifier)
+                        }
                     }
+                    .labelsHidden()
                 }
                 Text(websiteBrowser.map { "Opens in \($0.label)" } ?? "Opens in your default browser")
                     .font(.caption)
@@ -56,19 +61,25 @@ struct StepConfigurationView: View {
                     missing: arrangementName.isEmpty ? "Choose an application" : "Unresolved: \(arrangementName)"
                 )
 
-                Picker("Position", selection: presetBinding(for: preset)) {
-                    ForEach(WindowPreset.allCases, id: \.self) { value in
-                        Text(value.displayName).tag(value)
+                TaskOSInspectorField(title: "Position") {
+                    Picker("Position", selection: presetBinding(for: preset)) {
+                        ForEach(WindowPreset.allCases, id: \.self) { value in
+                            Text(value.displayName).tag(value)
+                        }
                     }
+                    .labelsHidden()
                 }
 
-                Picker("Display", selection: displayBinding(for: display)) {
-                    Text("This window's display").tag(WindowDisplaySelection.current)
-                    Text("Main display").tag(WindowDisplaySelection.main)
-                    ForEach(model.displays, id: \.identifier) { screen in
-                        Text(screen.isMain ? "\(screen.displayName) (main)" : screen.displayName)
-                            .tag(WindowDisplaySelection.display(identifier: screen.identifier))
+                TaskOSInspectorField(title: "Display") {
+                    Picker("Display", selection: displayBinding(for: display)) {
+                        Text("This window's display").tag(WindowDisplaySelection.current)
+                        Text("Main display").tag(WindowDisplaySelection.main)
+                        ForEach(model.displays, id: \.identifier) { screen in
+                            Text(screen.isMain ? "\(screen.displayName) (main)" : screen.displayName)
+                                .tag(WindowDisplaySelection.display(identifier: screen.identifier))
+                        }
                     }
+                    .labelsHidden()
                 }
             }
 
@@ -127,18 +138,24 @@ struct StepConfigurationView: View {
 
     @ViewBuilder
     private func applicationRow(label: String?, missing: String) -> some View {
-        VStack(alignment: .leading, spacing: TaskOSSpacing.xs) {
-            if let label {
-                Label(label, systemImage: "checkmark.circle.fill")
-                    .foregroundStyle(.green)
-            } else {
-                Label(missing, systemImage: "exclamationmark.triangle")
-                    .foregroundStyle(.orange)
-            }
-            Picker("Application", selection: applicationSelection) {
-                Text("Select…").tag("")
-                ForEach(model.applications, id: \.bundleIdentifier) { application in
-                    Text(application.displayName).tag(application.bundleIdentifier)
+        TaskOSInspectorField(title: "Application") {
+            VStack(alignment: .leading, spacing: TaskOSSpacing.xxs) {
+                Picker("Application", selection: applicationSelection) {
+                    Text("Select…").tag("")
+                    ForEach(model.applications, id: \.bundleIdentifier) { application in
+                        Text(application.displayName).tag(application.bundleIdentifier)
+                    }
+                }
+                .labelsHidden()
+
+                if let label {
+                    Label(label, systemImage: "checkmark.circle.fill")
+                        .font(.caption)
+                        .foregroundStyle(.green)
+                } else {
+                    Label(missing, systemImage: "exclamationmark.triangle")
+                        .font(.caption)
+                        .foregroundStyle(.orange)
                 }
             }
         }

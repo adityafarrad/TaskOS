@@ -16,14 +16,14 @@ enum TaskOSRadius {
 }
 
 enum TaskOSMetrics {
-    static let sidebarMin: CGFloat = 170
+    static let sidebarMin: CGFloat = 160
     static let sidebarIdeal: CGFloat = 230
-    static let editorMin: CGFloat = 320
-    static let inspectorMin: CGFloat = 250
+    static let editorMin: CGFloat = 300
+    static let inspectorMin: CGFloat = 220
     static let inspectorIdeal: CGFloat = 290
     static let inspectorMax: CGFloat = 380
-    static let windowMinWidth: CGFloat = 720
-    static let windowMinHeight: CGFloat = 560
+    static let windowMinWidth: CGFloat = 680
+    static let windowMinHeight: CGFloat = 520
     static let windowDefaultWidth: CGFloat = 1180
     static let windowDefaultHeight: CGFloat = 760
 }
@@ -126,6 +126,22 @@ struct TaskOSStatusChip: View {
         .padding(.vertical, 2)
         .background(tint.opacity(0.12), in: Capsule())
         .accessibilityElement(children: .combine)
+    }
+}
+
+struct TaskOSInspectorField<Content: View>: View {
+    let title: String
+    @ViewBuilder var content: () -> Content
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: TaskOSSpacing.xxs) {
+            Text(title)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            content()
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 

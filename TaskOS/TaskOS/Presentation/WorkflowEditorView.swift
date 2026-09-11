@@ -25,6 +25,8 @@ struct WorkflowEditorView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: TaskOSSpacing.md) {
+                titleHeader
+
                 triggerPill
 
                 CommandComposerView(
@@ -53,6 +55,7 @@ struct WorkflowEditorView: View {
             .frame(maxWidth: .infinity, alignment: .center)
         }
         .toolbar { toolbarContent }
+        .navigationTitle(model.draftName)
         .onChange(of: composerFocusToken) { _, _ in
             composerFocused = true
         }
@@ -110,6 +113,34 @@ struct WorkflowEditorView: View {
 
     private var triggerFamilies: [ComposerViewModel.TriggerFamily] {
         [.manual, .schedule, .applicationLifecycle, .wake, .displayConnection, .externalVolume, .powerSource, .batteryThreshold]
+    }
+
+    private var titleHeader: some View {
+        HStack(alignment: .firstTextBaseline, spacing: TaskOSSpacing.sm) {
+            TextField(
+                "Untitled Workflow",
+                text: Binding(get: { model.draftName }, set: { model.updateName($0) })
+            )
+            .textFieldStyle(.plain)
+            .font(.system(size: 26, weight: .semibold))
+            .lineLimit(1)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .accessibilityLabel("Workflow name")
+
+            if model.supportsAutomaticRuns {
+                Toggle(
+                    "Run automatically",
+                    isOn: Binding(get: { model.autoRunEnabled }, set: { model.autoRunEnabled = $0 })
+                )
+                .toggleStyle(.switch)
+                .controlSize(.small)
+                .labelsHidden()
+                .fixedSize()
+                .help("Run automatically on its trigger")
+                .accessibilityLabel("Run automatically")
+            }
+        }
+        .padding(.vertical, 2)
     }
 
     @ViewBuilder
@@ -219,31 +250,6 @@ struct WorkflowEditorView: View {
 
     @ToolbarContentBuilder
     private var toolbarContent: some ToolbarContent {
-        ToolbarItem(placement: .principal) {
-            HStack(spacing: TaskOSSpacing.sm) {
-                TextField(
-                    "Workflow name",
-                    text: Binding(get: { model.draftName }, set: { model.updateName($0) })
-                )
-                .textFieldStyle(.plain)
-                .font(.title3.weight(.semibold))
-                .frame(minWidth: 120, maxWidth: 280)
-                .accessibilityLabel("Workflow name")
-
-                if model.supportsAutomaticRuns {
-                    Toggle(
-                        "Run automatically",
-                        isOn: Binding(get: { model.autoRunEnabled }, set: { model.autoRunEnabled = $0 })
-                    )
-                    .toggleStyle(.switch)
-                    .controlSize(.small)
-                    .labelsHidden()
-                    .help("Run automatically on its trigger")
-                    .accessibilityLabel("Run automatically")
-                }
-            }
-        }
-
         ToolbarItemGroup(placement: .primaryAction) {
             if model.hasUnsavedChanges {
                 Button {

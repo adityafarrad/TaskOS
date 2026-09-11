@@ -2049,3 +2049,32 @@ record isolation/recovery) is deferred to Phase 3 with the migration fixtures.
   folder → first step keeps its app).
 - Next eligible work package: U4 accessibility/responsive polish, then Phase 3.1.
 
+### Increment U-fix4 — Responsive columns and discoverable workflow name
+
+- Status: done
+- Defects:
+  - Resizing smaller cut the inspector ("Unresolved: an app…", "Select…"
+    clipped): the editor toolbar's centered name field imposed a large minimum
+    width, so the split view squeezed the inspector below its minimum.
+  - The workflow name lived only in the toolbar center, so it was easy to miss,
+    and its text field had no leading inset while typing.
+- Behavior delivered:
+  - Removed the toolbar principal name field (the window title still reflects
+    the workflow name via `navigationTitle`) and dropped the explicit
+    `.balanced` split style, freeing the detail column to shrink so the sidebar
+    can collapse and the inspector keeps its minimum instead of clipping.
+  - Added a prominent, editable workflow title at the top of the editor content
+    (large semibold, inside the editor's generous horizontal padding) with the
+    automatic-run switch beside it. This is the first thing visible in the
+    editor and fixes the missing left inset.
+  - Made the inspector narrow-friendly: a `TaskOSInspectorField` caption+control
+    pattern with hidden picker labels is used for Application, Position,
+    Display, Address, and Browser, so controls shrink and wrap instead of
+    overflowing.
+  - Lowered the minimum column widths (sidebar 160, editor 300, inspector 220)
+    and the window minimum to 680×520; the window can no longer be resized below
+    the point where the three areas fit.
+- Tests performed: Debug and Release builds — BUILD SUCCEEDED (no warnings);
+  Release app relaunched at the restored default size.
+- Next eligible work package: U4 accessibility/responsive polish, then Phase 3.1.
+
