@@ -345,8 +345,12 @@ struct ContentView: View {
 
     private var librarySection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Library")
-                .font(.headline)
+            HStack {
+                Text("Library")
+                    .font(.headline)
+                Spacer()
+                Button("Import…") { model.importWorkflow() }
+            }
 
             TextField(
                 "Search workflows",
@@ -406,6 +410,7 @@ struct ContentView: View {
                         Button("Edit") { model.loadForEditing(workflow) }
                         Button("Rename") { model.beginRename(workflow) }
                         Button("Duplicate") { model.duplicate(workflow) }
+                        Button("Export…") { model.exportWorkflow(workflow) }
                         Button("Run") { model.runSaved(workflow) }
                         Button { model.deleteSaved(workflow) } label: { Image(systemName: "trash") }
                     }

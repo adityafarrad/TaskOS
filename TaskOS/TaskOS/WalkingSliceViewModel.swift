@@ -2,6 +2,7 @@ import AppKit
 import Foundation
 import Observation
 import TaskOSCore
+import UniformTypeIdentifiers
 
 @MainActor
 @Observable
@@ -369,6 +370,54 @@ final class ComposerViewModel {
 
     func isMissingFile(_ target: FileTarget) -> Bool {
         !FileTargetResolver.exists(target)
+    }
+
+    func exportWorkflow(_ workflow: SavedWorkflow) {
+        let alert = NSAlert()
+        alert.messageText = "Export \"\(workflow.name)\"?"
+        alert.informativeText = "The file may contain private information such as configured URLs, notification messages, and copied text. It does not include the enabled state, run history, permissions, or file access."
+        alert.addButton(withTitle: "Export")
+        alert.addButton(withTitle: "Cancel")
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
+
+        let panel = NSSavePanel()
+        panel.nameFieldStringValue = "\(workflow.name).taskos.json"
+        panel.allowedContentTypes = [.json]
+        panel.canCreateDirectories = true
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+
+        do {
+            let data = try WorkflowPortability.export(workflow.definition)
+            try data.write(to: url)
+            notice = "Exported \"\(workflow.name)\"."
+        } catch {
+            notice = "Could not export: \(error.localizedDescription)"
+        }
+    }
+
+    func importWorkflow() {
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = true
+        panel.canChooseDirectories = false
+        panel.allowsMultipleSelection = false
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+
+        do {
+            let data = try Data(contentsOf: url)
+            let definition = try WorkflowPortability.importWorkflow(data)
+            let imported = SavedWorkflow(definition: definition, isEnabled: false)
+
+            Task { [weak self] in
+                guard let self else { return }
+                try? await self.composition.repository.save(imported)
+                self.loadLibrary()
+                self.loadForEditing(imported)
+                self.autoRunEnabled = false
+                self.notice = "Imported \"\(imported.name)\". Choose the exact local resources, then save. It will not run automatically."
+            }
+        } catch {
+            notice = "Could not import this workflow: \(error.localizedDescription)"
+        }
     }
 
     func chooseFile(id: UUID) {

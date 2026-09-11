@@ -34,7 +34,7 @@ compressed into implementation plus per-increment physical smoke checks.
 |---|---|---|---|---|
 | 2.1 | Add scheduling and runtime admission | done | Increments H1–H3 + fixes H3-d/H3-e | Schedule model, occurrence calc, admission/queue/pause/cancel, schedule grammar, runtime registry, trigger card + next-run preview + enable toggle; physical tests A–E passed |
 | 2.2 | Finish app, window, and utility actions | done | Increments I1–I3 | Copy Text, Hide, normal Quit, specific-display selection, window presets, and notification editing/presentation done; lifecycle loop suppression tracked in 2.4 |
-| 2.3 | Add selected files and portable workflows | in progress | Increments J1 + J2 | File selection, Open/Reveal, durable bookmarks, and missing-resource repair done; export/import pending |
+| 2.3 | Add selected files and portable workflows | done | Increments J1–J3 | File selection, Open/Reveal, durable references, repair, and portable export/import with rebinding done |
 | 2.4 | Add event-triggered workflows | not started | — | |
 | 2.5 | Finish the template and discovery experience | not started | — | |
 | 2.6 | Complete everyday management and recovery | not started | — | |
@@ -1286,3 +1286,38 @@ Next eligible work package: 2.1 — scheduling and runtime admission.
   security-scoped bookmark refresh is deferred.
 - Next eligible work package: 2.3 increment J3 — portable export/import with
   rebinding and disabled defaults.
+
+### Increment J3 — Portable export/import (plan 2.3 completion; plan 2.12)
+
+- Status: done
+- Behavior delivered: a saved workflow can be exported to a JSON file and
+  imported on another Mac. Export includes the format version, name, trigger, and
+  action configuration plus human-readable resource labels and literal content;
+  it excludes the enabled state, run history, drafts, permission state, and file
+  bookmark/path authority. Export first explains that URLs, notification
+  messages, and copied text may contain private information. Imports are capped
+  at 256 KiB, reject unknown executable fields and future formats, receive a
+  fresh identity, start disabled, and place the workflow in the editor for
+  explicit local resource selection and review. Imported resource references are
+  unresolved (empty identifiers/paths) so the workflow cannot run until rebound.
+- Interfaces changed: added `PortabilityError` and `WorkflowPortability`
+  (`export`, `importWorkflow`, format version, 256 KiB cap) with a portable
+  action representation that carries labels/literals but strips application
+  bundle identifiers and file path/bookmark authority; app `ComposerViewModel`
+  gained `exportWorkflow`/`importWorkflow` (NSAlert/panel flow) and a per-row
+  Export button plus a Library Import button.
+- Tests performed:
+  - `swift test --package-path Packages/TaskOSCore` — 205 tests, 28 suites, pass
+    (was 198/27; +7). New coverage: round-trip preserving trigger/order/literals,
+    imported resources requiring rebinding (invalid until resolved), file
+    references dropping path/bookmark, fresh identity and revision, future
+    format rejection, oversized rejection, and unknown action fields rejected.
+  - App tests (`xcodebuild ... test -only-testing:TaskOSTests`) — TEST SUCCEEDED.
+  - Debug build — BUILD SUCCEEDED.
+  - Release build — BUILD SUCCEEDED.
+- Physical checks: pending (export a workflow, inspect the file, re-import,
+  confirm it is disabled/needs rebinding, and export/import retains action order).
+- Remaining/gaps: exported display selections keep their local display
+  identifier (specific displays may need re-selection on another Mac); imported
+  scheduled triggers are not registered because imports start disabled.
+- Next eligible work package: 2.4 — event-triggered workflows.
