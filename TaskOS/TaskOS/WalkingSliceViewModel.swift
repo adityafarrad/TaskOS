@@ -1034,6 +1034,17 @@ final class ComposerViewModel {
             self.displays = await self.composition.loadDisplays()
             self.hardware = self.composition.hardwareAvailability()
         }
+        Task { [weak self] in
+            guard let self else { return }
+            try? await Task.sleep(for: .milliseconds(1_200))
+            self.refreshPermissions()
+            self.loadLibrary()
+        }
+    }
+
+    func recheckPermissions() {
+        refreshPermissions()
+        loadLibrary()
     }
 
     func refreshRuntimeActivity() {

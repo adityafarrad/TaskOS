@@ -1804,3 +1804,21 @@ Next eligible work package: 2.1 — scheduling and runtime admission.
   - Debug and Release builds — BUILD SUCCEEDED.
 - Physical checks: pending (with Accessibility off, confirm the Arrange Window
   workflow shows Needs attention in the Library; grant and confirm it clears).
+
+### Fix N-e — Attention clears after granting a permission
+
+- Status: done
+- Defect (reported during physical checks): after enabling Accessibility, the
+  Library kept showing **Needs attention** until Preview was clicked again; the
+  permission became visible to the app slightly after reactivation, so the
+  activation refresh ran too early.
+- Fix: `refreshAll()` now runs a second permission + library refresh ~1.2s after
+  activation (bounded, one-shot), catching macOS's delayed trust update. Settings
+  **Recheck** now calls `recheckPermissions()` which refreshes permission state
+  and recomputes library attention, so it can also be forced.
+- Tests performed:
+  - `swift test --package-path Packages/TaskOSCore` — 255 tests, 33 suites, pass.
+  - App tests (`xcodebuild ... test -only-testing:TaskOSTests`) — TEST SUCCEEDED.
+  - Debug and Release builds — BUILD SUCCEEDED.
+- Physical checks: pending (grant Accessibility, return, confirm the badge clears
+  within ~1–2s without Preview; Recheck also clears it).

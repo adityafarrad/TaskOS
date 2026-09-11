@@ -788,7 +788,7 @@ struct ContentView: View {
             HStack(spacing: 12) {
                 Text("Notifications: \(permissionLabel(model.notificationPermission))")
                 Text("Accessibility: \(permissionLabel(model.accessibilityPermission))")
-                Button("Recheck") { model.refreshPermissions() }
+                Button("Recheck") { model.recheckPermissions() }
                 if model.accessibilityPermission != .granted {
                     Button("Grant Accessibility") {
                         model.requestAccessibilityPermission()
