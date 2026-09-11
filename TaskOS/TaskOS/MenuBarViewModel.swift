@@ -103,6 +103,7 @@ final class MenuBarViewModel {
                 await self.composition.coordinator.pauseAutomaticTriggers()
             }
             await self.updateStatus()
+            NotificationCenter.default.post(name: .taskOSRuntimeStateDidChange, object: nil)
         }
     }
 

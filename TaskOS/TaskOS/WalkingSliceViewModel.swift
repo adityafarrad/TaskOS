@@ -41,6 +41,7 @@ final class ComposerViewModel {
     var discoverySearch = ""
     var showDiscovery = false
     var autoRunEnabled = false
+    var scrollToTopToken = 0
     var renameTarget: AutomationID?
     var renameText = ""
     private(set) var notificationPermission: PermissionState = .notDetermined
@@ -72,6 +73,15 @@ final class ComposerViewModel {
         ) { [weak self] _ in
             Task { @MainActor in
                 self?.loadHistory()
+                self?.refreshRuntimeActivity()
+            }
+        }
+        NotificationCenter.default.addObserver(
+            forName: .taskOSRuntimeStateDidChange,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in
                 self?.refreshRuntimeActivity()
             }
         }
@@ -961,7 +971,12 @@ final class ComposerViewModel {
         lastSavedSignature = currentSignature
         refreshSuggestions()
         resetPreview()
-        notice = "Editing \"\(workflow.name)\" (revision \(workflow.definition.revision.value))."
+        if let reason = workflowAttention[workflow.id] {
+            notice = "Editing \"\(workflow.name)\". Needs attention: \(reason)"
+        } else {
+            notice = "Editing \"\(workflow.name)\" (revision \(workflow.definition.revision.value))."
+        }
+        scrollToTopToken += 1
     }
 
     private func recoverInterruptedRuns() {
@@ -979,6 +994,13 @@ final class ComposerViewModel {
                 self.libraryError = "Could not load run history: \(error.localizedDescription)"
             }
         }
+    }
+
+    func refreshAll() {
+        loadLibrary()
+        loadHistory()
+        refreshRuntimeActivity()
+        refreshPermissions()
     }
 
     func refreshRuntimeActivity() {

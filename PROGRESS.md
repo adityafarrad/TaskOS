@@ -1739,3 +1739,27 @@ Next eligible work package: 2.1 — scheduling and runtime admission.
   - App tests (`xcodebuild ... test -only-testing:TaskOSTests`) — TEST SUCCEEDED.
   - Debug and Release builds — BUILD SUCCEEDED.
 - Next eligible work package: Phase 2 physical UI verification, then Phase 3.
+
+### Fix N-b — Live refresh of attention, permissions, paused state, and Fix feedback
+
+- Status: done
+- Defects (reported during physical checks):
+  1. Library "Needs attention" only appeared after restarting the app (a file
+     moved in Finder or a permission revoked in System Settings was not
+     re-evaluated while the window stayed open).
+  2. Clicking **Fix** gave no visible feedback and did not move the view to the
+     steps; the attention reason was not shown.
+  3. The paused banner did not appear in real time when pausing from the menu bar.
+- Fix: `ComposerViewModel` gained `refreshAll()` (library attention, history,
+  runtime activity, permissions), called when the app becomes active
+  (`NSApplication.didBecomeActiveNotification`), so external changes are picked
+  up on return. `loadForEditing` now shows the attention reason in the notice and
+  bumps a `scrollToTopToken`; `ContentView` wraps the form in a `ScrollViewReader`
+  and scrolls to the top on Fix/Edit. The menu-bar pause/resume posts a
+  `.taskOSRuntimeStateDidChange` notification that the composer observes, so the
+  paused banner updates live.
+- Tests performed:
+  - `swift test --package-path Packages/TaskOSCore` — 255 tests, 33 suites, pass.
+  - App tests (`xcodebuild ... test -only-testing:TaskOSTests`) — TEST SUCCEEDED.
+  - Debug and Release builds — BUILD SUCCEEDED.
+- Next eligible work package: Phase 2 physical UI verification, then Phase 3.

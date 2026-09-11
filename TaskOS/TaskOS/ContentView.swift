@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 import TaskOSCore
 
@@ -5,28 +6,39 @@ struct ContentView: View {
     @State private var model = ComposerViewModel()
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-                header
-                nameField
-                triggerSection
-                commandField
-                suggestionsSection
-                unresolvedNotice
-                stepsSection
-                addMenu
-                reviewSection
-                templatesSection
-                librarySection
-                historySection
-                runtimeActivitySection
-                settingsSection
-                resultSection
+        ScrollViewReader { proxy in
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    header
+                        .id("top")
+                    nameField
+                    triggerSection
+                    commandField
+                    suggestionsSection
+                    unresolvedNotice
+                    stepsSection
+                    addMenu
+                    reviewSection
+                    templatesSection
+                    librarySection
+                    historySection
+                    runtimeActivitySection
+                    settingsSection
+                    resultSection
+                }
+                .padding()
             }
-            .padding()
+            .onChange(of: model.scrollToTopToken) { _, _ in
+                withAnimation {
+                    proxy.scrollTo("top", anchor: .top)
+                }
+            }
         }
         .frame(minWidth: 700, minHeight: 660, alignment: .topLeading)
         .onAppear { model.loadApplicationsIfNeeded() }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            model.refreshAll()
+        }
         .sheet(
             isPresented: Binding(get: { model.showOnboarding }, set: { model.showOnboarding = $0 })
         ) {
