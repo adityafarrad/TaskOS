@@ -1942,3 +1942,47 @@ record isolation/recovery) is deferred to Phase 3 with the migration fixtures.
   selection resets).
 - Next eligible work package: Phase 3.1 system validation (gap 4 and the smaller
   gaps 5–12 remain deferred).
+
+### Increment U1–U3 — Native three-area UI redesign (presentation only)
+
+- Status: done
+- Behavior delivered: replaced the single long scroll page with a
+  `NavigationSplitView` shell plus a trailing inspector. Left sidebar holds the
+  TaskOS mark, Workflows/Templates/History/Settings destinations, and saved
+  workflows with an inline search field and `+`; selection uses the native
+  List accent. The editor is now the focal point: editable workflow name and an
+  enabled switch in the toolbar, a compact trigger pill (`Manual ▾`), a command
+  composer with the `command` glyph and “Describe what you want your Mac to
+  do…” placeholder plus a floating suggestion panel, and step cards with step
+  icon, summary, status chip, drag handle, duplicate, and delete. Secondary
+  actions (Review, Rename, Duplicate, Export, Delete, Import) live in the
+  toolbar `•••` menu; Run is the prominent `play.fill` action and opens a review
+  popover that states testing runs for real. The inspector shows trigger or step
+  configuration on selection and collapses otherwise. Templates became a card
+  gallery (featured six + “View all templates”); History is a day-grouped
+  timeline with expandable action outcomes plus a Skipped & queued section;
+  Settings is a grouped Form with permissions, startup, history retention, help,
+  and a separated destructive section behind confirmation dialogs. Discovery and
+  onboarding restyled to match.
+- Interfaces changed: added `ComposerDocument.moveActions(fromOffsets:toOffset:)`
+  (one undo entry, leaves unresolved elements in place) with a Core test;
+  `ComposerViewModel` gained `moveActions`, `duplicateAction`, `dismissResult`,
+  `hasUnsavedChanges`, `isEditingSavedWorkflow`, and `activeWorkflow`.
+  New presentation files under `TaskOS/TaskOS/Presentation/`: `DesignTokens`,
+  `PresentationMappings`, `AppNavigation` (`TaskOSCommands`, `EditorSelection`),
+  `SidebarView`, `WorkflowEditorView`, `CommandComposerView`, `StepCardView`,
+  `StepConfigurationView`, `TriggerConfigurationView`, `InspectorView`,
+  `RunReviewView`, `TemplatesGalleryView`, `HistoryView`, `SettingsView`,
+  `DiscoveryView`. `ContentView` reduced to the shell. `TaskOSApp` registers
+  `TaskOSCommands`.
+- Tests performed:
+  - `swift test --package-path Packages/TaskOSCore` — 267 tests, 34 suites, pass
+    (was 265/34; +2 reorder coverage).
+  - App tests (`xcodebuild ... test -only-testing:TaskOSTests`) — TEST SUCCEEDED.
+  - Debug and Release builds — BUILD SUCCEEDED; no code warnings.
+- Physical checks: Release app launched cleanly. Pending manual pass (U4):
+  trigger/step inspector, drag reorder, review popover, ⌘N/⌘K/⌘R/⌘S/⌘,,
+  light/dark, compact widths, and VoiceOver. Then re-run the 2.5 template
+  physical check against the new gallery.
+- Next eligible work package: U4 accessibility/responsive polish, then Phase 3.1.
+

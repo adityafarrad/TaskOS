@@ -341,6 +341,36 @@ public struct ComposerDocument: Sendable {
         bumpRevision()
     }
 
+    public mutating func moveActions(fromOffsets offsets: IndexSet, toOffset destination: Int) {
+        let slots = elements.indices.filter { index in
+            if case .action = elements[index] { return true }
+            return false
+        }
+        let current = slots.map { elements[$0] }
+        let reordered = Self.reordered(current, fromOffsets: offsets, toOffset: destination)
+        guard reordered != current else { return }
+        recordHistory()
+        for (slot, element) in zip(slots, reordered) {
+            elements[slot] = element
+        }
+        text = renderedText()
+        bumpRevision()
+    }
+
+    private static func reordered<T: Equatable>(_ items: [T], fromOffsets offsets: IndexSet, toOffset destination: Int) -> [T] {
+        guard !offsets.isEmpty else { return items }
+        let moving = offsets.sorted().compactMap { items.indices.contains($0) ? items[$0] : nil }
+        guard !moving.isEmpty else { return items }
+        var result = items
+        for index in offsets.sorted(by: >) where result.indices.contains(index) {
+            result.remove(at: index)
+        }
+        let removedBefore = offsets.filter { $0 < destination }.count
+        let insertion = max(0, min(destination - removedBefore, result.count))
+        result.insert(contentsOf: moving, at: insertion)
+        return result
+    }
+
     public mutating func undo() {
         guard let snapshot = undoStack.popLast() else { return }
         redoStack.append(currentSnapshot())

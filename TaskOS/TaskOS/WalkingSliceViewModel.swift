@@ -151,6 +151,28 @@ final class ComposerViewModel {
         return approvedRevision == currentRevision
     }
 
+    var isEditingSavedWorkflow: Bool {
+        editingWorkflowID != nil
+    }
+
+    var activeWorkflow: SavedWorkflow? {
+        guard let editingWorkflowID else { return nil }
+        return savedWorkflows.first { $0.id == editingWorkflowID }
+    }
+
+    var hasUnsavedChanges: Bool {
+        if let lastSavedSignature {
+            return currentSignature != lastSavedSignature
+        }
+        return !document.actions.isEmpty
+    }
+
+    func dismissResult() {
+        if case .finished = stage {
+            stage = .composing
+        }
+    }
+
     enum TriggerKind: Int, CaseIterable {
         case daily
         case weekdays
@@ -539,6 +561,22 @@ final class ComposerViewModel {
 
     func moveDown(id: UUID) {
         document.moveActionDown(id: id)
+        afterEdit()
+    }
+
+    func moveActions(fromOffsets offsets: IndexSet, toOffset destination: Int) {
+        document.moveActions(fromOffsets: offsets, toOffset: destination)
+        afterEdit()
+    }
+
+    func duplicateAction(id: UUID) {
+        guard let index = document.actions.firstIndex(where: { $0.id == id }) else { return }
+        let draft = document.actions[index].draft
+        document.addAction(draft)
+        let lastIndex = document.actions.count - 1
+        if lastIndex > index + 1 {
+            document.moveActions(fromOffsets: IndexSet(integer: lastIndex), toOffset: index + 1)
+        }
         afterEdit()
     }
 

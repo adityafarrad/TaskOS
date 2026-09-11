@@ -1,0 +1,307 @@
+import SwiftUI
+import TaskOSCore
+
+struct WorkflowEditorView: View {
+    let model: ComposerViewModel
+    let selection: EditorSelection
+    @Binding var sidebarSelection: SidebarSelection
+    @Binding var showReview: Bool
+    @Binding var composerFocusToken: Int
+    let onRun: () -> Void
+    let onSave: () -> Void
+    let onViewHistory: () -> Void
+
+    @FocusState private var composerFocused: Bool
+    @State private var pendingDelete: SavedWorkflow?
+
+    private var finishedRecord: RunRecord? {
+        if case .finished(let record) = model.stage {
+            return record
+        }
+        return nil
+    }
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: TaskOSSpacing.md) {
+                triggerPill
+
+                CommandComposerView(
+                    model: model,
+                    isFocused: $composerFocused,
+                    onBrowseActions: { model.showDiscovery = true }
+                )
+
+                if let record = finishedRecord {
+                    RunBannerView(
+                        record: record,
+                        onViewHistory: onViewHistory,
+                        onDismiss: { model.dismissResult() }
+                    )
+                }
+
+                stepsSection
+
+                if let notice = model.notice {
+                    noticeRow(notice)
+                }
+            }
+            .frame(maxWidth: 760, alignment: .leading)
+            .padding(.horizontal, TaskOSSpacing.xl)
+            .padding(.vertical, TaskOSSpacing.lg)
+            .frame(maxWidth: .infinity, alignment: .center)
+        }
+        .frame(minWidth: TaskOSMetrics.editorMin)
+        .toolbar { toolbarContent }
+        .onChange(of: composerFocusToken) { _, _ in
+            composerFocused = true
+        }
+        .alert(
+            "Delete Workflow?",
+            isPresented: Binding(
+                get: { pendingDelete != nil },
+                set: { if !$0 { pendingDelete = nil } }
+            ),
+            presenting: pendingDelete
+        ) { workflow in
+            Button("Delete", role: .destructive) {
+                model.deleteSaved(workflow)
+                pendingDelete = nil
+            }
+            Button("Cancel", role: .cancel) { pendingDelete = nil }
+        } message: { workflow in
+            Text("“\(workflow.name)” and its history metadata will be removed. This cannot be undone.")
+        }
+    }
+
+    private var triggerPill: some View {
+        Menu {
+            ForEach(triggerFamilies, id: \.self) { family in
+                Button {
+                    model.setTriggerFamily(family)
+                    selection.selectTrigger()
+                } label: {
+                    Label(TriggerPresentation.title(for: family), systemImage: TriggerPresentation.symbol(for: family))
+                }
+            }
+            Divider()
+            Button("Configure Trigger…") { selection.selectTrigger() }
+        } label: {
+            HStack(spacing: 6) {
+                Image(systemName: TriggerPresentation.symbol(for: model.triggerFamily))
+                    .font(.system(size: 11, weight: .semibold))
+                Text(TriggerPresentation.title(for: model.triggerFamily))
+                    .font(.subheadline.weight(.medium))
+                Image(systemName: "chevron.down")
+                    .font(.system(size: 9, weight: .bold))
+                    .foregroundStyle(.secondary)
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 5)
+            .background(.regularMaterial, in: Capsule())
+            .overlay(Capsule().strokeBorder(Color(nsColor: .separatorColor), lineWidth: 1))
+        }
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .help("Change when this workflow runs")
+        .accessibilityLabel("Trigger: \(TriggerPresentation.title(for: model.triggerFamily))")
+    }
+
+    private var triggerFamilies: [ComposerViewModel.TriggerFamily] {
+        [.manual, .schedule, .applicationLifecycle, .wake, .displayConnection, .externalVolume, .powerSource, .batteryThreshold]
+    }
+
+    @ViewBuilder
+    private var stepsSection: some View {
+        VStack(alignment: .leading, spacing: TaskOSSpacing.xs) {
+            TaskOSSectionHeader(title: "Steps") {
+                Text(model.actions.count == 1 ? "1 step" : "\(model.actions.count) steps")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .monospacedDigit()
+            }
+
+            if model.actions.isEmpty {
+                emptySteps
+            } else {
+                VStack(spacing: TaskOSSpacing.xs) {
+                    ForEach(Array(model.actions.enumerated()), id: \.element.id) { index, action in
+                        StepCardView(
+                            index: index,
+                            action: action,
+                            model: model,
+                            isSelected: selection.selectedStepID == action.id,
+                            onSelect: { selection.selectStep(action.id) },
+                            onMoveUp: { model.moveUp(id: action.id) },
+                            onMoveDown: { model.moveDown(id: action.id) },
+                            onDuplicate: {
+                                model.duplicateAction(id: action.id)
+                            },
+                            onDelete: {
+                                model.remove(id: action.id)
+                                selection.stepWasRemoved(action.id)
+                            }
+                        )
+                        .dropDestination(for: String.self) { items, _ in
+                            guard let raw = items.first,
+                                  let draggedID = UUID(uuidString: raw),
+                                  let from = model.actions.firstIndex(where: { $0.id == draggedID }) else {
+                                return false
+                            }
+                            withAnimation(.taskOSStandard) {
+                                model.moveActions(fromOffsets: IndexSet(integer: from), toOffset: index)
+                            }
+                            return true
+                        }
+                    }
+                }
+                .animation(.taskOSStandard, value: model.actions.map(\.id))
+            }
+
+            addStepMenu
+                .padding(.top, 2)
+        }
+    }
+
+    private var emptySteps: some View {
+        HStack(spacing: TaskOSSpacing.sm) {
+            Image(systemName: "rectangle.stack.badge.plus")
+                .font(.system(size: 18))
+                .foregroundStyle(.tertiary)
+            VStack(alignment: .leading, spacing: 1) {
+                Text("No steps yet")
+                    .font(.subheadline.weight(.medium))
+                Text("Describe what you want above, or add a step below.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            Spacer()
+        }
+        .padding(TaskOSSpacing.sm)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.primary.opacity(0.04), in: RoundedRectangle(cornerRadius: TaskOSRadius.card, style: .continuous))
+    }
+
+    private var addStepMenu: some View {
+        Menu {
+            Button("Open a website") { model.add(.openWebsite(url: "https://", browser: nil)) }
+            Button("Open a file or folder") { model.add(.openFile(target: nil)) }
+            Button("Reveal in Finder") { model.add(.revealInFinder(target: nil)) }
+            Button("Hide an application") { model.add(.hideApplication(name: "", resolved: nil)) }
+            Button("Quit an application") { model.add(.quitApplication(name: "", resolved: nil)) }
+            Button("Arrange a window") {
+                model.add(.arrangeWindow(name: "", resolved: nil, preset: .leftHalf, display: .current))
+            }
+            Button("Wait 1 second") { model.add(.wait(1)) }
+            Button("Wait 5 seconds") { model.add(.wait(5)) }
+            Button("Show a notification") {
+                model.add(.showNotification(title: "TaskOS", message: ""))
+            }
+            Button("Copy text") {
+                model.add(.copyText(""))
+            }
+        } label: {
+            Label("Add step", systemImage: "plus")
+        }
+        .fixedSize()
+    }
+
+    private func noticeRow(_ notice: String) -> some View {
+        Label(notice, systemImage: "info.circle")
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, TaskOSSpacing.sm)
+            .padding(.vertical, 6)
+            .background(Color.primary.opacity(0.04), in: RoundedRectangle(cornerRadius: TaskOSRadius.control, style: .continuous))
+    }
+
+    @ToolbarContentBuilder
+    private var toolbarContent: some ToolbarContent {
+        ToolbarItem(placement: .principal) {
+            HStack(spacing: TaskOSSpacing.sm) {
+                TextField(
+                    "Workflow name",
+                    text: Binding(get: { model.draftName }, set: { model.updateName($0) })
+                )
+                .textFieldStyle(.plain)
+                .font(.title3.weight(.semibold))
+                .frame(minWidth: 120, maxWidth: 280)
+                .accessibilityLabel("Workflow name")
+
+                if model.supportsAutomaticRuns {
+                    Toggle(
+                        "Run automatically",
+                        isOn: Binding(get: { model.autoRunEnabled }, set: { model.autoRunEnabled = $0 })
+                    )
+                    .toggleStyle(.switch)
+                    .controlSize(.small)
+                    .labelsHidden()
+                    .help("Run automatically on its trigger")
+                    .accessibilityLabel("Run automatically")
+                }
+            }
+        }
+
+        ToolbarItemGroup(placement: .primaryAction) {
+            if model.hasUnsavedChanges {
+                Button {
+                    onSave()
+                } label: {
+                    Label("Save", systemImage: "square.and.arrow.down")
+                }
+                .help("Save workflow (⌘S)")
+            }
+
+            Button {
+                onRun()
+            } label: {
+                Label("Run", systemImage: "play.fill")
+            }
+            .buttonStyle(.borderedProminent)
+            .help("Run workflow (⌘R)")
+            .popover(isPresented: $showReview, arrowEdge: .bottom) {
+                RunReviewView(
+                    model: model,
+                    onSave: {
+                        onSave()
+                        showReview = false
+                    },
+                    onRun: {
+                        showReview = false
+                        model.test()
+                    },
+                    onDismiss: { showReview = false }
+                )
+            }
+
+            Menu {
+                moreActions
+            } label: {
+                Label("More", systemImage: "ellipsis")
+            }
+            .menuIndicator(.hidden)
+            .help("More actions")
+        }
+    }
+
+    @ViewBuilder
+    private var moreActions: some View {
+        Button("Review Workflow…") { showReview = true }
+
+        if let workflow = model.activeWorkflow {
+            Divider()
+            Button("Rename…") { model.beginRename(workflow) }
+            Button("Duplicate") { model.duplicate(workflow) }
+            Button("Export…") { model.exportWorkflow(workflow) }
+            Divider()
+            Button("Delete…", role: .destructive) { pendingDelete = workflow }
+        }
+
+        Divider()
+        Button("Import Workflow…") { model.importWorkflow() }
+        Button("Save") { onSave() }
+            .disabled(!model.hasUnsavedChanges)
+    }
+}

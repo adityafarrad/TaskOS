@@ -177,4 +177,50 @@ struct ComposerDocumentTests {
         #expect(document.text == "wait 2 seconds then Open Safari")
         #expect(document.actions.count == 2)
     }
+
+    @Test func reorderingActionsPreservesUnresolvedTextAndRecordsOneUndo() {
+        var document = ComposerDocument()
+        document.setText("open Safari")
+        document.addAction(.wait(1))
+        document.addAction(.wait(2))
+
+        #expect(document.actions.map(\.draft) == [
+            .openApplication(name: "Safari", resolved: nil),
+            .wait(1),
+            .wait(2),
+        ])
+
+        document.moveActions(fromOffsets: IndexSet(integer: 2), toOffset: 0)
+
+        #expect(document.actions.map(\.draft) == [
+            .wait(2),
+            .openApplication(name: "Safari", resolved: nil),
+            .wait(1),
+        ])
+        #expect(document.renderedText() == "Wait 2 seconds, then Open Safari, then Wait 1 seconds")
+
+        document.undo()
+
+        #expect(document.actions.map(\.draft) == [
+            .openApplication(name: "Safari", resolved: nil),
+            .wait(1),
+            .wait(2),
+        ])
+    }
+
+    @Test func reorderingActionsLeavesUnresolvedElementsInPlace() {
+        var document = ComposerDocument()
+        document.setText("open Safari then email Bob then wait 1 seconds")
+
+        #expect(document.actions.count == 2)
+        #expect(document.unresolvedTexts == ["email Bob"])
+
+        document.moveActions(fromOffsets: IndexSet(integer: 1), toOffset: 0)
+
+        #expect(document.actions.map(\.draft) == [
+            .wait(1),
+            .openApplication(name: "Safari", resolved: nil),
+        ])
+        #expect(document.unresolvedTexts == ["email Bob"])
+    }
 }

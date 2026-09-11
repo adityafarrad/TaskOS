@@ -9,6 +9,9 @@ struct TaskOSApp: App {
         WindowGroup(id: "main") {
             ContentView()
         }
+        .commands {
+            TaskOSCommands()
+        }
 
         MenuBarExtra("TaskOS") {
             MenuBarContent()
