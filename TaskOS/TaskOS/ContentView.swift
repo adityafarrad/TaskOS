@@ -790,6 +790,10 @@ struct ContentView: View {
                 isOn: Binding(get: { model.launchAtLogin }, set: { model.setLaunchAtLogin($0) })
             )
 
+            Text("History keeps up to \(RunHistoryRetention.maximumRuns) runs for 30 days, whichever is reached first.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
             HStack(spacing: 12) {
                 Button("Clear history") { model.clearHistory() }
                 Button("Delete all workflows") { model.clearAllWorkflows() }

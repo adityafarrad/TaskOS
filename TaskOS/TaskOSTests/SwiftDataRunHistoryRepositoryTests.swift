@@ -29,11 +29,21 @@ struct SwiftDataRunHistoryRepositoryTests {
 
     @Test func appendsAndReadsNewestFirst() async throws {
         let repository: any RunHistoryRepository = try makeRepository()
-        try await repository.append(makeRecord(name: "Older", startedAt: Date(timeIntervalSince1970: 1)))
-        try await repository.append(makeRecord(name: "Newer", startedAt: Date(timeIntervalSince1970: 2)))
+        try await repository.append(makeRecord(name: "Older", startedAt: Date()))
+        try await repository.append(makeRecord(name: "Newer", startedAt: Date().addingTimeInterval(1)))
 
         let runs = try await repository.recentRuns(limit: 10)
         #expect(runs.map(\.automationName) == ["Newer", "Older"])
+    }
+
+    @Test func prunesRunsOlderThanRetentionWindow() async throws {
+        let repository: any RunHistoryRepository = try makeRepository()
+        let old = Date().addingTimeInterval(-RunHistoryRetention.maximumAge - 3600)
+        try await repository.append(makeRecord(name: "Old", startedAt: old))
+        try await repository.append(makeRecord(name: "New", startedAt: Date()))
+
+        let runs = try await repository.recentRuns(limit: 10)
+        #expect(runs.map(\.automationName) == ["New"])
     }
 
     @Test func clearRemovesAllRuns() async throws {
@@ -48,6 +58,7 @@ struct SwiftDataRunHistoryRepositoryTests {
     @Test func updateAndInterruptedRecovery() async throws {
         let repository: any RunHistoryRepository = try makeRepository()
 
+        let base = Date()
         let finishedID = UUID()
         var running = RunRecord(
             id: finishedID,
@@ -55,13 +66,13 @@ struct SwiftDataRunHistoryRepositoryTests {
             revision: WorkflowRevision(1),
             automationName: "Finished",
             status: .running,
-            startedAt: Date(timeIntervalSince1970: 1),
-            finishedAt: Date(timeIntervalSince1970: 1),
+            startedAt: base,
+            finishedAt: base,
             actions: []
         )
         try await repository.append(running)
         running.status = .succeeded
-        running.finishedAt = Date(timeIntervalSince1970: 2)
+        running.finishedAt = base.addingTimeInterval(1)
         try await repository.update(running)
 
         let unfinished = RunRecord(
@@ -70,8 +81,8 @@ struct SwiftDataRunHistoryRepositoryTests {
             revision: WorkflowRevision(1),
             automationName: "Unfinished",
             status: .running,
-            startedAt: Date(timeIntervalSince1970: 3),
-            finishedAt: Date(timeIntervalSince1970: 3),
+            startedAt: base.addingTimeInterval(2),
+            finishedAt: base.addingTimeInterval(2),
             actions: []
         )
         try await repository.append(unfinished)

@@ -37,7 +37,7 @@ compressed into implementation plus per-increment physical smoke checks.
 | 2.3 | Add selected files and portable workflows | done | Increments J1–J3 | File selection, Open/Reveal, durable references, repair, and portable export/import with rebinding done |
 | 2.4 | Add event-triggered workflows | done | Increments K1–K6 | All six event families implemented end to end with discovery/availability; user-confirmed physical checks complete |
 | 2.5 | Finish the template and discovery experience | in progress | Increments M1–M3 | Twelve templates, template picker, and capability discovery implemented; physical UI check pending |
-| 2.6 | Complete everyday management and recovery | in progress | Increments N1 + N2 | Skipped/queue visibility, library attention states/repair, and action-level history added; retention and onboarding polish pending |
+| 2.6 | Complete everyday management and recovery | in progress | Increments N1–N3 | Visibility, attention/repair, action-level history, and retention added; permission-recheck/onboarding polish pending |
 
 ### Phase 3 — Qualify, beta-test, and distribute
 
@@ -1655,3 +1655,30 @@ Next eligible work package: 2.1 — scheduling and runtime admission.
   refinement.
 - Next eligible work package: 2.6 increment N3 — history retention and data
   controls.
+
+### Increment N3 — History retention and data controls (plan 2.6, partial; plan 2.11)
+
+- Status: done
+- Behavior delivered: run history is retained for at most 30 days or 1,000 runs,
+  whichever is reached first. Pruning runs on every append and deletes entries
+  older than 30 days and any beyond the 1,000-run cap. Settings states the
+  retention policy alongside the existing Clear history / Delete all workflows
+  controls.
+- Interfaces changed: added `RunHistoryRetention` (maximumRuns = 1,000,
+  maximumAge = 30 days); `SwiftDataRunHistoryRepository` now prunes by age and
+  count; Settings retention note.
+- Tests performed:
+  - `swift test --package-path Packages/TaskOSCore` — 255 tests, 33 suites, pass.
+  - App tests (`xcodebuild ... test -only-testing:TaskOSTests`) — TEST SUCCEEDED,
+    including a new test that an expired run is pruned while a recent one is
+    kept. Updated two existing fixtures that used 1970 dates (now correctly
+    pruned) to recent dates.
+  - Debug build — BUILD SUCCEEDED.
+  - Release build — BUILD SUCCEEDED.
+- Physical checks: pending (accumulate runs, confirm the oldest drop past the
+  limits; confirm Clear history and Delete all workflows still work).
+- Remaining in 2.6: permission recheck/resource-repair polish (Fix flow exists;
+  deep attention copy and one-click grant/repair) and onboarding/help
+  refinement. Admission-event persistence remains a gap.
+- Next eligible work package: 2.6 increment N4 — permission recheck/resource
+  repair polish and onboarding/help refinement, then Phase 2 exit gate.

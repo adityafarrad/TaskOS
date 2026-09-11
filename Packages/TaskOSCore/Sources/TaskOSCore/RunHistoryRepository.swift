@@ -1,5 +1,10 @@
 import Foundation
 
+public enum RunHistoryRetention {
+    public static let maximumRuns = 1_000
+    public static let maximumAge: TimeInterval = 30 * 24 * 60 * 60
+}
+
 public protocol RunHistoryRepository: Sendable {
     func recentRuns(limit: Int) async throws -> [RunRecord]
     func append(_ record: RunRecord) async throws

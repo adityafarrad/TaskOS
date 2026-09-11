@@ -33,7 +33,7 @@ final class RunRecordEntry {
 
 @ModelActor
 actor SwiftDataRunHistoryRepository: RunHistoryRepository {
-    private static let retentionLimit = 200
+    private static let retentionLimit = RunHistoryRetention.maximumRuns
 
     func recentRuns(limit: Int) async throws -> [RunRecord] {
         var descriptor = FetchDescriptor<RunRecordEntry>(
@@ -94,15 +94,25 @@ actor SwiftDataRunHistoryRepository: RunHistoryRepository {
     }
 
     private func prune() throws {
+        let cutoff = Date().addingTimeInterval(-RunHistoryRetention.maximumAge)
+        let expired = try modelContext.fetch(
+            FetchDescriptor<RunRecordEntry>(predicate: #Predicate { $0.startedAt < cutoff })
+        )
+        for entry in expired {
+            modelContext.delete(entry)
+        }
+
         var descriptor = FetchDescriptor<RunRecordEntry>(
             sortBy: [SortDescriptor(\.startedAt, order: .reverse)]
         )
         descriptor.fetchOffset = Self.retentionLimit
         let overflow = try modelContext.fetch(descriptor)
-        guard !overflow.isEmpty else { return }
         for entry in overflow {
             modelContext.delete(entry)
         }
-        try modelContext.save()
+
+        if !expired.isEmpty || !overflow.isEmpty {
+            try modelContext.save()
+        }
     }
 }
