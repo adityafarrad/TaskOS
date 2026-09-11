@@ -141,6 +141,26 @@ public struct SuggestionEngine: Sendable {
             )
             suggestions.append(
                 Suggestion(
+                    id: "action.openFile",
+                    phrase: "Open the selected file",
+                    title: "Open a file or folder",
+                    category: .action,
+                    requiresParameter: true,
+                    match: .grammarPosition
+                )
+            )
+            suggestions.append(
+                Suggestion(
+                    id: "action.revealInFinder",
+                    phrase: "Reveal the selected item",
+                    title: "Reveal in Finder",
+                    category: .action,
+                    requiresParameter: true,
+                    match: .grammarPosition
+                )
+            )
+            suggestions.append(
+                Suggestion(
                     id: "action.arrangeWindow",
                     phrase: "Put an application on the left half",
                     title: "Arrange a window",

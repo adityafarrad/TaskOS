@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import Observation
 import TaskOSCore
@@ -363,6 +364,33 @@ final class ComposerViewModel {
 
     func updateCopyText(id: UUID, text: String) {
         document.updateAction(id: id, draft: .copyText(text))
+        afterEdit()
+    }
+
+    func chooseFile(id: UUID) {
+        guard let draft = actionDraft(id: id) else { return }
+
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = true
+        panel.canChooseDirectories = true
+        panel.allowsMultipleSelection = false
+        panel.canCreateDirectories = false
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+
+        let isDirectory = (try? url.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) ?? false
+        let target = FileTarget(
+            kind: isDirectory ? .folder : .file,
+            displayName: FileManager.default.displayName(atPath: url.path),
+            path: url.path,
+            bookmark: try? url.bookmarkData(options: [], includingResourceValuesForKeys: nil, relativeTo: nil)
+        )
+
+        switch draft {
+        case .revealInFinder:
+            document.updateAction(id: id, draft: .revealInFinder(target: target))
+        default:
+            document.updateAction(id: id, draft: .openFile(target: target))
+        }
         afterEdit()
     }
 

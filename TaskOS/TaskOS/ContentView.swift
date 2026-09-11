@@ -291,6 +291,8 @@ struct ContentView: View {
     private var addMenu: some View {
         Menu("Add action") {
             Button("Open a website") { model.add(.openWebsite(url: "https://", browser: nil)) }
+            Button("Open a file or folder") { model.add(.openFile(target: nil)) }
+            Button("Reveal in Finder") { model.add(.revealInFinder(target: nil)) }
             Button("Hide an application") { model.add(.hideApplication(name: "", resolved: nil)) }
             Button("Quit an application") { model.add(.quitApplication(name: "", resolved: nil)) }
             Button("Arrange a window") {
@@ -548,6 +550,8 @@ private struct ActionCard: View {
         case .openApplication: return "Open Application"
         case .hideApplication: return "Hide Application"
         case .quitApplication: return "Quit Application"
+        case .openFile: return "Open File or Folder"
+        case .revealInFinder: return "Reveal in Finder"
         case .openWebsite: return "Open Website"
         case .arrangeWindow: return "Arrange Window"
         case .wait: return "Wait"
@@ -598,6 +602,18 @@ private struct ActionCard: View {
                 }
                 .labelsHidden()
                 .frame(width: 220)
+            }
+
+        case .openFile(let fileTarget), .revealInFinder(let fileTarget):
+            HStack(spacing: 8) {
+                if let fileTarget {
+                    Label(fileTarget.displayName, systemImage: fileTarget.kind == .folder ? "folder" : "doc")
+                } else {
+                    Label("Choose a file or folder", systemImage: "exclamationmark.triangle")
+                        .foregroundStyle(.orange)
+                }
+                Spacer()
+                Button("Choose…") { model.chooseFile(id: action.id) }
             }
 
         case .openWebsite(let websiteURL, let websiteBrowser):
@@ -905,6 +921,8 @@ private struct RunResultView: View {
         case .openApplication: return "Open Application"
         case .hideApplication: return "Hide Application"
         case .quitApplication: return "Quit Application"
+        case .openFile: return "Open File or Folder"
+        case .revealInFinder: return "Reveal in Finder"
         case .openWebsite: return "Open Website"
         case .arrangeWindow: return "Arrange Window"
         case .wait: return "Wait"

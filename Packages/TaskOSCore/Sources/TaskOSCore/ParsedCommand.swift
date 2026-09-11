@@ -5,6 +5,8 @@ public enum ParsedClauseKind: Hashable, Sendable {
     case openApplication
     case hideApplication
     case quitApplication
+    case openFile
+    case revealInFinder
     case arrangeWindow
     case wait
     case showNotification
@@ -28,6 +30,7 @@ public enum ParsedParameter: Hashable, Sendable {
     case arrange(preset: WindowPreset?, applicationName: String)
     case schedule(ParsedSchedule)
     case copyText(String)
+    case fileSelection(kind: FileTarget.Kind)
     case none
 }
 
@@ -85,6 +88,13 @@ public struct ParsedClause: Hashable, Sendable {
         }
         return nil
     }
+
+    public var fileSelectionKind: FileTarget.Kind? {
+        if case .fileSelection(let kind) = parameter {
+            return kind
+        }
+        return nil
+    }
 }
 
 public enum ParseOutcome: String, Hashable, Sendable, Codable {
@@ -139,7 +149,8 @@ public struct ParsedCommand: Hashable, Sendable {
         clauses.filter { clause in
             switch clause.kind {
             case .openApplication, .hideApplication, .quitApplication,
-                 .arrangeWindow, .wait, .showNotification, .copyText:
+                 .openFile, .revealInFinder, .arrangeWindow, .wait,
+                 .showNotification, .copyText:
                 return true
             case .schedule, .unsupported, .unrecognized:
                 return false

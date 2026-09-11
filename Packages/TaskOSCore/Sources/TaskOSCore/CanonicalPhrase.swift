@@ -9,6 +9,10 @@ public enum CanonicalPhrase {
             return "Hide \(configuration.application.label)"
         case .quitApplication(let configuration):
             return "Quit \(configuration.application.label)"
+        case .openFile(let configuration):
+            return configuration.target.kind == .folder ? "Open the selected folder" : "Open the selected file"
+        case .revealInFinder:
+            return "Reveal the selected item"
         case .openWebsite(let configuration):
             return "Open \(configuration.url)"
         case .arrangeWindow(let configuration):

@@ -11,6 +11,8 @@ public enum ActionID: String, Codable, Sendable, CaseIterable, Hashable {
     case openApplication
     case hideApplication
     case quitApplication
+    case openFile
+    case revealInFinder
     case openWebsite
     case arrangeWindow
     case wait

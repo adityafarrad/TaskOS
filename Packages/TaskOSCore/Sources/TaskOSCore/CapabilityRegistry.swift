@@ -73,6 +73,14 @@ public struct CapabilityRegistry: Sendable {
                 title: "Quit Application",
                 summary: "Request a normal quit of a selected running app."
             ),
+            .openFile: CapabilityDescriptor(
+                title: "Open File or Folder",
+                summary: "Open an explicitly selected document or folder."
+            ),
+            .revealInFinder: CapabilityDescriptor(
+                title: "Reveal in Finder",
+                summary: "Reveal an explicitly selected item in Finder."
+            ),
             .openWebsite: CapabilityDescriptor(
                 title: "Open Website",
                 summary: "Open an absolute HTTP(S) URL in the default or a selected browser."

@@ -14,10 +14,10 @@ struct SuggestionEngineTests {
 
     @Test func emptyFieldOffersStarters() {
         let suggestions = engine.suggestions(for: "")
+        #expect(suggestions.count <= engine.limit)
         #expect(suggestions.first?.match == .grammarPosition)
+        #expect(suggestions.allSatisfy { $0.match == .grammarPosition })
         #expect(suggestions.contains { $0.id == "action.openApplication" })
-        #expect(suggestions.contains { $0.id == "action.wait" })
-        #expect(suggestions.contains { $0.id == "action.showNotification" })
     }
 
     @Test func openOffersActionAndApplications() {

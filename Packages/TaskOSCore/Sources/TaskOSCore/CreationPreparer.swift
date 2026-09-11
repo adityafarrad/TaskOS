@@ -117,6 +117,45 @@ public struct CreationPreparer: Sendable {
                     issues.append(.error("Action \(index + 1): \(label) is not available on this Mac."))
                 }
 
+            case .openFile(let configuration):
+                let target = configuration.target
+                if target.isExecutableOrUnsupported {
+                    actionPreviews.append(
+                        ActionPreview(
+                            index: index,
+                            actionID: .openFile,
+                            title: title(for: .openFile),
+                            targetLabel: target.displayName,
+                            status: .missingResource,
+                            detail: "Unsupported file type."
+                        )
+                    )
+                    issues.append(.error("Action \(index + 1): TaskOS cannot open applications, installers, scripts, or automation files."))
+                } else {
+                    actionPreviews.append(
+                        ActionPreview(
+                            index: index,
+                            actionID: .openFile,
+                            title: title(for: .openFile),
+                            targetLabel: target.displayName,
+                            status: .ready,
+                            detail: "Fails if the item was moved or deleted."
+                        )
+                    )
+                }
+
+            case .revealInFinder(let configuration):
+                actionPreviews.append(
+                    ActionPreview(
+                        index: index,
+                        actionID: .revealInFinder,
+                        title: title(for: .revealInFinder),
+                        targetLabel: configuration.target.displayName,
+                        status: .ready,
+                        detail: "Fails if the item was moved or deleted."
+                    )
+                )
+
             case .openWebsite(let configuration):
                 if let browser = configuration.browser,
                    await catalog.application(bundleIdentifier: browser.identifier) == nil {

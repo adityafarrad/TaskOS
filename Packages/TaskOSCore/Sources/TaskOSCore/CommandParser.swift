@@ -113,8 +113,8 @@ private struct ParserWorker {
 
     static let connectors: Set<String> = ["and", "then", "also", ","]
     static let clauseKeywords: Set<String> = [
-        "open", "hide", "quit", "wait", "show", "notify", "put", "arrange",
-        "maximize", "center", "copy", "every", "once", "in",
+        "open", "hide", "quit", "reveal", "wait", "show", "notify", "put",
+        "arrange", "maximize", "center", "copy", "every", "once", "in",
     ]
     static let timeUnits: Set<String> = ["second", "seconds", "sec", "secs", "s"]
     static let weekdayNames: [String: Weekday] = [
@@ -198,6 +198,8 @@ private struct ParserWorker {
             return clause.resourceNames.isEmpty
         case .hideApplication, .quitApplication:
             return clause.resourceNames.isEmpty
+        case .openFile, .revealInFinder:
+            return clause.fileSelectionKind == nil
         case .arrangeWindow:
             let name = clause.arrangeApplicationName ?? ""
             return clause.arrangePreset == nil || name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
@@ -221,6 +223,11 @@ private struct ParserWorker {
             return [.error("Hide needs an application name.", span: clause.span)]
         case .quitApplication where clause.resourceNames.isEmpty:
             return [.error("Quit needs an application name.", span: clause.span)]
+        case .openFile, .revealInFinder:
+            if clause.fileSelectionKind == nil {
+                return [.error("Choose a file or folder for this step.", span: clause.span)]
+            }
+            return []
         case .wait:
             guard let duration = clause.duration else {
                 return [.error("Wait needs a duration, for example 5 seconds.", span: clause.span)]
@@ -276,6 +283,8 @@ private struct ParserWorker {
             return parseApplicationListClause(kind: .hideApplication)
         case "quit":
             return parseApplicationListClause(kind: .quitApplication)
+        case "reveal":
+            return parseReveal()
         case "wait":
             return parseWait()
         case "show", "notify":
@@ -302,12 +311,57 @@ private struct ParserWorker {
         let openToken = tokens[position]
         position += 1
         let (names, end) = collectApplicationNames(after: openToken)
+
+        let joined = names.joined(separator: " ").lowercased()
+        let kind: FileTarget.Kind?
+        switch joined {
+        case "the selected file":
+            kind = .file
+        case "the selected folder":
+            kind = .folder
+        default:
+            kind = nil
+        }
+
+        if let kind {
+            return ParsedClause(
+                kind: .openFile,
+                span: SourceSpan(start: openToken.span.start, end: end),
+                parameter: .fileSelection(kind: kind),
+                detail: nil
+            )
+        }
+
         return ParsedClause(
             kind: .openApplication,
             span: SourceSpan(start: openToken.span.start, end: end),
             parameter: .resourceNames(names),
             detail: nil
         )
+    }
+
+    private mutating func parseReveal() -> ParsedClause {
+        let keyword = tokens[position]
+        position += 1
+        let (names, end) = collectApplicationNames(after: keyword)
+        let joined = names.joined(separator: " ").lowercased()
+
+        switch joined {
+        case "the selected item", "the selected file", "the selected folder":
+            return ParsedClause(
+                kind: .revealInFinder,
+                span: SourceSpan(start: keyword.span.start, end: end),
+                parameter: .fileSelection(kind: .file),
+                detail: nil
+            )
+        default:
+            return ParsedClause(
+                kind: .revealInFinder,
+                span: SourceSpan(start: keyword.span.start, end: end),
+                parameter: .none,
+                detail: nil
+            )
+        }
     }
 
     private mutating func parseApplicationListClause(kind: ParsedClauseKind) -> ParsedClause {

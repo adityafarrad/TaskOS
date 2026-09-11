@@ -65,6 +65,10 @@ extension ActionConfiguration {
             return action.validate()
         case .quitApplication(let action):
             return action.validate()
+        case .openFile(let action):
+            return action.validate()
+        case .revealInFinder(let action):
+            return action.validate()
         case .openWebsite(let action):
             return action.validate()
         case .arrangeWindow(let action):
@@ -127,6 +131,30 @@ extension QuitApplicationAction {
             issues.append(.error("TaskOS cannot quit itself, Finder, or system infrastructure."))
         }
         return ValidationResult(issues: issues)
+    }
+}
+
+extension OpenFileAction {
+    public func validate() -> ValidationResult {
+        var issues: [ValidationIssue] = []
+        if target.path.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            || target.displayName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            issues.append(.error("Open File requires an explicitly selected file or folder."))
+        }
+        if target.isExecutableOrUnsupported {
+            issues.append(.error("TaskOS cannot open applications, installers, scripts, or automation files."))
+        }
+        return ValidationResult(issues: issues)
+    }
+}
+
+extension RevealInFinderAction {
+    public func validate() -> ValidationResult {
+        if target.path.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            || target.displayName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return ValidationResult(issues: [.error("Reveal in Finder requires an explicitly selected item.")])
+        }
+        return .valid
     }
 }
 

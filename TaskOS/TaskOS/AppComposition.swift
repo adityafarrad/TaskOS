@@ -45,6 +45,8 @@ final class AppComposition {
                 OpenApplicationExecutor(),
                 HideApplicationExecutor(),
                 QuitApplicationExecutor(),
+                OpenFileExecutor(),
+                RevealInFinderExecutor(),
                 OpenWebsiteExecutor(),
                 ArrangeWindowExecutor(),
                 NotificationExecutor(),

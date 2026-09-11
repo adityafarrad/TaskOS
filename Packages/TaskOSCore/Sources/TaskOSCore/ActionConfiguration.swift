@@ -32,6 +32,55 @@ public struct QuitApplicationAction: Codable, Hashable, Sendable {
     }
 }
 
+public struct FileTarget: Codable, Hashable, Sendable {
+    public enum Kind: String, Codable, Hashable, Sendable {
+        case file
+        case folder
+    }
+
+    public static let rejectedExtensions: Set<String> = [
+        "app", "pkg", "mpkg", "dmg", "sh", "command", "scpt", "applescript",
+        "workflow", "jar", "exe", "osx", "action", "plugin", "kext", "terminal",
+        "installer",
+    ]
+
+    public var kind: Kind
+    public var displayName: String
+    public var path: String
+    public var bookmark: Data?
+
+    public init(kind: Kind, displayName: String, path: String, bookmark: Data? = nil) {
+        self.kind = kind
+        self.displayName = displayName
+        self.path = path
+        self.bookmark = bookmark
+    }
+
+    public var fileExtension: String {
+        (path as NSString).pathExtension.lowercased()
+    }
+
+    public var isExecutableOrUnsupported: Bool {
+        kind == .file && Self.rejectedExtensions.contains(fileExtension)
+    }
+}
+
+public struct OpenFileAction: Codable, Hashable, Sendable {
+    public var target: FileTarget
+
+    public init(target: FileTarget) {
+        self.target = target
+    }
+}
+
+public struct RevealInFinderAction: Codable, Hashable, Sendable {
+    public var target: FileTarget
+
+    public init(target: FileTarget) {
+        self.target = target
+    }
+}
+
 public struct OpenWebsiteAction: Codable, Hashable, Sendable {
     public var url: String
     public var browser: ResourceReference?
@@ -88,6 +137,8 @@ public enum ActionConfiguration: Codable, Hashable, Sendable {
     case openApplication(OpenApplicationAction)
     case hideApplication(HideApplicationAction)
     case quitApplication(QuitApplicationAction)
+    case openFile(OpenFileAction)
+    case revealInFinder(RevealInFinderAction)
     case openWebsite(OpenWebsiteAction)
     case arrangeWindow(ArrangeWindowAction)
     case wait(WaitAction)
@@ -102,6 +153,10 @@ public enum ActionConfiguration: Codable, Hashable, Sendable {
             return .hideApplication
         case .quitApplication:
             return .quitApplication
+        case .openFile:
+            return .openFile
+        case .revealInFinder:
+            return .revealInFinder
         case .openWebsite:
             return .openWebsite
         case .arrangeWindow:

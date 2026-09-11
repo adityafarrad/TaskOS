@@ -34,7 +34,7 @@ compressed into implementation plus per-increment physical smoke checks.
 |---|---|---|---|---|
 | 2.1 | Add scheduling and runtime admission | done | Increments H1–H3 + fixes H3-d/H3-e | Schedule model, occurrence calc, admission/queue/pause/cancel, schedule grammar, runtime registry, trigger card + next-run preview + enable toggle; physical tests A–E passed |
 | 2.2 | Finish app, window, and utility actions | done | Increments I1–I3 | Copy Text, Hide, normal Quit, specific-display selection, window presets, and notification editing/presentation done; lifecycle loop suppression tracked in 2.4 |
-| 2.3 | Add selected files and portable workflows | not started | — | |
+| 2.3 | Add selected files and portable workflows | in progress | Increment J1 | Open File/Reveal in Finder with explicit selection done; durable repair and export/import pending |
 | 2.4 | Add event-triggered workflows | not started | — | |
 | 2.5 | Finish the template and discovery experience | not started | — | |
 | 2.6 | Complete everyday management and recovery | not started | — | |
@@ -1217,3 +1217,44 @@ Next eligible work package: 2.1 — scheduling and runtime admission.
   app launch/quit must suppress correlated lifecycle triggers) is intentionally
   deferred to 2.4, where app lifecycle triggers are implemented.
 - Next eligible work package: 2.3 — selected files and portable workflows.
+
+### Increment J1 — Selected files: Open File and Reveal in Finder (plan 2.3, partial; A5 + A6)
+
+- Status: done
+- Behavior delivered: a workflow can open or reveal an explicitly user-selected
+  file or folder. Steps are added from the Add-action menu or by typing the
+  generic phrases `open the selected file` / `open the selected folder` /
+  `reveal the selected item`; the card then requires a real selection via
+  `NSOpenPanel` and stores a display name, path, and bookmark. The chosen target
+  survives later text edits (order-based reuse). Open File rejects executables,
+  installers, scripts, and automation bundles by extension at validation and
+  again at execution; a missing/moved target fails with recovery text instead of
+  substituting another file. Files require no permission, and typed paths never
+  substitute for a selection.
+- Interfaces changed: added `FileTarget` (kind/displayName/path/bookmark +
+  `rejectedExtensions`/`isExecutableOrUnsupported`), `OpenFileAction`,
+  `RevealInFinderAction`; `ActionID.openFile`/`.revealInFinder`; registry
+  descriptors; validation; parser `ParsedClauseKind.openFile`/`.revealInFinder`,
+  `ParsedParameter.fileSelection`, the `reveal` keyword, and file-phrase
+  detection in `parseOpen`/`parseReveal`; `CanonicalPhrase`; `ComposerActionDraft`
+  cases with order-based target preservation; `CreationPreparer` previews;
+  `SuggestionEngine` starters; app `FileTargetResolver`, `OpenFileExecutor`,
+  `RevealInFinderExecutor`, `ComposerViewModel.chooseFile`, and card/add-menu UI.
+- Tests performed:
+  - `swift test --package-path Packages/TaskOSCore` — 196 tests, 27 suites, pass
+    (was 187/26; +9). New coverage: open-file/folder and reveal parsing,
+    canonical round-trips, composer requiring a selection, selection surviving
+    text edits, executable rejection, missing-target validation, and no required
+    permissions. Updated the suggestions starter test for the larger catalog
+    (visible limit of eight). Fixed a compound-`case ... where` bug that made
+    every `openFile` clause report a spurious diagnostic.
+  - App tests (`xcodebuild ... test -only-testing:TaskOSTests`) — TEST SUCCEEDED.
+  - Debug build — BUILD SUCCEEDED.
+  - Release build — BUILD SUCCEEDED.
+- Physical checks: pending (select a real file and a folder, open and reveal
+  them; move a file and confirm recovery text; try a `.app` and confirm refusal).
+- Remaining in plan 2.3: durable resource references / missing-resource repair
+  (bookmark re-resolution and a repair control), and portable export/import with
+  rebinding and disabled defaults.
+- Next eligible work package: 2.3 increment J2 — durable file references and
+  missing-resource repair.

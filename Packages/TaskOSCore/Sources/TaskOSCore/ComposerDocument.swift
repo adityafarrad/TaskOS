@@ -4,6 +4,8 @@ public enum ComposerActionDraft: Hashable, Sendable {
     case openApplication(name: String, resolved: ResourceReference?)
     case hideApplication(name: String, resolved: ResourceReference?)
     case quitApplication(name: String, resolved: ResourceReference?)
+    case openFile(target: FileTarget?)
+    case revealInFinder(target: FileTarget?)
     case openWebsite(url: String, browser: ResourceReference?)
     case arrangeWindow(name: String, resolved: ResourceReference?, preset: WindowPreset, display: WindowDisplaySelection)
     case wait(TimeInterval)
@@ -129,8 +131,19 @@ public struct ComposerDocument: Sendable {
         }
     }
 
+    public var hasUnresolvedFiles: Bool {
+        actions.contains { action in
+            switch action.draft {
+            case .openFile(let target), .revealInFinder(let target):
+                return target == nil
+            default:
+                return false
+            }
+        }
+    }
+
     public var hasUnresolvedActions: Bool {
-        hasUnresolvedApplications || hasUnresolvedWebsites || hasUnresolvedCopyText
+        hasUnresolvedApplications || hasUnresolvedWebsites || hasUnresolvedCopyText || hasUnresolvedFiles
     }
 
     public mutating func setText(_ newText: String) {
@@ -257,6 +270,12 @@ public struct ComposerDocument: Sendable {
             case .quitApplication(_, let resolved):
                 guard let resolved else { return nil }
                 result.append(.quitApplication(QuitApplicationAction(application: resolved)))
+            case .openFile(let target):
+                guard let target else { return nil }
+                result.append(.openFile(OpenFileAction(target: target)))
+            case .revealInFinder(let target):
+                guard let target else { return nil }
+                result.append(.revealInFinder(RevealInFinderAction(target: target)))
             case .openWebsite(let url, let browser):
                 guard OpenWebsiteAction.isAbsoluteHTTPURL(url) else { return nil }
                 result.append(.openWebsite(OpenWebsiteAction(url: url, browser: browser)))
@@ -408,6 +427,12 @@ public struct ComposerDocument: Sendable {
                     )
                 }
 
+            case .openFile:
+                newElements.append(.action(reusedAction(for: .openFile(target: nil), from: previousActions, cursor: &cursor)))
+
+            case .revealInFinder:
+                newElements.append(.action(reusedAction(for: .revealInFinder(target: nil), from: previousActions, cursor: &cursor)))
+
             case .arrangeWindow:
                 let name = (clause.arrangeApplicationName ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
                 if let preset = clause.arrangePreset, !name.isEmpty {
@@ -490,6 +515,12 @@ public struct ComposerDocument: Sendable {
             }
             return new
 
+        case (.openFile(let oldTarget), .openFile(let newTarget)):
+            return .openFile(target: newTarget ?? oldTarget)
+
+        case (.revealInFinder(let oldTarget), .revealInFinder(let newTarget)):
+            return .revealInFinder(target: newTarget ?? oldTarget)
+
         case (.showNotification(let title, let message), .showNotification):
             return .showNotification(title: title, message: message)
 
@@ -547,6 +578,10 @@ public struct ComposerDocument: Sendable {
             return "Hide \(name)"
         case .quitApplication(let name, _):
             return "Quit \(name)"
+        case .openFile(let target):
+            return target?.kind == .folder ? "Open the selected folder" : "Open the selected file"
+        case .revealInFinder:
+            return "Reveal the selected item"
         case .openWebsite(let url, _):
             return "Open \(url)"
         case .arrangeWindow(let name, _, let preset, _):
