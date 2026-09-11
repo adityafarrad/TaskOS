@@ -97,6 +97,10 @@ final class AppComposition {
         await catalog.installedApplications()
     }
 
+    func loadDisplays() async -> [DisplayResource] {
+        await catalog.installedDisplays()
+    }
+
     func syncScheduleRegistrations() async {
         let workflows = (try? await repository.loadAll()) ?? []
         let enabledSchedules = workflows

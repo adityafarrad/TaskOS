@@ -4,9 +4,14 @@ import Foundation
 
 private struct FakeCatalog: ResourceCatalog {
     var installed: [String: ApplicationResource]
+    var displays: [DisplayResource] = []
 
     func application(bundleIdentifier: String) async -> ApplicationResource? {
         installed[bundleIdentifier]
+    }
+
+    func installedDisplays() async -> [DisplayResource] {
+        displays
     }
 }
 
@@ -99,6 +104,48 @@ struct CreationPreparerTests {
         #expect(preview.triggerTitle == "Manual")
         #expect(preview.willRunAutomatically == false)
         #expect(preview.actions.map(\.actionID) == [.openApplication, .wait])
+    }
+
+    @Test func missingSpecificDisplayBlocksArrangeWindow() async {
+        let subject = CreationPreparer(
+            catalog: FakeCatalog(
+                installed: ["com.apple.Safari": ApplicationResource(bundleIdentifier: "com.apple.Safari", displayName: "Safari")],
+                displays: [DisplayResource(identifier: "1", displayName: "Built-in", isMain: true)]
+            ),
+            permissions: FakePermissions(states: [.accessibility: .granted])
+        )
+        let action = ActionConfiguration.arrangeWindow(
+            ArrangeWindowAction(
+                application: .application(bundleIdentifier: "com.apple.Safari", label: "Safari"),
+                preset: .leftHalf,
+                display: .display(identifier: "999")
+            )
+        )
+        let preview = await subject.prepare(makeDefinition([action]))
+
+        #expect(preview.actions[0].status == .missingResource)
+        #expect(!preview.isRunnable)
+    }
+
+    @Test func connectedSpecificDisplayIsNotMissing() async {
+        let subject = CreationPreparer(
+            catalog: FakeCatalog(
+                installed: ["com.apple.Safari": ApplicationResource(bundleIdentifier: "com.apple.Safari", displayName: "Safari")],
+                displays: [DisplayResource(identifier: "1", displayName: "Built-in", isMain: true)]
+            ),
+            permissions: FakePermissions(states: [.accessibility: .granted])
+        )
+        let action = ActionConfiguration.arrangeWindow(
+            ArrangeWindowAction(
+                application: .application(bundleIdentifier: "com.apple.Safari", label: "Safari"),
+                preset: .leftHalf,
+                display: .display(identifier: "1")
+            )
+        )
+        let preview = await subject.prepare(makeDefinition([action]))
+
+        #expect(preview.actions[0].status == .ready)
+        #expect(preview.isRunnable)
     }
 
     @Test func previewReportsAutomaticRunsForSchedule() async {

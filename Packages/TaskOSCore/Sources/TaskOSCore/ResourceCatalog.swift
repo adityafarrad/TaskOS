@@ -10,13 +10,35 @@ public struct ApplicationResource: Hashable, Sendable {
     }
 }
 
+public struct DisplayResource: Hashable, Sendable {
+    public let identifier: String
+    public let displayName: String
+    public let isMain: Bool
+
+    public init(identifier: String, displayName: String, isMain: Bool) {
+        self.identifier = identifier
+        self.displayName = displayName
+        self.isMain = isMain
+    }
+}
+
 public protocol ResourceCatalog: Sendable {
     func application(bundleIdentifier: String) async -> ApplicationResource?
     func installedApplications() async -> [ApplicationResource]
+    func display(identifier: String) async -> DisplayResource?
+    func installedDisplays() async -> [DisplayResource]
 }
 
 public extension ResourceCatalog {
     func installedApplications() async -> [ApplicationResource] {
         []
+    }
+
+    func installedDisplays() async -> [DisplayResource] {
+        []
+    }
+
+    func display(identifier: String) async -> DisplayResource? {
+        await installedDisplays().first { $0.identifier == identifier }
     }
 }

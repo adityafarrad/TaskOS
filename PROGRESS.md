@@ -33,7 +33,7 @@ compressed into implementation plus per-increment physical smoke checks.
 | ID | Work package | Status | Evidence | Notes |
 |---|---|---|---|---|
 | 2.1 | Add scheduling and runtime admission | done | Increments H1–H3 + fixes H3-d/H3-e | Schedule model, occurrence calc, admission/queue/pause/cancel, schedule grammar, runtime registry, trigger card + next-run preview + enable toggle; physical tests A–E passed |
-| 2.2 | Finish app, window, and utility actions | in progress | Increments I1 + I2 | Copy Text, Hide Application, and normal Quit Application done end to end; specific-display selection and notification-editing review pending |
+| 2.2 | Finish app, window, and utility actions | done | Increments I1–I3 | Copy Text, Hide, normal Quit, specific-display selection, window presets, and notification editing/presentation done; lifecycle loop suppression tracked in 2.4 |
 | 2.3 | Add selected files and portable workflows | not started | — | |
 | 2.4 | Add event-triggered workflows | not started | — | |
 | 2.5 | Finish the template and discovery experience | not started | — | |
@@ -1187,3 +1187,33 @@ Next eligible work package: 2.1 — scheduling and runtime admission.
   and permission handling. Lifecycle feedback-loop suppression belongs to 2.4.
 - Next eligible work package: 2.2 increment I3 — specific-display selection and
   notification editing/permission review.
+
+### Increment I3 — Specific display selection and notification review (plan 2.2 completion)
+
+- Status: done
+- Behavior delivered: Arrange Window can target a specific connected display, not
+  just the current or main one. The card lists every connected display by name
+  (marking the main one); unavailable specific displays are flagged in preview
+  and fail at execution rather than silently falling back to another display.
+  Notification editing/review is complete: title/message fields, permission
+  state in preview, the `NotificationPresenter` banner fix (H3-e), and the
+  documented caveat that success means macOS accepted the request.
+- Interfaces changed: added `DisplayResource`; `ResourceCatalog` gained
+  `installedDisplays()` / `display(identifier:)` (defaulted); `CreationPreparer`
+  validates a specific display before other arrange checks; app
+  `WorkspaceResourceCatalog` enumerates `NSScreen`s by `NSScreenNumber`;
+  `AppComposition.loadDisplays()`; `ComposerViewModel.displays`; the Arrange
+  Window card display picker now lists concrete displays.
+- Tests performed:
+  - `swift test --package-path Packages/TaskOSCore` — 187 tests, 26 suites, pass
+    (was 185/26; +2). New coverage: a missing specific display blocks arrange
+    (missing resource, not runnable) and a connected specific display is ready.
+  - App tests (`xcodebuild ... test -only-testing:TaskOSTests`) — TEST SUCCEEDED.
+  - Debug build — BUILD SUCCEEDED.
+  - Release build — BUILD SUCCEEDED.
+- Physical checks: pending (arrange a window onto a second display by name, and
+  disconnect it to confirm the preview flags it instead of falling back).
+- Remaining in plan 2.2: lifecycle feedback-loop suppression (MacFlow-initiated
+  app launch/quit must suppress correlated lifecycle triggers) is intentionally
+  deferred to 2.4, where app lifecycle triggers are implemented.
+- Next eligible work package: 2.3 — selected files and portable workflows.

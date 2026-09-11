@@ -13,6 +13,21 @@ struct WorkspaceResourceCatalog: ResourceCatalog {
         }
     }
 
+    nonisolated func installedDisplays() async -> [DisplayResource] {
+        await MainActor.run {
+            NSScreen.screens.compactMap { screen in
+                guard let number = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber else {
+                    return nil
+                }
+                return DisplayResource(
+                    identifier: number.stringValue,
+                    displayName: screen.localizedName,
+                    isMain: screen == NSScreen.main
+                )
+            }
+        }
+    }
+
     nonisolated func installedApplications() async -> [ApplicationResource] {
         let fileManager = FileManager.default
         let directories = [

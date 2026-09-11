@@ -18,6 +18,7 @@ final class ComposerViewModel {
     private(set) var highlightedSuggestion = 0
     private(set) var suggestionsDismissed = false
     private(set) var applications: [ApplicationResource] = []
+    private(set) var displays: [DisplayResource] = []
     private(set) var stage: Stage = .composing
     private(set) var approvedRevision: WorkflowRevision?
     private(set) var notice: String?
@@ -271,6 +272,7 @@ final class ComposerViewModel {
             guard let self else { return }
             let loaded = await composition.loadApplications()
             self.applications = loaded
+            self.displays = await composition.loadDisplays()
             self.refreshSuggestions()
             self.autoResolveApplications()
             self.restoreDraftIfNeeded()

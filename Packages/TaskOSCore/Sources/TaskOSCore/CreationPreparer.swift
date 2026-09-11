@@ -159,6 +159,21 @@ public struct CreationPreparer: Sendable {
 
             case .arrangeWindow(let configuration):
                 let appLabel = configuration.application.label
+                if case .display(let identifier) = configuration.display,
+                   await catalog.display(identifier: identifier) == nil {
+                    actionPreviews.append(
+                        ActionPreview(
+                            index: index,
+                            actionID: .arrangeWindow,
+                            title: title(for: .arrangeWindow),
+                            targetLabel: appLabel,
+                            status: .missingResource,
+                            detail: "The selected display is not connected."
+                        )
+                    )
+                    issues.append(.error("Action \(index + 1): The selected display is not connected."))
+                    break
+                }
                 if let application = await catalog.application(bundleIdentifier: configuration.application.identifier) {
                     let state = await permissions.state(for: .accessibility)
                     switch state {

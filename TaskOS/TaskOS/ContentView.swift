@@ -665,6 +665,10 @@ private struct ActionCard: View {
                     Picker("Display", selection: displayBinding(for: display)) {
                         Text("This window's display").tag(WindowDisplaySelection.current)
                         Text("Main display").tag(WindowDisplaySelection.main)
+                        ForEach(model.displays, id: \.identifier) { screen in
+                            Text(screen.isMain ? "\(screen.displayName) (main)" : screen.displayName)
+                                .tag(WindowDisplaySelection.display(identifier: screen.identifier))
+                        }
                     }
                     .labelsHidden()
                     .frame(width: 190)
