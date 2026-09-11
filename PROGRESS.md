@@ -37,7 +37,7 @@ compressed into implementation plus per-increment physical smoke checks.
 | 2.3 | Add selected files and portable workflows | done | Increments J1–J3 | File selection, Open/Reveal, durable references, repair, and portable export/import with rebinding done |
 | 2.4 | Add event-triggered workflows | done | Increments K1–K6 | All six event families implemented end to end with discovery/availability; user-confirmed physical checks complete |
 | 2.5 | Finish the template and discovery experience | in progress | Increments M1–M3 | Twelve templates, template picker, and capability discovery implemented; physical UI check pending |
-| 2.6 | Complete everyday management and recovery | in progress | Increment N1 | Skipped/queue event visibility added; status badges, repair, retention, onboarding polish pending |
+| 2.6 | Complete everyday management and recovery | in progress | Increments N1 + N2 | Skipped/queue visibility, library attention states/repair, and action-level history added; retention and onboarding polish pending |
 
 ### Phase 3 — Qualify, beta-test, and distribute
 
@@ -1629,3 +1629,29 @@ Next eligible work package: 2.1 — scheduling and runtime admission.
   refinement.
 - Next eligible work package: 2.6 increment N2 — library status badges,
   attention/repair, and action-level history detail.
+
+### Increment N2 — Library attention, paused state, and action-level history (plan 2.6, partial)
+
+- Status: done
+- Behavior delivered: the Library now shows a paused banner when automatic
+  triggers are paused from the menu bar, and marks any saved workflow that is
+  not runnable (missing app/file/display or denied permission) with a **Needs
+  attention** badge whose Edit button becomes **Fix**. History rows expand to
+  show each action's outcome, so partial failures are readable.
+- Interfaces changed: `ComposerViewModel.workflowAttention`,
+  `automaticTriggersPaused`, and `computeAttention` (uses
+  `CreationPreparer.prepare`); Library paused banner, attention badge/Fix, and
+  history disclosure with `actionTitle`/`actionOutcomeLabel`.
+- Tests performed:
+  - `swift test --package-path Packages/TaskOSCore` — 255 tests, 33 suites, pass.
+  - App tests (`xcodebuild ... test -only-testing:TaskOSTests`) — TEST SUCCEEDED.
+  - Debug build — BUILD SUCCEEDED.
+  - Release build — BUILD SUCCEEDED.
+- Physical checks: pending (save a workflow with a missing app, confirm the
+  attention badge/Fix; expand a history row to see per-action outcomes; pause
+  from the menu and confirm the banner).
+- Remaining in 2.6: history retention limits (30 days / 1,000 runs) and data
+  controls, permission recheck/resource repair polish, and onboarding/help
+  refinement.
+- Next eligible work package: 2.6 increment N3 — history retention and data
+  controls.

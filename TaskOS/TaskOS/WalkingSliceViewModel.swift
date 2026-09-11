@@ -33,6 +33,8 @@ final class ComposerViewModel {
     private(set) var libraryError: String?
     private(set) var history: [RunRecord] = []
     private(set) var admissionEvents: [AdmissionEvent] = []
+    private(set) var workflowAttention: [AutomationID: String] = [:]
+    private(set) var automaticTriggersPaused = false
     private(set) var draftName = "Untitled"
     var librarySearch = ""
     var templateSearch = ""
@@ -701,12 +703,27 @@ final class ComposerViewModel {
         Task { [weak self] in
             guard let self else { return }
             do {
-                self.savedWorkflows = try await self.composition.repository.loadAll()
+                let workflows = try await self.composition.repository.loadAll()
+                self.savedWorkflows = workflows
                 self.libraryError = nil
+                self.workflowAttention = await self.computeAttention(for: workflows)
             } catch {
                 self.libraryError = "Could not load saved workflows: \(error.localizedDescription)"
             }
         }
+    }
+
+    private func computeAttention(for workflows: [SavedWorkflow]) async -> [AutomationID: String] {
+        var attention: [AutomationID: String] = [:]
+        for workflow in workflows {
+            let preview = await composition.preparer.prepare(workflow.definition)
+            guard !preview.isRunnable else { continue }
+            let reason = preview.issues.first { $0.severity == .error }?.message
+                ?? preview.actions.first { $0.status == .missingResource }?.detail
+                ?? "Needs attention."
+            attention[workflow.id] = reason
+        }
+        return attention
     }
 
     func save() {
@@ -954,7 +971,9 @@ final class ComposerViewModel {
     func refreshRuntimeActivity() {
         Task { [weak self] in
             guard let self else { return }
-            self.admissionEvents = await self.composition.coordinator.status().recentEvents
+            let status = await self.composition.coordinator.status()
+            self.admissionEvents = status.recentEvents
+            self.automaticTriggersPaused = status.isPaused
         }
     }
 

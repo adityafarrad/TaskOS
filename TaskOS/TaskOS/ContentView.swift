@@ -584,6 +584,12 @@ struct ContentView: View {
                 Button("Import…") { model.importWorkflow() }
             }
 
+            if model.automaticTriggersPaused {
+                Label("Automatic triggers are paused from the menu bar.", systemImage: "pause.circle")
+                    .font(.caption)
+                    .foregroundStyle(.orange)
+            }
+
             TextField(
                 "Search workflows",
                 text: Binding(get: { model.librarySearch }, set: { model.librarySearch = $0 })
@@ -616,6 +622,12 @@ struct ContentView: View {
                         Button("Cancel") { model.cancelRename() }
                     } else {
                         Text(workflow.name)
+                        if let reason = model.workflowAttention[workflow.id] {
+                            Label("Needs attention", systemImage: "exclamationmark.triangle")
+                                .font(.caption)
+                                .foregroundStyle(.orange)
+                                .help(reason)
+                        }
                         Text(workflow.definition.actions.count == 1 ? "1 step" : "\(workflow.definition.actions.count) steps")
                             .font(.caption)
                             .foregroundStyle(.secondary)
@@ -639,7 +651,9 @@ struct ContentView: View {
                         Text(workflow.updatedAt.formatted(date: .abbreviated, time: .shortened))
                             .font(.caption)
                             .foregroundStyle(.secondary)
-                        Button("Edit") { model.loadForEditing(workflow) }
+                        Button(model.workflowAttention[workflow.id] == nil ? "Edit" : "Fix") {
+                            model.loadForEditing(workflow)
+                        }
                         Button("Rename") { model.beginRename(workflow) }
                         Button("Duplicate") { model.duplicate(workflow) }
                         Button("Export…") { model.exportWorkflow(workflow) }
@@ -662,23 +676,59 @@ struct ContentView: View {
             }
 
             ForEach(Array(model.history.prefix(10).enumerated()), id: \.offset) { _, run in
-                HStack(spacing: 12) {
-                    Text(run.automationName)
-                    Text(run.status.rawValue)
-                        .font(.caption)
-                        .foregroundStyle(runStatusColor(run.status))
-                    Spacer()
-                    Text("\(run.actions.count) steps")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    Text(String(format: "%.1fs", run.duration))
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    Text(run.startedAt.formatted(date: .abbreviated, time: .shortened))
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                DisclosureGroup {
+                    ForEach(run.actions, id: \.index) { item in
+                        HStack(spacing: 8) {
+                            Text("\(item.index + 1). \(actionTitle(for: item.actionID))")
+                            Spacer()
+                            Text(actionOutcomeLabel(item.outcome))
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                } label: {
+                    HStack(spacing: 12) {
+                        Text(run.automationName)
+                        Text(run.status.rawValue)
+                            .font(.caption)
+                            .foregroundStyle(runStatusColor(run.status))
+                        Spacer()
+                        Text("\(run.actions.count) steps")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Text(String(format: "%.1fs", run.duration))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Text(run.startedAt.formatted(date: .abbreviated, time: .shortened))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
                 }
             }
+        }
+    }
+
+    private func actionTitle(for id: ActionID) -> String {
+        switch id {
+        case .openApplication: return "Open Application"
+        case .hideApplication: return "Hide Application"
+        case .quitApplication: return "Quit Application"
+        case .openFile: return "Open File or Folder"
+        case .revealInFinder: return "Reveal in Finder"
+        case .openWebsite: return "Open Website"
+        case .arrangeWindow: return "Arrange Window"
+        case .wait: return "Wait"
+        case .showNotification: return "Show Notification"
+        case .copyText: return "Copy Text"
+        }
+    }
+
+    private func actionOutcomeLabel(_ outcome: ActionOutcome) -> String {
+        switch outcome {
+        case .succeeded: return "done"
+        case .failed(let failure): return failure.message
+        case .cancelled: return "cancelled"
+        case .notExecuted: return "not executed"
         }
     }
 
