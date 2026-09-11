@@ -1686,9 +1686,10 @@ Next eligible work package: 2.1 — scheduling and runtime admission.
 ### Increment N4 — Permission settings links and onboarding polish (plan 2.6, partial)
 
 - Status: done
-- Behavior delivered: Settings now offers direct **Accessibility Settings** and
-  **Notification Settings** buttons whenever the corresponding permission is not
-  granted, alongside Recheck and Grant. Onboarding mentions starting from a
+- Behavior delivered: Settings always offers direct **Accessibility Settings**
+  and **Notification Settings** buttons (plus Grant Accessibility when not
+  granted, and Recheck). They were originally conditional on the permission being
+  missing, which made them hard to find when already granted. Onboarding mentions starting from a
   template or a trigger phrase and using Browse supported actions. The resource
   repair path (attention badge → Fix) is already in place from N2.
 - Interfaces changed: `ComposerViewModel.openNotificationSettings()` /
