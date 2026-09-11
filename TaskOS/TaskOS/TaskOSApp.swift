@@ -23,6 +23,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        NotificationPresenter.shared.activate()
         MenuBarViewModel.shared.load()
         MenuBarViewModel.shared.refreshStatus()
         Task { await AppComposition.shared.syncScheduleRegistrations() }

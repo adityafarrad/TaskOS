@@ -1094,6 +1094,26 @@ Next eligible work package: 2.1 — scheduling and runtime admission.
 - Physical checks: pending re-run of Test A on the rebuilt app (quit and relaunch
   so the fixed binary is running).
 
+### Fix H3-e — Notifications suppressed while TaskOS is active
+
+- Status: done
+- Defect (reported after the schedule fired): a scheduled run reported
+  `succeeded` in history but no notification was visible.
+- Root cause: the app never assigned a `UNUserNotificationCenterDelegate`.
+  When TaskOS is the active application, macOS suppresses a notification unless
+  the delegate's `willPresent` opts into presenting it. `center.add` still
+  succeeds, so history correctly showed success while nothing was shown.
+- Fix: added `NotificationPresenter` (a `UNUserNotificationCenterDelegate` that
+  returns `[.banner, .sound, .list]`) and activate it at app launch in
+  `AppDelegate.applicationDidFinishLaunching`.
+- Tests performed:
+  - App tests (`xcodebuild ... test -only-testing:TaskOSTests`) — TEST SUCCEEDED.
+  - Release build — BUILD SUCCEEDED.
+- Physical checks: pending (relaunch and confirm the banner appears even when
+  TaskOS is frontmost). Note: system Focus/Do Not Disturb or per-app
+  notification settings can still suppress banners; success only means macOS
+  accepted the request.
+
 ### Increment I1 — Copy Text (plan 2.2, partial; plan A10)
 
 - Status: done
