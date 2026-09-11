@@ -35,7 +35,7 @@ compressed into implementation plus per-increment physical smoke checks.
 | 2.1 | Add scheduling and runtime admission | done | Increments H1–H3 + fixes H3-d/H3-e | Schedule model, occurrence calc, admission/queue/pause/cancel, schedule grammar, runtime registry, trigger card + next-run preview + enable toggle; physical tests A–E passed |
 | 2.2 | Finish app, window, and utility actions | done | Increments I1–I3 | Copy Text, Hide, normal Quit, specific-display selection, window presets, and notification editing/presentation done; lifecycle loop suppression tracked in 2.4 |
 | 2.3 | Add selected files and portable workflows | done | Increments J1–J3 | File selection, Open/Reveal, durable references, repair, and portable export/import with rebinding done |
-| 2.4 | Add event-triggered workflows | in progress | Increments K1–K5 | All six event families done end to end; discovery/availability polish pending |
+| 2.4 | Add event-triggered workflows | in progress | Increments K1–K6 | All six event families implemented end to end with discovery/availability; physical checks for wake/display/volume/power/battery pending hardware |
 | 2.5 | Finish the template and discovery experience | not started | — | |
 | 2.6 | Complete everyday management and recovery | not started | — | |
 
@@ -1514,3 +1514,40 @@ Next eligible work package: 2.1 — scheduling and runtime admission.
   restarted on time-zone/hardware changes (not relevant).
 - Next eligible work package: 2.4 increment K6 — trigger discovery/availability
   wording, suggestion entries, acceptance sweep, and phase close-out.
+
+### Increment K6 — Event trigger discovery and availability (plan 2.4 completion)
+
+- Status: done
+- Behavior delivered: event triggers are discoverable and honest about missing
+  hardware. Typing `when` offers ranked trigger suggestions for all six families.
+  The When card warns when the selected family's hardware is absent: a battery
+  trigger on a Mac with no battery, or a display/volume trigger with no external
+  display/removable volume currently present. Implemented across all six
+  families: app lifecycle, wake, display, external volume, power source, and
+  battery threshold, each registered at launch and on save, firing through the
+  admission coordinator, with history and pause support inherited from the
+  runtime.
+- Interfaces changed: added `Suggestion.Category.trigger` and a `when`
+  suggestion context/`whenSuggestions` in `SuggestionEngine`; added
+  `HardwareAvailability` and `AppComposition.hardwareAvailability()`;
+  `ComposerViewModel.hardware`; trigger card availability notes.
+- Tests performed:
+  - `swift test --package-path Packages/TaskOSCore` — 242 tests, 31 suites, pass
+    (was 241/31; +1). New coverage: the `when` context returns only trigger
+    suggestions including wake and battery.
+  - App tests (`xcodebuild ... test -only-testing:TaskOSTests`) — TEST SUCCEEDED.
+  - Debug build — BUILD SUCCEEDED.
+  - Release build — BUILD SUCCEEDED.
+- Plan 2.4 acceptance review: registration establishes a baseline without
+  fabricating an event (reconciler + battery baseline); display/volume bursts
+  reconcile to logical transitions; battery jitter does not repeat (two-point
+  rearm); absent hardware is described accurately; callbacks from obsolete
+  registrations cannot start a run (the registry only evaluates current
+  entries); event triggers require no permissions, so there is no background
+  prompt loop.
+- Physical checks: app lifecycle verified by the user. Wake, display, volume,
+  power, and battery are implemented and unit-tested but not yet physically
+  verified (need sleep/wake, an external display, removable storage, and a
+  laptop battery). Recorded as the remaining evidence gap for 2.4.
+- Next eligible work package: 2.4 physical verification sweep, then 2.5 —
+  templates and discovery.

@@ -98,6 +98,29 @@ struct ContentView: View {
                     .foregroundStyle(.secondary)
             }
 
+            if model.isBatteryTrigger, !model.hardware.hasBattery {
+                Label(
+                    "This Mac has no battery, so this trigger will not fire here.",
+                    systemImage: "exclamationmark.triangle"
+                )
+                .font(.caption)
+                .foregroundStyle(.orange)
+            } else if model.isDisplayTrigger, !model.hardware.hasExternalDisplay {
+                Label(
+                    "No external display is connected now; this fires when one connects.",
+                    systemImage: "info.circle"
+                )
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            } else if model.isVolumeTrigger, !model.hardware.hasRemovableVolume {
+                Label(
+                    "No removable volume is mounted now; this fires when one mounts.",
+                    systemImage: "info.circle"
+                )
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            }
+
             if model.supportsAutomaticRuns {
                 Toggle(
                     "Run automatically after saving",

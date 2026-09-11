@@ -33,6 +33,9 @@ public struct SuggestionEngine: Sendable {
         case .notification:
             return rankAndLimit(notificationSuggestions())
 
+        case .when:
+            return rankAndLimit(whenSuggestions())
+
         case .other:
             return []
         }
@@ -43,6 +46,7 @@ public struct SuggestionEngine: Sendable {
         case openApplication(prefix: String)
         case waitDuration
         case notification
+        case when
         case other
     }
 
@@ -68,6 +72,8 @@ public struct SuggestionEngine: Sendable {
             return .other
         case "notify":
             return .other
+        case "when":
+            return .when
         default:
             return .other
         }
@@ -281,6 +287,59 @@ public struct SuggestionEngine: Sendable {
                 requiresParameter: false,
                 match: .grammarPosition
             )
+        ]
+    }
+
+    private func whenSuggestions() -> [Suggestion] {
+        [
+            Suggestion(
+                id: "trigger.appLifecycle",
+                phrase: "When Safari opens",
+                title: "When an app opens or quits",
+                category: .trigger,
+                requiresParameter: true,
+                match: .grammarPosition
+            ),
+            Suggestion(
+                id: "trigger.wake",
+                phrase: "When the Mac wakes",
+                title: "When the Mac wakes",
+                category: .trigger,
+                requiresParameter: false,
+                match: .grammarPosition
+            ),
+            Suggestion(
+                id: "trigger.display",
+                phrase: "When a display connects",
+                title: "When a display connects or disconnects",
+                category: .trigger,
+                requiresParameter: false,
+                match: .grammarPosition
+            ),
+            Suggestion(
+                id: "trigger.volume",
+                phrase: "When an external drive mounts",
+                title: "When an external drive mounts or unmounts",
+                category: .trigger,
+                requiresParameter: false,
+                match: .grammarPosition
+            ),
+            Suggestion(
+                id: "trigger.power",
+                phrase: "When the Mac switches to battery",
+                title: "When the power source changes",
+                category: .trigger,
+                requiresParameter: false,
+                match: .grammarPosition
+            ),
+            Suggestion(
+                id: "trigger.battery",
+                phrase: "When the battery drops below 20%",
+                title: "When the battery crosses a percentage",
+                category: .trigger,
+                requiresParameter: true,
+                match: .grammarPosition
+            ),
         ]
     }
 

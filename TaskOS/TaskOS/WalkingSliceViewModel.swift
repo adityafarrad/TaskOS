@@ -21,6 +21,11 @@ final class ComposerViewModel {
     private(set) var suggestionsDismissed = false
     private(set) var applications: [ApplicationResource] = []
     private(set) var displays: [DisplayResource] = []
+    private(set) var hardware = HardwareAvailability(
+        hasBattery: true,
+        hasExternalDisplay: false,
+        hasRemovableVolume: false
+    )
     private(set) var stage: Stage = .composing
     private(set) var approvedRevision: WorkflowRevision?
     private(set) var notice: String?
@@ -454,6 +459,7 @@ final class ComposerViewModel {
             let loaded = await composition.loadApplications()
             self.applications = loaded
             self.displays = await composition.loadDisplays()
+            self.hardware = composition.hardwareAvailability()
             self.refreshSuggestions()
             self.autoResolveApplications()
             self.restoreDraftIfNeeded()

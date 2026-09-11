@@ -20,6 +20,14 @@ struct SuggestionEngineTests {
         #expect(suggestions.contains { $0.id == "action.openApplication" })
     }
 
+    @Test func whenContextOffersTriggerSuggestions() {
+        let suggestions = engine.suggestions(for: "when")
+        #expect(!suggestions.isEmpty)
+        #expect(suggestions.allSatisfy { $0.category == .trigger })
+        #expect(suggestions.contains { $0.id == "trigger.wake" })
+        #expect(suggestions.contains { $0.id == "trigger.battery" })
+    }
+
     @Test func openOffersActionAndApplications() {
         let suggestions = engine.suggestions(for: "open", applications: applications)
         #expect(suggestions.contains { $0.id == "action.openApplication" })

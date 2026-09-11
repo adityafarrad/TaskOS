@@ -13,6 +13,7 @@ public struct Suggestion: Hashable, Sendable {
         case action
         case application
         case parameter
+        case trigger
     }
 
     public let id: String

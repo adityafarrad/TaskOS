@@ -1,6 +1,14 @@
+import AppKit
 import Foundation
+import IOKit.ps
 import SwiftData
 import TaskOSCore
+
+struct HardwareAvailability: Sendable, Equatable {
+    var hasBattery: Bool
+    var hasExternalDisplay: Bool
+    var hasRemovableVolume: Bool
+}
 
 @MainActor
 final class AppComposition {
@@ -120,6 +128,45 @@ final class AppComposition {
 
     func loadDisplays() async -> [DisplayResource] {
         await catalog.installedDisplays()
+    }
+
+    func hardwareAvailability() -> HardwareAvailability {
+        HardwareAvailability(
+            hasBattery: Self.hasInternalBattery(),
+            hasExternalDisplay: NSScreen.screens.contains { screen in
+                guard let number = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber else {
+                    return false
+                }
+                return CGDisplayIsBuiltin(CGDirectDisplayID(number.uint32Value)) == 0
+            },
+            hasRemovableVolume: Self.hasRemovableVolume()
+        )
+    }
+
+    private static func hasInternalBattery() -> Bool {
+        guard let snapshot = IOPSCopyPowerSourcesInfo()?.takeRetainedValue(),
+              let sources = IOPSCopyPowerSourcesList(snapshot)?.takeRetainedValue() as? [CFTypeRef] else {
+            return false
+        }
+        for source in sources {
+            if let description = IOPSGetPowerSourceDescription(snapshot, source)?.takeUnretainedValue() as? [String: Any],
+               let type = description[kIOPSTypeKey] as? String,
+               type == kIOPSInternalBatteryType {
+                return true
+            }
+        }
+        return false
+    }
+
+    private static func hasRemovableVolume() -> Bool {
+        let keys: [URLResourceKey] = [.volumeIsInternalKey]
+        guard let urls = FileManager.default.mountedVolumeURLs(includingResourceValuesForKeys: keys) else {
+            return false
+        }
+        return urls.contains { url in
+            let values = try? url.resourceValues(forKeys: Set(keys))
+            return values?.volumeIsInternal == false
+        }
     }
 
     func syncTriggerRegistrations() async {
