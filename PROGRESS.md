@@ -1721,8 +1721,15 @@ Next eligible work package: 2.1 — scheduling and runtime admission.
 - Known gaps recorded: admission events are in-memory only; the composer
   "Test now"/Library "Run" execute outside the admission queue (busy-guarded);
   a stale file bookmark is resolved but not refreshed into storage.
-- Phase 2 is functionally complete pending the user's physical verification of
-  the N2–N4 UI affordances and any remaining hardware spot-checks.
+- Physical UI verification (user-confirmed): 2.1 schedule tests A–E; 2.4 all six
+  event families; 2.6 N2 (attention/Fix/expanded history), N3 (retention), N4
+  (permission settings buttons and onboarding). Issues found during these checks
+  were fixed (menu-bar live refresh, live attention/permission updates,
+  filesystem watch, accessibility denial reporting, delayed permission
+  re-check, always-visible settings buttons).
+- Phase 2 exit gate: PASSED. Phase 2 work packages 2.1–2.6 are complete and
+  physically verified except the specific-volume card selection (deferred) and
+  the global hotkey (deferred by plan/user decision).
 
 ### Fix N-a — Menu-bar workflow list did not refresh after saving
 
