@@ -32,7 +32,7 @@ compressed into implementation plus per-increment physical smoke checks.
 
 | ID | Work package | Status | Evidence | Notes |
 |---|---|---|---|---|
-| 2.1 | Add scheduling and runtime admission | in progress | Increments H1–H3 | Schedule model, occurrence calc, admission/queue/pause/cancel, schedule grammar, runtime registry, trigger card + next-run preview + enable toggle all implemented; physical verification of the schedule UI pending |
+| 2.1 | Add scheduling and runtime admission | done | Increments H1–H3 + fixes H3-d/H3-e | Schedule model, occurrence calc, admission/queue/pause/cancel, schedule grammar, runtime registry, trigger card + next-run preview + enable toggle; physical tests A–E passed |
 | 2.2 | Finish app, window, and utility actions | in progress | Increments I1 + I2 | Copy Text, Hide Application, and normal Quit Application done end to end; specific-display selection and notification-editing review pending |
 | 2.3 | Add selected files and portable workflows | not started | — | |
 | 2.4 | Add event-triggered workflows | not started | — | |
@@ -1051,10 +1051,12 @@ Next eligible work package: 2.1 — scheduling and runtime admission.
   - App tests (`xcodebuild ... test -only-testing:TaskOSTests`) — TEST SUCCEEDED.
   - Debug build — BUILD SUCCEEDED.
   - Release build — BUILD SUCCEEDED.
-- Physical checks: pending. To verify: create a schedule whose next run is 1–2
-  minutes out, enable it, leave the app running, and confirm the run fires (menu
-  status + history) with the window closed; also confirm the next-three preview
-  matches, disabling stops it, and relaunching re-registers an enabled schedule.
+- Physical checks: complete. User-confirmed tests A–E: an enabled one-time
+  schedule fired with the window closed and recorded history; the next-three
+  preview matched; enable/disable from the Library worked; an enabled schedule
+  was re-registered after relaunch and fired; pause suppressed automatic runs.
+  Two defects found and fixed during verification (H3-d overshoot rejection,
+  H3-e notification presenter).
 - Remaining defects / gaps:
   - The composer "Test now" and Library "Run" still execute via `WorkflowRunner`
     directly (with a coordinator busy-guard) rather than through admission; they
@@ -1091,8 +1093,8 @@ Next eligible work package: 2.1 — scheduling and runtime admission.
     automatic one-time definition that has just fired.
   - App tests (`xcodebuild ... test -only-testing:TaskOSTests`) — TEST SUCCEEDED.
   - Release build — BUILD SUCCEEDED.
-- Physical checks: pending re-run of Test A on the rebuilt app (quit and relaunch
-  so the fixed binary is running).
+- Physical checks: confirmed. After relaunch, the one-time schedule fired and
+  recorded a success in history (Test A).
 
 ### Fix H3-e — Notifications suppressed while TaskOS is active
 
@@ -1109,10 +1111,9 @@ Next eligible work package: 2.1 — scheduling and runtime admission.
 - Tests performed:
   - App tests (`xcodebuild ... test -only-testing:TaskOSTests`) — TEST SUCCEEDED.
   - Release build — BUILD SUCCEEDED.
-- Physical checks: pending (relaunch and confirm the banner appears even when
-  TaskOS is frontmost). Note: system Focus/Do Not Disturb or per-app
-  notification settings can still suppress banners; success only means macOS
-  accepted the request.
+- Physical checks: confirmed. The notification banner appears when a scheduled
+  run fires. Note: system Focus/Do Not Disturb or per-app notification settings
+  can still suppress banners; success only means macOS accepted the request.
 
 ### Increment I1 — Copy Text (plan 2.2, partial; plan A10)
 
