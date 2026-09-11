@@ -1785,3 +1785,22 @@ Next eligible work package: 2.1 — scheduling and runtime admission.
   - Debug and Release builds — BUILD SUCCEEDED.
 - Physical checks: pending (delete/move a selected file and confirm the badge
   appears with no interaction).
+
+### Fix N-d — Accessibility denial now surfaces as library attention
+
+- Status: done
+- Defect (reported during physical checks): a workflow using Arrange Window did
+  not show **Needs attention** when Accessibility was off; the permission only
+  appeared in Preview.
+- Root cause: `SystemPermissionStatusProvider` mapped `!AXIsProcessTrusted()` to
+  `.notDetermined`, which `CreationPreparer` treats as "will be requested" (no
+  error), so the workflow was considered runnable and no attention was raised.
+- Fix: not-trusted Accessibility now reports `.denied`, so Arrange Window
+  previews and the library attention badge report the missing permission, and
+  the existing Grant / Accessibility Settings affordances apply.
+- Tests performed:
+  - `swift test --package-path Packages/TaskOSCore` — 255 tests, 33 suites, pass.
+  - App tests (`xcodebuild ... test -only-testing:TaskOSTests`) — TEST SUCCEEDED.
+  - Debug and Release builds — BUILD SUCCEEDED.
+- Physical checks: pending (with Accessibility off, confirm the Arrange Window
+  workflow shows Needs attention in the Library; grant and confirm it clears).

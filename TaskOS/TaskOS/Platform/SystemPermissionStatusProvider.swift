@@ -18,7 +18,7 @@ struct SystemPermissionStatusProvider: PermissionStatusProvider {
                 return .notDetermined
             }
         case .accessibility:
-            return AXIsProcessTrusted() ? .granted : .notDetermined
+            return AXIsProcessTrusted() ? .granted : .denied
         }
     }
 }
