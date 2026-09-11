@@ -1,6 +1,7 @@
 import Foundation
 
 public enum ParsedClauseKind: Hashable, Sendable {
+    case schedule
     case openApplication
     case arrangeWindow
     case wait
@@ -9,10 +10,20 @@ public enum ParsedClauseKind: Hashable, Sendable {
     case unrecognized
 }
 
+public enum ParsedSchedule: Hashable, Sendable {
+    case daily(hour: Int, minute: Int)
+    case weekdays(Set<Weekday>, hour: Int, minute: Int)
+    case interval(TimeInterval)
+    case relative(TimeInterval)
+    case once(hour: Int, minute: Int)
+    case incomplete
+}
+
 public enum ParsedParameter: Hashable, Sendable {
     case resourceNames([String])
     case duration(TimeInterval)
     case arrange(preset: WindowPreset?, applicationName: String)
+    case schedule(ParsedSchedule)
     case none
 }
 
@@ -53,6 +64,13 @@ public struct ParsedClause: Hashable, Sendable {
     public var arrangeApplicationName: String? {
         if case .arrange(_, let name) = parameter {
             return name
+        }
+        return nil
+    }
+
+    public var schedule: ParsedSchedule? {
+        if case .schedule(let value) = parameter {
+            return value
         }
         return nil
     }
@@ -111,7 +129,7 @@ public struct ParsedCommand: Hashable, Sendable {
             switch clause.kind {
             case .openApplication, .arrangeWindow, .wait, .showNotification:
                 return true
-            case .unsupported, .unrecognized:
+            case .schedule, .unsupported, .unrecognized:
                 return false
             }
         }

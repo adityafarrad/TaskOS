@@ -943,3 +943,41 @@ Next eligible work package: 2.1 — scheduling and runtime admission.
 - Physical checks: pending re-check (run `Queue test` from the menu bar with the
   main window open; the History row should appear/update live and show ~30.0s).
 - Next eligible work package: 2.1 UI half (Increment H3).
+
+### Increment H3a — Schedule grammar and composer trigger (plan 2.1, partial)
+
+- Status: done
+- Behavior delivered: the composer now recognizes and holds a schedule trigger.
+  Text like `every day at 9 am`, `every weekday at 5:30 pm`, `every monday and
+  friday at 9:00 am`, `every weekend at 10:00 am`, `every 30 minutes`, `every 2
+  hours`, `in 45 minutes`, and `once at 7:00 pm` produces a typed trigger instead
+  of an action. The trigger can also be set from a card (`setTrigger`), renders
+  back into parseable canonical text, participates in undo/redo, and flows into
+  the saved definition. Relative (`in N`) and `once` schedules resolve to an
+  absolute one-time date at definition time; past-due one-time schedules are
+  rejected.
+- Interfaces changed: added `ParsedClauseKind.schedule`, `ParsedSchedule`,
+  `ParsedParameter.schedule`, and `ParsedClause.schedule`; `CommandParser` gained
+  schedule productions (time with required am/pm or 24-hour, weekday lists,
+  intervals, relative, once). Added `ComposerTriggerDraft`;
+  `ComposerDocument` gained `trigger`, `setTrigger`,
+  `triggerConfiguration(relativeTo:)`, and `makeDefinition(..., now:)`;
+  `renderedText()` and undo snapshots now include the trigger.
+- Tests performed:
+  - `swift test --package-path Packages/TaskOSCore` — 158 tests, 23 suites, pass
+    (was 142/22; +16). New coverage: daily/24-hour/weekday/selected-weekday/
+    weekend/interval/relative/once parsing, bare ambiguous hour needs input,
+    schedule-with-actions completeness, composer trigger extraction, relative
+    one-time definition resolution, past-due rejection, card render/parse
+    round-trip, undo of trigger edits, and manual default.
+  - Debug build — BUILD SUCCEEDED.
+- Physical checks: none (no UI control yet).
+- Remaining defects / gaps:
+  - One-time dates are card-only: once a full date/time is chosen in the UI it
+    renders as `Once at h:mm AM` and re-parsing the text keeps only the time.
+  - No suggestion entries for schedules yet, and no trigger card, next-occurrence
+    preview, or enable toggle (H3 UI).
+  - No runtime registration that fires enabled schedules yet (H3 runtime).
+- Next eligible work package: H3b — schedule runtime (registration, validation
+  before events, fired via the coordinator) and H3c — trigger card, next
+  three-occurrence preview, automatic-run enablement, and save/edit wiring.

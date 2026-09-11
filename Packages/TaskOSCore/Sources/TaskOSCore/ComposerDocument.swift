@@ -8,6 +8,16 @@ public enum ComposerActionDraft: Hashable, Sendable {
     case showNotification(title: String, message: String)
 }
 
+public enum ComposerTriggerDraft: Hashable, Sendable {
+    case manual
+    case daily(hour: Int, minute: Int)
+    case weekdays(Set<Weekday>, hour: Int, minute: Int)
+    case interval(TimeInterval)
+    case relative(TimeInterval)
+    case once(hour: Int, minute: Int)
+    case oneTime(Date)
+}
+
 public struct ComposerAction: Hashable, Sendable, Identifiable {
     public let id: UUID
     public let draft: ComposerActionDraft
@@ -26,6 +36,7 @@ public enum ComposerElement: Hashable, Sendable {
 public struct ComposerDocument: Sendable {
     private struct Snapshot: Sendable {
         let text: String
+        let trigger: ComposerTriggerDraft
         let elements: [ComposerElement]
         let parseOutcome: ParseOutcome
         let diagnostics: [ParseDiagnostic]
@@ -36,6 +47,7 @@ public struct ComposerDocument: Sendable {
     private static let historyLimit = 100
 
     public private(set) var text: String
+    public private(set) var trigger: ComposerTriggerDraft
     public private(set) var elements: [ComposerElement]
     public private(set) var parseOutcome: ParseOutcome
     public private(set) var diagnostics: [ParseDiagnostic]
@@ -46,6 +58,7 @@ public struct ComposerDocument: Sendable {
 
     public init(text: String = "") {
         self.text = text
+        self.trigger = .manual
         self.elements = []
         self.parseOutcome = .needsInput
         self.diagnostics = []
@@ -199,7 +212,15 @@ public struct ComposerDocument: Sendable {
     }
 
     public func renderedText() -> String {
-        elements.map(Self.render).joined(separator: ", then ")
+        let actionText = elements.map(Self.render).joined(separator: ", then ")
+        let triggerText = Self.render(trigger)
+        if triggerText.isEmpty {
+            return actionText
+        }
+        if actionText.isEmpty {
+            return triggerText
+        }
+        return triggerText + ", then " + actionText
     }
 
     public func resolvedActions() -> [ActionConfiguration]? {
@@ -228,17 +249,58 @@ public struct ComposerDocument: Sendable {
     public func makeDefinition(
         name: String,
         id: AutomationID = AutomationID(),
-        revision: WorkflowRevision = WorkflowRevision(1)
+        revision: WorkflowRevision = WorkflowRevision(1),
+        now: Date = Date()
     ) -> AutomationDefinition? {
         guard !hasUnresolvedText else { return nil }
         guard let actions = resolvedActions(), !actions.isEmpty else { return nil }
-        return AutomationDefinition(
+        guard let triggerConfiguration = triggerConfiguration(relativeTo: now) else { return nil }
+        let definition = AutomationDefinition(
             id: id,
             name: name,
             revision: revision,
-            trigger: .manual(ManualTrigger()),
+            trigger: triggerConfiguration,
             actions: actions
         )
+        return definition.validate(relativeTo: now).isValid ? definition : nil
+    }
+
+    public func triggerConfiguration(relativeTo now: Date = Date()) -> TriggerConfiguration? {
+        switch trigger {
+        case .manual:
+            return .manual(ManualTrigger())
+        case .daily(let hour, let minute):
+            return .schedule(.daily(hour: hour, minute: minute))
+        case .weekdays(let days, let hour, let minute):
+            return .schedule(.weekdays(days, hour: hour, minute: minute))
+        case .interval(let seconds):
+            return .schedule(.interval(every: seconds, startingAt: now))
+        case .relative(let seconds):
+            return .schedule(.oneTime(now.addingTimeInterval(seconds)))
+        case .once(let hour, let minute):
+            let calendar = Calendar.current
+            let components = DateComponents(hour: hour, minute: minute, second: 0)
+            guard let date = calendar.nextDate(
+                after: now.addingTimeInterval(-1),
+                matching: components,
+                matchingPolicy: .nextTime,
+                repeatedTimePolicy: .first,
+                direction: .forward
+            ) else {
+                return nil
+            }
+            return .schedule(.oneTime(date))
+        case .oneTime(let date):
+            return .schedule(.oneTime(date))
+        }
+    }
+
+    public mutating func setTrigger(_ draft: ComposerTriggerDraft) {
+        guard draft != trigger else { return }
+        recordHistory()
+        trigger = draft
+        text = renderedText()
+        bumpRevision()
     }
 
     private func action(id: UUID) -> ComposerAction? {
@@ -272,9 +334,26 @@ public struct ComposerDocument: Sendable {
         let previousActions = actions
         var cursor = 0
         var newElements: [ComposerElement] = []
+        var newTrigger: ComposerTriggerDraft = .manual
 
         for clause in parsed.clauses {
             switch clause.kind {
+            case .schedule:
+                switch clause.schedule {
+                case .daily(let hour, let minute):
+                    newTrigger = .daily(hour: hour, minute: minute)
+                case .weekdays(let days, let hour, let minute):
+                    newTrigger = .weekdays(days, hour: hour, minute: minute)
+                case .interval(let seconds):
+                    newTrigger = .interval(seconds)
+                case .relative(let seconds):
+                    newTrigger = .relative(seconds)
+                case .once(let hour, let minute):
+                    newTrigger = .once(hour: hour, minute: minute)
+                case .incomplete, .none:
+                    newElements.append(.unresolved(clauseText(clause)))
+                }
+
             case .openApplication:
                 for name in clause.resourceNames {
                     let draft: ComposerActionDraft
@@ -324,6 +403,7 @@ public struct ComposerDocument: Sendable {
         }
 
         elements = newElements
+        trigger = newTrigger
     }
 
     private func reusedAction(
@@ -418,12 +498,57 @@ public struct ComposerDocument: Sendable {
         }
     }
 
+    private static func render(_ trigger: ComposerTriggerDraft) -> String {
+        switch trigger {
+        case .manual:
+            return ""
+        case .daily(let hour, let minute):
+            return "Every day at \(clockText(hour: hour, minute: minute))"
+        case .weekdays(let days, let hour, let minute):
+            let names = days.sorted { $0.rawValue < $1.rawValue }.map(\.displayName).joined(separator: ", ")
+            return "Every \(names) at \(clockText(hour: hour, minute: minute))"
+        case .interval(let seconds):
+            return "Every \(intervalText(seconds))"
+        case .relative(let seconds):
+            return "In \(intervalText(seconds))"
+        case .once(let hour, let minute):
+            return "Once at \(clockText(hour: hour, minute: minute))"
+        case .oneTime(let date):
+            let components = Calendar.current.dateComponents([.hour, .minute], from: date)
+            return "Once at \(clockText(hour: components.hour ?? 0, minute: components.minute ?? 0))"
+        }
+    }
+
+    private static func clockText(hour: Int, minute: Int) -> String {
+        let period = hour < 12 ? "AM" : "PM"
+        var display = hour % 12
+        if display == 0 { display = 12 }
+        return String(format: "%d:%02d %@", display, minute, period)
+    }
+
+    private static func intervalText(_ seconds: TimeInterval) -> String {
+        let minutes = seconds / 60
+        if minutes >= 60, minutes.truncatingRemainder(dividingBy: 60) == 0 {
+            let hours = Int(minutes / 60)
+            return hours == 1 ? "1 hour" : "\(hours) hours"
+        }
+        let whole = Int(minutes)
+        return whole == 1 ? "1 minute" : "\(whole) minutes"
+    }
+
     private mutating func bumpRevision() {
         revision = revision.next()
     }
 
     private func currentSnapshot() -> Snapshot {
-        Snapshot(text: text, elements: elements, parseOutcome: parseOutcome, diagnostics: diagnostics, revision: revision)
+        Snapshot(
+            text: text,
+            trigger: trigger,
+            elements: elements,
+            parseOutcome: parseOutcome,
+            diagnostics: diagnostics,
+            revision: revision
+        )
     }
 
     private mutating func recordHistory() {
@@ -436,6 +561,7 @@ public struct ComposerDocument: Sendable {
 
     private mutating func restore(_ snapshot: Snapshot) {
         text = snapshot.text
+        trigger = snapshot.trigger
         elements = snapshot.elements
         parseOutcome = snapshot.parseOutcome
         diagnostics = snapshot.diagnostics

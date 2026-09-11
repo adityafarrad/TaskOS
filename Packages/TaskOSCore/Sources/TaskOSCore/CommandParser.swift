@@ -114,8 +114,22 @@ private struct ParserWorker {
     static let connectors: Set<String> = ["and", "then", "also", ","]
     static let clauseKeywords: Set<String> = [
         "open", "wait", "show", "notify", "put", "arrange", "maximize", "center",
+        "every", "once", "in",
     ]
     static let timeUnits: Set<String> = ["second", "seconds", "sec", "secs", "s"]
+    static let weekdayNames: [String: Weekday] = [
+        "sunday": .sunday,
+        "monday": .monday,
+        "tuesday": .tuesday,
+        "wednesday": .wednesday,
+        "thursday": .thursday,
+        "friday": .friday,
+        "saturday": .saturday,
+    ]
+    static let durationUnits: [String: TimeInterval] = [
+        "minute": 60, "minutes": 60, "min": 60, "mins": 60,
+        "hour": 3600, "hours": 3600, "hr": 3600, "hrs": 3600,
+    ]
     static let excluded: [String: String] = [
         "email": "Sending email is not supported in this release.",
         "send": "Sending messages is not supported in this release.",
@@ -188,6 +202,8 @@ private struct ParserWorker {
         case .wait:
             guard let duration = clause.duration else { return true }
             return !WaitAction.allowedRange.contains(duration)
+        case .schedule:
+            return clause.schedule == .incomplete
         case .showNotification, .unsupported, .unrecognized:
             return false
         }
@@ -215,6 +231,11 @@ private struct ParserWorker {
                 issues.append(.error("Arrange Window needs a position, for example the left half.", span: clause.span))
             }
             return issues
+        case .schedule:
+            if clause.schedule == .incomplete {
+                return [.error("Specify a time, for example every day at 9 am, or in 30 minutes.", span: clause.span)]
+            }
+            return []
         case .unsupported:
             return [.error(clause.detail ?? "This capability is not supported in this release.", span: clause.span)]
         case .unrecognized:
@@ -248,6 +269,8 @@ private struct ParserWorker {
             return parseArrangeWithFixedPreset(.maximize)
         case "center":
             return parseArrangeWithFixedPreset(.center)
+        case "every", "once", "in":
+            return parseSchedule()
         default:
             if let reason = Self.excluded[word] {
                 return parseUnsupported(reason: reason)
@@ -511,6 +534,221 @@ private struct ParserWorker {
             kind: .unrecognized,
             span: SourceSpan(start: startToken.span.start, end: end),
             parameter: .none,
+            detail: nil
+        )
+    }
+
+    private mutating func parseSchedule() -> ParsedClause {
+        let startToken = tokens[position]
+        guard case .word(let keyword) = startToken.kind else {
+            position += 1
+            return ParsedClause(kind: .unrecognized, span: startToken.span, parameter: .none, detail: nil)
+        }
+        position += 1
+        let end = startToken.span.end
+
+        switch keyword {
+        case "in":
+            if let (seconds, durationEnd) = parseDurationPhrase(allowBareUnit: false) {
+                return scheduleClause(.relative(seconds), start: startToken.span.start, end: durationEnd)
+            }
+            return scheduleClause(.incomplete, start: startToken.span.start, end: end)
+
+        case "once":
+            skipWord("at")
+            if let clock = parseClock() {
+                return scheduleClause(.once(hour: clock.hour, minute: clock.minute), start: startToken.span.start, end: clock.end)
+            }
+            return scheduleClause(.incomplete, start: startToken.span.start, end: end)
+
+        default:
+            return parseEvery(startToken: startToken)
+        }
+    }
+
+    private mutating func parseEvery(startToken: CommandToken) -> ParsedClause {
+        var end = startToken.span.end
+
+        if position < tokens.count, case .number = tokens[position].kind {
+            if let (seconds, durationEnd) = parseDurationPhrase(allowBareUnit: true) {
+                return scheduleClause(.interval(seconds), start: startToken.span.start, end: durationEnd)
+            }
+            return scheduleClause(.incomplete, start: startToken.span.start, end: end)
+        }
+
+        guard position < tokens.count, case .word(let word) = tokens[position].kind else {
+            return scheduleClause(.incomplete, start: startToken.span.start, end: end)
+        }
+
+        switch word {
+        case "day", "days":
+            end = tokens[position].span.end
+            position += 1
+            skipWord("at")
+            if let clock = parseClock() {
+                return scheduleClause(.daily(hour: clock.hour, minute: clock.minute), start: startToken.span.start, end: clock.end)
+            }
+            return scheduleClause(.incomplete, start: startToken.span.start, end: end)
+
+        case "weekday", "weekdays":
+            end = tokens[position].span.end
+            position += 1
+            skipWord("at")
+            if let clock = parseClock() {
+                return scheduleClause(
+                    .weekdays(Weekday.weekdays, hour: clock.hour, minute: clock.minute),
+                    start: startToken.span.start,
+                    end: clock.end
+                )
+            }
+            return scheduleClause(.incomplete, start: startToken.span.start, end: end)
+
+        case "weekend", "weekends":
+            end = tokens[position].span.end
+            position += 1
+            skipWord("at")
+            if let clock = parseClock() {
+                return scheduleClause(
+                    .weekdays(Weekday.weekend, hour: clock.hour, minute: clock.minute),
+                    start: startToken.span.start,
+                    end: clock.end
+                )
+            }
+            return scheduleClause(.incomplete, start: startToken.span.start, end: end)
+
+        default:
+            if let firstDay = Self.weekdayNames[word] {
+                var days: Set<Weekday> = [firstDay]
+                end = tokens[position].span.end
+                position += 1
+
+                while true {
+                    let saved = position
+                    if position < tokens.count, isConnectorToken(tokens[position]) {
+                        position += 1
+                    }
+                    guard position < tokens.count,
+                          case .word(let next) = tokens[position].kind,
+                          let day = Self.weekdayNames[next] else {
+                        position = saved
+                        break
+                    }
+                    days.insert(day)
+                    end = tokens[position].span.end
+                    position += 1
+                }
+
+                skipWord("at")
+                if let clock = parseClock() {
+                    return scheduleClause(
+                        .weekdays(days, hour: clock.hour, minute: clock.minute),
+                        start: startToken.span.start,
+                        end: clock.end
+                    )
+                }
+                return scheduleClause(.incomplete, start: startToken.span.start, end: end)
+            }
+
+            if let (seconds, durationEnd) = parseDurationPhrase(allowBareUnit: true) {
+                return scheduleClause(.interval(seconds), start: startToken.span.start, end: durationEnd)
+            }
+            return scheduleClause(.incomplete, start: startToken.span.start, end: end)
+        }
+    }
+
+    private mutating func parseClock() -> (hour: Int, minute: Int, end: Int)? {
+        guard position < tokens.count,
+              case .number(let hourValue) = tokens[position].kind,
+              hourValue == hourValue.rounded() else {
+            return nil
+        }
+        var hour = Int(hourValue)
+        var end = tokens[position].span.end
+        position += 1
+
+        var minute = 0
+        if position < tokens.count, case .punctuation(":") = tokens[position].kind {
+            position += 1
+            guard position < tokens.count,
+                  case .number(let minuteValue) = tokens[position].kind,
+                  minuteValue == minuteValue.rounded() else {
+                return nil
+            }
+            minute = Int(minuteValue)
+            end = tokens[position].span.end
+            position += 1
+        }
+
+        var meridiem: Bool?
+        if position < tokens.count, case .word(let word) = tokens[position].kind {
+            switch word {
+            case "am", "a.m", "a.m.":
+                meridiem = false
+            case "pm", "p.m", "p.m.":
+                meridiem = true
+            default:
+                break
+            }
+            if meridiem != nil {
+                end = tokens[position].span.end
+                position += 1
+            }
+        }
+
+        guard (0...59).contains(minute) else { return nil }
+
+        if let isPM = meridiem {
+            guard (1...12).contains(hour) else { return nil }
+            if isPM, hour < 12 { hour += 12 }
+            if !isPM, hour == 12 { hour = 0 }
+        } else {
+            guard (0...23).contains(hour), hour == 0 || hour >= 13 else { return nil }
+        }
+
+        return (hour, minute, end)
+    }
+
+    private mutating func parseDurationPhrase(allowBareUnit: Bool) -> (TimeInterval, Int)? {
+        guard position < tokens.count else { return nil }
+
+        var value: Double
+        var end: Int
+
+        if case .number(let number) = tokens[position].kind {
+            value = number
+            end = tokens[position].span.end
+            position += 1
+        } else if allowBareUnit,
+                  case .word(let unit) = tokens[position].kind,
+                  let multiplier = Self.durationUnits[unit] {
+            end = tokens[position].span.end
+            position += 1
+            return (multiplier, end)
+        } else {
+            return nil
+        }
+
+        guard position < tokens.count,
+              case .word(let unit) = tokens[position].kind,
+              let multiplier = Self.durationUnits[unit] else {
+            return nil
+        }
+        end = tokens[position].span.end
+        position += 1
+        return (value * multiplier, end)
+    }
+
+    private mutating func skipWord(_ target: String) {
+        if position < tokens.count, case .word(let word) = tokens[position].kind, word == target {
+            position += 1
+        }
+    }
+
+    private func scheduleClause(_ schedule: ParsedSchedule, start: Int, end: Int) -> ParsedClause {
+        ParsedClause(
+            kind: .schedule,
+            span: SourceSpan(start: start, end: end),
+            parameter: .schedule(schedule),
             detail: nil
         )
     }
