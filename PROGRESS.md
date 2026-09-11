@@ -1986,3 +1986,19 @@ record isolation/recovery) is deferred to Phase 3 with the migration fixtures.
   physical check against the new gallery.
 - Next eligible work package: U4 accessibility/responsive polish, then Phase 3.1.
 
+### Increment U-fix — Sidebar navigation reliability
+
+- Status: done
+- Defect: after selecting Templates or History, the Workflows destination could
+  not be reselected. The search field and `+` control lived inside the
+  `List(selection:)` rows, which interfered with AppKit sidebar selection.
+- Behavior delivered: sidebar destinations and saved workflows are now explicit
+  selection buttons that write `SidebarSelection` directly, with a subtle
+  accent-tinted row background instead of relying on List selection; the detail
+  pane is keyed to the selection so the destination view always swaps. Search
+  and `+` remain under Workflows.
+- Tests performed: Debug and Release builds — BUILD SUCCEEDED; Release app
+  launched. (Accessibility automation is not authorized in this environment, so
+  the click-through is a pending manual check.)
+- Next eligible work package: U4 accessibility/responsive polish, then Phase 3.1.
+

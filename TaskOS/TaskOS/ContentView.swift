@@ -14,6 +14,7 @@ struct ContentView: View {
             SidebarView(model: model, selection: $sidebarSelection)
         } detail: {
             detail
+                .id(sidebarSelection)
         }
         .inspector(isPresented: $selection.isInspectorPresented) {
             InspectorView(model: model, selection: selection)

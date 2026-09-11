@@ -17,15 +17,15 @@ struct SidebarView: View {
     }
 
     var body: some View {
-        List(selection: $selection) {
+        List {
             Section {
-                workflowRow
+                destinationButton(.workflows, badge: model.savedWorkflows.count)
                 if isWorkflowsActive {
                     workflowChildren
                 }
-                destinationRow(.templates)
-                destinationRow(.history)
-                destinationRow(.settings)
+                destinationButton(.templates)
+                destinationButton(.history)
+                destinationButton(.settings)
             } header: {
                 brand
             } footer: {
@@ -79,15 +79,40 @@ struct SidebarView: View {
         .textCase(nil)
     }
 
-    private var workflowRow: some View {
-        Label(SidebarDestination.workflows.title, systemImage: SidebarPresentation.symbol(for: .workflows))
-            .tag(SidebarSelection.destination(.workflows))
-            .badge(model.savedWorkflows.count)
+    private func isDestinationSelected(_ destination: SidebarDestination) -> Bool {
+        selection == .destination(destination)
     }
 
-    private func destinationRow(_ destination: SidebarDestination) -> some View {
-        Label(destination.title, systemImage: SidebarPresentation.symbol(for: destination))
-            .tag(SidebarSelection.destination(destination))
+    private func destinationButton(_ destination: SidebarDestination, badge: Int? = nil) -> some View {
+        Button {
+            selection = .destination(destination)
+        } label: {
+            HStack(spacing: TaskOSSpacing.xs) {
+                Label(destination.title, systemImage: SidebarPresentation.symbol(for: destination))
+                Spacer(minLength: 0)
+                if let badge, badge > 0 {
+                    Text("\(badge)")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .monospacedDigit()
+                }
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .listRowBackground(rowBackground(isSelected: isDestinationSelected(destination)))
+        .accessibilityAddTraits(isDestinationSelected(destination) ? [.isSelected] : [])
+    }
+
+    @ViewBuilder
+    private func rowBackground(isSelected: Bool) -> some View {
+        if isSelected {
+            RoundedRectangle(cornerRadius: 6, style: .continuous)
+                .fill(Color.accentColor.opacity(0.16))
+                .padding(.horizontal, 4)
+        } else {
+            Color.clear
+        }
     }
 
     @ViewBuilder
@@ -116,12 +141,18 @@ struct SidebarView: View {
         .padding(.trailing, 2)
 
         ForEach(model.filteredWorkflows) { workflow in
-            WorkflowSidebarRow(
-                workflow: workflow,
-                needsAttention: model.workflowAttention[workflow.id] != nil
-            )
-            .tag(SidebarSelection.workflow(workflow.id))
+            Button {
+                selection = .workflow(workflow.id)
+            } label: {
+                WorkflowSidebarRow(
+                    workflow: workflow,
+                    needsAttention: model.workflowAttention[workflow.id] != nil
+                )
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
             .padding(.leading, 20)
+            .listRowBackground(rowBackground(isSelected: selection == .workflow(workflow.id)))
             .contextMenu {
                 Button("Edit") {
                     model.loadForEditing(workflow)
