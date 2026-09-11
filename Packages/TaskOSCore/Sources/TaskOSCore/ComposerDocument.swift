@@ -77,6 +77,16 @@ public struct ComposerDocument: Sendable {
         applyText(text)
     }
 
+    public init(trigger: ComposerTriggerDraft, actions: [ComposerActionDraft]) {
+        self.text = ""
+        self.trigger = trigger
+        self.elements = actions.map { .action(ComposerAction(draft: $0)) }
+        self.parseOutcome = .needsInput
+        self.diagnostics = []
+        self.revision = WorkflowRevision(1)
+        self.text = renderedText()
+    }
+
     public var actions: [ComposerAction] {
         elements.compactMap { element in
             if case .action(let action) = element {
