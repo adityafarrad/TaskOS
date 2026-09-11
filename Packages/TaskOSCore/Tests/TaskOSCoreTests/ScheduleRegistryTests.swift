@@ -143,6 +143,21 @@ struct ScheduleRegistryTests {
         await registry.stop()
     }
 
+    @Test func oneTimeFiresWhenClockOvershoots() async {
+        let (clock, probe, _, registry) = context(now: date(2026, 9, 10, 8, 0))
+        let fireAt = date(2026, 9, 10, 9, 0)
+        let definition = scheduled(.oneTime(fireAt))
+
+        await registry.register(definition)
+        await waitArmed(clock)
+
+        clock.advance(by: .seconds(3600 + 5))
+        await probe.awaitStarted(1)
+        #expect(probe.started == [definition.id])
+
+        await registry.stop()
+    }
+
     @Test func oneTimeFiresOnce() async {
         let (clock, probe, _, registry) = context(now: date(2026, 9, 10, 8, 0))
         let definition = scheduled(.oneTime(date(2026, 9, 10, 9, 0)))

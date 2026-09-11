@@ -139,6 +139,21 @@ struct RunCoordinatorTests {
         #expect(await coordinator.status().recentEvents.isEmpty)
     }
 
+    @Test func automaticOneTimeJustFiredIsAccepted() async {
+        let clock = TestClock(now: Date(timeIntervalSince1970: 1_000))
+        let probe = ExecutionProbe()
+        let coordinator = makeCoordinator(clock: clock, probe: probe)
+        let definition = AutomationDefinition(
+            name: "Once",
+            trigger: .schedule(.oneTime(Date(timeIntervalSince1970: 999))),
+            actions: [.showNotification(ShowNotificationAction(title: "TaskOS", message: ""))]
+        )
+
+        #expect(await coordinator.submit(definition, source: .automatic(.schedule)) == .started)
+        await coordinator.waitUntilIdle()
+        #expect(probe.started == [definition.id])
+    }
+
     @Test func duplicateAutomaticRunIsSuppressedWhileRunning() async {
         let clock = TestClock()
         let probe = ExecutionProbe()

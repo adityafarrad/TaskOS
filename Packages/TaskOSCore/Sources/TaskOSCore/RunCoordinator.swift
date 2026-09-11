@@ -140,7 +140,7 @@ public actor RunCoordinator {
     ) -> AdmissionOutcome {
         let now = clock.now()
 
-        let validation = definition.validate(relativeTo: now)
+        let validation = definition.validate()
         guard validation.isValid else {
             return .rejected(validation.errors.first?.message ?? "The workflow is not valid.")
         }

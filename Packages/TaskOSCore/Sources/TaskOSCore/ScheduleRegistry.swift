@@ -108,7 +108,7 @@ public actor ScheduleRegistry {
             let fireNow = clock.now()
             guard fireNow >= fireDate else { continue }
 
-            if let definition = entries[id], definition.validate(relativeTo: fireNow).isValid {
+            if let definition = entries[id], definition.validate(relativeTo: fireDate).isValid {
                 _ = await coordinator.submit(definition, source: .automatic(.schedule))
             }
         }

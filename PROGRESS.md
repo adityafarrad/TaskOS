@@ -1067,6 +1067,33 @@ Next eligible work package: 2.1 — scheduling and runtime admission.
 - With H1–H3 complete, plan 2.1 is functionally implemented pending the physical
   schedule verification above.
 
+### Fix H3-d — One-time schedules did not fire (overshoot rejection)
+
+- Status: done
+- Defect (reported during the Test A schedule check): an enabled one-time
+  schedule never ran and never appeared in history.
+- Root cause: both the registry's fire-time re-validation and the coordinator's
+  admission validation compared the one-time scheduled instant to the *current*
+  time. `Task.sleep` wakes a few milliseconds after the scheduled instant, so at
+  fire time the one-time date was strictly in the past and validation rejected it
+  as "past due" — the event was silently dropped.
+- Fix: admission (`RunCoordinator.submit`) now validates definitions
+  structurally (no reference date); authoring/registration still enforce the
+  past-due rule. The registry's fire-time re-validation uses the scheduled
+  `fireDate` rather than the woken wall-clock time.
+- Investigation evidence: the SwiftData store showed `Test 1` saved with
+  `isEnabled = true` and a `oneTime` trigger ~40s in the future, but no run
+  record. The running process was also an older binary than the latest build.
+- Tests performed:
+  - `swift test --package-path Packages/TaskOSCore` — 185 tests, 26 suites, pass
+    (was 183/26; +2). New coverage: a one-time schedule fires when the clock
+    overshoots the scheduled instant, and the coordinator accepts an
+    automatic one-time definition that has just fired.
+  - App tests (`xcodebuild ... test -only-testing:TaskOSTests`) — TEST SUCCEEDED.
+  - Release build — BUILD SUCCEEDED.
+- Physical checks: pending re-run of Test A on the rebuilt app (quit and relaunch
+  so the fixed binary is running).
+
 ### Increment I1 — Copy Text (plan 2.2, partial; plan A10)
 
 - Status: done
