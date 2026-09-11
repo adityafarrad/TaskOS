@@ -52,7 +52,6 @@ struct WorkflowEditorView: View {
             .padding(.vertical, TaskOSSpacing.lg)
             .frame(maxWidth: .infinity, alignment: .center)
         }
-        .frame(minWidth: TaskOSMetrics.editorMin)
         .toolbar { toolbarContent }
         .onChange(of: composerFocusToken) { _, _ in
             composerFocused = true

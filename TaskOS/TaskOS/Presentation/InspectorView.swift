@@ -30,7 +30,7 @@ struct InspectorView: View {
                 )
             }
         }
-        .frame(minWidth: TaskOSMetrics.inspectorMin, idealWidth: TaskOSMetrics.inspectorIdeal)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .accessibilityElement(children: .contain)
     }
 

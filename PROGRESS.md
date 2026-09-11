@@ -2002,3 +2002,50 @@ record isolation/recovery) is deferred to Phase 3 with the migration fixtures.
   the click-through is a pending manual check.)
 - Next eligible work package: U4 accessibility/responsive polish, then Phase 3.1.
 
+### Increment U-fix2 — Window sizing and responsive columns
+
+- Status: done
+- Defect: a restored 900-point window frame left no room for all three columns,
+  so the sidebar collapsed to its icon rail and the inspector was clipped off
+  the right edge.
+- Behavior delivered: the window opens at a 1180×760 default with the sidebar
+  visibility explicitly `.all`; column minimums are reduced (sidebar 170,
+  inspector 250) and the editor no longer enforces a hard minimum, so all three
+  areas fit and the editor compresses instead of pushing the inspector
+  off-screen. The inspector column now has min/ideal/max bounds and its content
+  no longer sets an inner minimum width.
+- Tests performed: Debug and Release builds — BUILD SUCCEEDED; Release app
+  launched at the new default size.
+- Next eligible work package: U4 accessibility/responsive polish, then Phase 3.1.
+
+### Increment U-fix3 — Preserve resolved resources across text re-parse
+
+- Status: done
+- Defect: setting an application on a step and then choosing a folder on another
+  step could clear the first step. The composer's `TextField` wrote a
+  normalized/canonical string back to the model after programmatic changes;
+  `setText` re-parsed the whole document, and `reconcileElements` paired previous
+  actions by position, so a changed or reordered text recycled the wrong action
+  and dropped card-only values such as the resolved application.
+- Behavior delivered:
+  - `ComposerDocument.reconcileElements` now reuses previous actions by matching
+    type and name (exact match first, then same action kind) via a consumed set
+    instead of a positional cursor, so resolved references, file targets,
+    browsers, and other card-only values survive reorder and re-parse.
+  - The composer uses a local text buffer and only propagates genuine user edits;
+    writes whose trimmed value equals the model text (for example a trailing
+    space after a programmatic change) are ignored, avoiding spurious re-parses
+    and undo entries.
+- Interfaces changed: `reusedAction` signature (`consumed: inout Set<Int>`),
+  added `sameCase`/`matchesExactly`; new `ComposerValuePreservationTests`.
+- Tests performed:
+  - `swift test --package-path Packages/TaskOSCore` — 270 tests, 35 suites, pass
+    (was 267/34; +3 regression tests: resolve survives file choice, text resync,
+    and reorder + stale write).
+  - App tests (`xcodebuild ... test -only-testing:TaskOSTests`) — TEST SUCCEEDED.
+  - Debug and Release builds — BUILD SUCCEEDED.
+- Physical checks: Release app relaunched; pending manual confirmation of the
+  reported sequence (Open Application → set app → add Reveal/Open File → choose
+  folder → first step keeps its app).
+- Next eligible work package: U4 accessibility/responsive polish, then Phase 3.1.
+

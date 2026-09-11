@@ -6,6 +6,7 @@ struct CommandComposerView: View {
     @FocusState.Binding var isFocused: Bool
     var onBrowseActions: () -> Void
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var localText = ""
 
     var body: some View {
         VStack(alignment: .leading, spacing: TaskOSSpacing.xs) {
@@ -17,7 +18,7 @@ struct CommandComposerView: View {
 
                 TextField(
                     "Describe what you want your Mac to do…",
-                    text: Binding(get: { model.text }, set: { model.setText($0) }),
+                    text: $localText,
                     axis: .vertical
                 )
                 .textFieldStyle(.plain)
@@ -25,6 +26,17 @@ struct CommandComposerView: View {
                 .lineLimit(2...6)
                 .focused($isFocused)
                 .accessibilityLabel("Automation command")
+                .onAppear { localText = model.text }
+                .onChange(of: localText) { _, newValue in
+                    guard newValue.trimmingCharacters(in: .whitespacesAndNewlines)
+                        != model.text.trimmingCharacters(in: .whitespacesAndNewlines) else { return }
+                    model.setText(newValue)
+                }
+                .onChange(of: model.text) { _, newValue in
+                    guard newValue.trimmingCharacters(in: .whitespacesAndNewlines)
+                        != localText.trimmingCharacters(in: .whitespacesAndNewlines) else { return }
+                    localText = newValue
+                }
                 .onKeyPress(.upArrow) {
                     model.moveHighlight(by: -1)
                     return .handled

@@ -9,6 +9,7 @@ struct TaskOSApp: App {
         WindowGroup(id: "main") {
             ContentView()
         }
+        .defaultSize(width: TaskOSMetrics.windowDefaultWidth, height: TaskOSMetrics.windowDefaultHeight)
         .commands {
             TaskOSCommands()
         }

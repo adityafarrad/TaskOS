@@ -533,7 +533,7 @@ public struct ComposerDocument: Sendable {
 
     private mutating func reconcileElements(from parsed: ParsedCommand) {
         let previousActions = actions
-        var cursor = 0
+        var consumed: Set<Int> = []
         var newElements: [ComposerElement] = []
         var newTrigger: ComposerTriggerDraft = .manual
 
@@ -602,28 +602,28 @@ public struct ComposerDocument: Sendable {
                     } else {
                         draft = .openApplication(name: name, resolved: nil)
                     }
-                    newElements.append(.action(reusedAction(for: draft, from: previousActions, cursor: &cursor)))
+                    newElements.append(.action(reusedAction(for: draft, from: previousActions, consumed: &consumed)))
                 }
 
             case .hideApplication:
                 for name in clause.resourceNames {
                     newElements.append(
-                        .action(reusedAction(for: .hideApplication(name: name, resolved: nil), from: previousActions, cursor: &cursor))
+                        .action(reusedAction(for: .hideApplication(name: name, resolved: nil), from: previousActions, consumed: &consumed))
                     )
                 }
 
             case .quitApplication:
                 for name in clause.resourceNames {
                     newElements.append(
-                        .action(reusedAction(for: .quitApplication(name: name, resolved: nil), from: previousActions, cursor: &cursor))
+                        .action(reusedAction(for: .quitApplication(name: name, resolved: nil), from: previousActions, consumed: &consumed))
                     )
                 }
 
             case .openFile:
-                newElements.append(.action(reusedAction(for: .openFile(target: nil), from: previousActions, cursor: &cursor)))
+                newElements.append(.action(reusedAction(for: .openFile(target: nil), from: previousActions, consumed: &consumed)))
 
             case .revealInFinder:
-                newElements.append(.action(reusedAction(for: .revealInFinder(target: nil), from: previousActions, cursor: &cursor)))
+                newElements.append(.action(reusedAction(for: .revealInFinder(target: nil), from: previousActions, consumed: &consumed)))
 
             case .arrangeWindow:
                 let name = (clause.arrangeApplicationName ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
@@ -634,14 +634,14 @@ public struct ComposerDocument: Sendable {
                         preset: preset,
                         display: .current
                     )
-                    newElements.append(.action(reusedAction(for: draft, from: previousActions, cursor: &cursor)))
+                    newElements.append(.action(reusedAction(for: draft, from: previousActions, consumed: &consumed)))
                 } else {
                     newElements.append(.unresolved(clauseText(clause)))
                 }
 
             case .wait:
                 if let duration = clause.duration, WaitAction.allowedRange.contains(duration) {
-                    newElements.append(.action(reusedAction(for: .wait(duration), from: previousActions, cursor: &cursor)))
+                    newElements.append(.action(reusedAction(for: .wait(duration), from: previousActions, consumed: &consumed)))
                 } else {
                     newElements.append(.unresolved(clauseText(clause)))
                 }
@@ -652,7 +652,7 @@ public struct ComposerDocument: Sendable {
                         reusedAction(
                             for: .showNotification(title: "TaskOS", message: ""),
                             from: previousActions,
-                            cursor: &cursor
+                            consumed: &consumed
                         )
                     )
                 )
@@ -662,7 +662,7 @@ public struct ComposerDocument: Sendable {
                 if literal.isEmpty {
                     newElements.append(.unresolved(clauseText(clause)))
                 } else {
-                    newElements.append(.action(reusedAction(for: .copyText(literal), from: previousActions, cursor: &cursor)))
+                    newElements.append(.action(reusedAction(for: .copyText(literal), from: previousActions, consumed: &consumed)))
                 }
 
             case .unsupported, .unrecognized:
@@ -677,14 +677,52 @@ public struct ComposerDocument: Sendable {
     private func reusedAction(
         for draft: ComposerActionDraft,
         from previous: [ComposerAction],
-        cursor: inout Int
+        consumed: inout Set<Int>
     ) -> ComposerAction {
-        guard cursor < previous.count else {
-            return ComposerAction(draft: draft)
+        if let index = previous.indices.first(where: {
+            !consumed.contains($0) && Self.matchesExactly(previous[$0].draft, draft)
+        }) {
+            consumed.insert(index)
+            return ComposerAction(id: previous[index].id, draft: merge(previous: previous[index].draft, new: draft))
         }
-        let previousAction = previous[cursor]
-        cursor += 1
-        return ComposerAction(id: previousAction.id, draft: merge(previous: previousAction.draft, new: draft))
+        if let index = previous.indices.first(where: {
+            !consumed.contains($0) && Self.sameCase(previous[$0].draft, draft)
+        }) {
+            consumed.insert(index)
+            return ComposerAction(id: previous[index].id, draft: merge(previous: previous[index].draft, new: draft))
+        }
+        return ComposerAction(draft: draft)
+    }
+
+    private static func sameCase(_ lhs: ComposerActionDraft, _ rhs: ComposerActionDraft) -> Bool {
+        switch (lhs, rhs) {
+        case (.openApplication, .openApplication),
+             (.hideApplication, .hideApplication),
+             (.quitApplication, .quitApplication),
+             (.openFile, .openFile),
+             (.revealInFinder, .revealInFinder),
+             (.openWebsite, .openWebsite),
+             (.arrangeWindow, .arrangeWindow),
+             (.wait, .wait),
+             (.showNotification, .showNotification),
+             (.copyText, .copyText):
+            return true
+        default:
+            return false
+        }
+    }
+
+    private static func matchesExactly(_ lhs: ComposerActionDraft, _ rhs: ComposerActionDraft) -> Bool {
+        switch (lhs, rhs) {
+        case (.openApplication(let a, _), .openApplication(let b, _)),
+             (.hideApplication(let a, _), .hideApplication(let b, _)),
+             (.quitApplication(let a, _), .quitApplication(let b, _)),
+             (.arrangeWindow(let a, _, _, _), .arrangeWindow(let b, _, _, _)),
+             (.openWebsite(let a, _), .openWebsite(let b, _)):
+            return a.caseInsensitiveCompare(b) == .orderedSame
+        default:
+            return sameCase(lhs, rhs)
+        }
     }
 
     private func merge(previous: ComposerActionDraft, new: ComposerActionDraft) -> ComposerActionDraft {

@@ -16,13 +16,16 @@ enum TaskOSRadius {
 }
 
 enum TaskOSMetrics {
-    static let sidebarMin: CGFloat = 200
-    static let sidebarIdeal: CGFloat = 235
-    static let editorMin: CGFloat = 420
-    static let inspectorMin: CGFloat = 280
-    static let inspectorIdeal: CGFloat = 320
-    static let windowMinWidth: CGFloat = 640
+    static let sidebarMin: CGFloat = 170
+    static let sidebarIdeal: CGFloat = 230
+    static let editorMin: CGFloat = 320
+    static let inspectorMin: CGFloat = 250
+    static let inspectorIdeal: CGFloat = 290
+    static let inspectorMax: CGFloat = 380
+    static let windowMinWidth: CGFloat = 720
     static let windowMinHeight: CGFloat = 560
+    static let windowDefaultWidth: CGFloat = 1180
+    static let windowDefaultHeight: CGFloat = 760
 }
 
 extension Animation {

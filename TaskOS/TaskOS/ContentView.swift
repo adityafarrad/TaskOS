@@ -6,21 +6,24 @@ struct ContentView: View {
     @State private var model = ComposerViewModel()
     @State private var selection = EditorSelection()
     @State private var sidebarSelection: SidebarSelection = .destination(.workflows)
+    @State private var columnVisibility: NavigationSplitViewVisibility = .all
     @State private var showReview = false
     @State private var composerFocusToken = 0
 
     var body: some View {
-        NavigationSplitView {
+        NavigationSplitView(columnVisibility: $columnVisibility) {
             SidebarView(model: model, selection: $sidebarSelection)
         } detail: {
             detail
                 .id(sidebarSelection)
         }
+        .navigationSplitViewStyle(.balanced)
         .inspector(isPresented: $selection.isInspectorPresented) {
             InspectorView(model: model, selection: selection)
                 .inspectorColumnWidth(
                     min: TaskOSMetrics.inspectorMin,
-                    ideal: TaskOSMetrics.inspectorIdeal
+                    ideal: TaskOSMetrics.inspectorIdeal,
+                    max: TaskOSMetrics.inspectorMax
                 )
         }
         .frame(minWidth: TaskOSMetrics.windowMinWidth, minHeight: TaskOSMetrics.windowMinHeight)
