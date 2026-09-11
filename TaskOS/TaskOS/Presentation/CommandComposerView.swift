@@ -66,7 +66,7 @@ struct CommandComposerView: View {
                 Button {
                     onBrowseActions()
                 } label: {
-                    Label("Browse supported actions", systemImage: "magnifyingglass")
+                    Label("Browse actions & triggers", systemImage: "list.bullet.rectangle")
                         .font(.caption)
                 }
                 .buttonStyle(.link)

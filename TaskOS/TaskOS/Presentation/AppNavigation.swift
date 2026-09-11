@@ -68,6 +68,7 @@ struct TaskOSCommandActions {
     var undo: () -> Void
     var redo: () -> Void
     var openSettings: () -> Void
+    var browseCapabilities: () -> Void
 }
 
 private struct TaskOSCommandActionsKey: FocusedValueKey {
@@ -113,6 +114,12 @@ struct TaskOSCommands: Commands {
                 .disabled(actions == nil)
             Button("Settings…") { actions?.openSettings() }
                 .keyboardShortcut(",", modifiers: .command)
+                .disabled(actions == nil)
+        }
+
+        CommandGroup(replacing: .help) {
+            Button("Supported Actions & Triggers") { actions?.browseCapabilities() }
+                .keyboardShortcut("/", modifiers: .command)
                 .disabled(actions == nil)
         }
     }

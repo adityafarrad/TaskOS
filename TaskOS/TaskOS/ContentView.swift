@@ -41,7 +41,11 @@ struct ContentView: View {
         .sheet(
             isPresented: Binding(get: { model.showDiscovery }, set: { model.showDiscovery = $0 })
         ) {
-            DiscoveryView(model: model)
+            DiscoveryView(
+                model: model,
+                selection: selection,
+                onEdit: { sidebarSelection = .destination(.workflows) }
+            )
         }
         .focusedSceneValue(\.taskOS, commandActions)
     }
@@ -88,7 +92,11 @@ struct ContentView: View {
             save: { model.save() },
             undo: { model.undo() },
             redo: { model.redo() },
-            openSettings: { sidebarSelection = .destination(.settings) }
+            openSettings: { sidebarSelection = .destination(.settings) },
+            browseCapabilities: {
+                sidebarSelection = .destination(.workflows)
+                model.showDiscovery = true
+            }
         )
     }
 

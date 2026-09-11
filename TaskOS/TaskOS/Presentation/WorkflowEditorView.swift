@@ -27,7 +27,7 @@ struct WorkflowEditorView: View {
             VStack(alignment: .leading, spacing: TaskOSSpacing.md) {
                 titleHeader
 
-                triggerPill
+                triggerRow
 
                 CommandComposerView(
                     model: model,
@@ -41,6 +41,10 @@ struct WorkflowEditorView: View {
                         onViewHistory: onViewHistory,
                         onDismiss: { model.dismissResult() }
                     )
+                }
+
+                if isEmptyWorkflow {
+                    quickStart
                 }
 
                 stepsSection
@@ -75,6 +79,88 @@ struct WorkflowEditorView: View {
         } message: { workflow in
             Text("“\(workflow.name)” and its history metadata will be removed. This cannot be undone.")
         }
+    }
+
+    private var triggerRow: some View {
+        HStack(alignment: .center, spacing: TaskOSSpacing.sm) {
+            Text("When")
+                .font(.subheadline.weight(.medium))
+                .foregroundStyle(.secondary)
+
+            triggerPill
+
+            Spacer(minLength: TaskOSSpacing.xs)
+
+            Button {
+                model.showDiscovery = true
+            } label: {
+                Label("Actions & Triggers", systemImage: "list.bullet.rectangle")
+                    .font(.caption)
+            }
+            .buttonStyle(.link)
+            .help("Browse every supported action and trigger")
+        }
+    }
+
+    private var isEmptyWorkflow: Bool {
+        model.actions.isEmpty
+            && model.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    private var quickStart: some View {
+        VStack(alignment: .leading, spacing: TaskOSSpacing.sm) {
+            Text("Get started")
+                .font(.headline)
+            Text("Describe what you want above, start from a template, or browse every supported action and trigger.")
+                .font(.callout)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            HStack(spacing: TaskOSSpacing.sm) {
+                Button {
+                    model.showDiscovery = true
+                } label: {
+                    Label("Browse Actions & Triggers", systemImage: "list.bullet.rectangle")
+                }
+                .buttonStyle(.borderedProminent)
+
+                Button {
+                    sidebarSelection = .destination(.templates)
+                } label: {
+                    Label("Browse Templates", systemImage: "square.grid.2x2")
+                }
+            }
+
+            VStack(alignment: .leading, spacing: TaskOSSpacing.xs) {
+                Text("Popular triggers")
+                    .font(.subheadline.weight(.medium))
+                    .foregroundStyle(.secondary)
+                HStack(spacing: TaskOSSpacing.xs) {
+                    triggerChip(.manual, "Run manually")
+                    triggerChip(.schedule, "On a schedule")
+                    triggerChip(.applicationLifecycle, "When an app opens")
+                    triggerChip(.wake, "When the Mac wakes")
+                }
+            }
+        }
+        .padding(TaskOSSpacing.md)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.primary.opacity(0.03), in: RoundedRectangle(cornerRadius: TaskOSRadius.card, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: TaskOSRadius.card, style: .continuous)
+                .strokeBorder(Color(nsColor: .separatorColor), lineWidth: 1)
+        )
+    }
+
+    private func triggerChip(_ family: ComposerViewModel.TriggerFamily, _ title: String) -> some View {
+        Button {
+            model.setTriggerFamily(family)
+            selection.selectTrigger()
+        } label: {
+            Label(title, systemImage: TriggerPresentation.symbol(for: family))
+                .font(.caption)
+        }
+        .buttonStyle(.bordered)
     }
 
     private var triggerPill: some View {
@@ -306,6 +392,7 @@ struct WorkflowEditorView: View {
         }
 
         Divider()
+        Button("Actions & Triggers…") { model.showDiscovery = true }
         Button("Import Workflow…") { model.importWorkflow() }
         Button("Save") { onSave() }
             .disabled(!model.hasUnsavedChanges)

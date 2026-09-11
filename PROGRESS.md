@@ -2078,3 +2078,30 @@ record isolation/recovery) is deferred to Phase 3 with the migration fixtures.
   Release app relaunched at the restored default size.
 - Next eligible work package: U4 accessibility/responsive polish, then Phase 3.1.
 
+### Increment U-fix5 — Surface actions, triggers, and scheduling on the first screen
+
+- Status: done
+- Defect: the only entry point to the capability guide was a small
+  "Browse supported actions" link under the composer, so users did not discover
+  that triggers (including scheduling) can be changed, and the guide was
+  read-only.
+- Behavior delivered:
+  - The editor's trigger row now reads `When  [Manual ▾]` and carries a visible
+    `Actions & Triggers` link, so scheduling is discoverable on the first screen.
+  - Empty workflows show a "Get started" panel with a prominent **Browse Actions
+    & Triggers** button, a **Browse Templates** button, and one-click popular
+    trigger chips (Run manually, On a schedule, When an app opens, When the Mac
+    wakes).
+  - The capability sheet can now set capabilities: trigger guides have a
+    **Use Trigger** action (sets the trigger, selects it for configuration, and
+    closes), and action guides have an **Add Step** action that appends a
+    default step. Unavailable capabilities stay disabled.
+  - Added `Actions & Triggers…` to the editor `•••` menu and a Help-menu command
+    with `⌘/`.
+- Interfaces changed: `TaskOSCommandActions.browseCapabilities`; `DiscoveryView`
+  now takes `selection` and `onEdit`; composer link renamed to
+  "Browse actions & triggers".
+- Tests performed: Debug and Release builds — BUILD SUCCEEDED; Release app
+  relaunched.
+- Next eligible work package: U4 accessibility/responsive polish, then Phase 3.1.
+
