@@ -700,6 +700,7 @@ final class ComposerViewModel {
     }
 
     func loadLibrary() {
+        NotificationCenter.default.post(name: .taskOSWorkflowLibraryDidChange, object: nil)
         Task { [weak self] in
             guard let self else { return }
             do {

@@ -1722,3 +1722,20 @@ Next eligible work package: 2.1 — scheduling and runtime admission.
   a stale file bookmark is resolved but not refreshed into storage.
 - Phase 2 is functionally complete pending the user's physical verification of
   the N2–N4 UI affordances and any remaining hardware spot-checks.
+
+### Fix N-a — Menu-bar workflow list did not refresh after saving
+
+- Status: done
+- Defect (reported during physical checks): a newly saved (or renamed, deleted,
+  duplicated, imported, enabled, or cleared) workflow did not appear in the
+  menu-bar **Run a workflow** list until the app was restarted, because the
+  menu-bar model loaded its list only at launch/window-open.
+- Fix: `ComposerViewModel.loadLibrary()` posts a
+  `.taskOSWorkflowLibraryDidChange` notification (called after every library
+  mutation); `MenuBarViewModel` observes it and reloads, so the menu updates
+  live.
+- Tests performed:
+  - `swift test --package-path Packages/TaskOSCore` — 255 tests, 33 suites, pass.
+  - App tests (`xcodebuild ... test -only-testing:TaskOSTests`) — TEST SUCCEEDED.
+  - Debug and Release builds — BUILD SUCCEEDED.
+- Next eligible work package: Phase 2 physical UI verification, then Phase 3.

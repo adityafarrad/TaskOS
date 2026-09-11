@@ -200,4 +200,5 @@ final class AppComposition {
 
 extension Notification.Name {
     static let taskOSRunHistoryDidChange = Notification.Name("taskOSRunHistoryDidChange")
+    static let taskOSWorkflowLibraryDidChange = Notification.Name("taskOSWorkflowLibraryDidChange")
 }

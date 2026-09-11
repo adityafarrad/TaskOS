@@ -22,6 +22,13 @@ final class MenuBarViewModel {
         load()
         refreshStatus()
         recoverInterruptedRuns()
+        NotificationCenter.default.addObserver(
+            forName: .taskOSWorkflowLibraryDidChange,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in self?.load() }
+        }
     }
 
     private func recoverInterruptedRuns() {
