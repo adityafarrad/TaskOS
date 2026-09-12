@@ -22,7 +22,7 @@ enum SidebarDestination: String, CaseIterable, Hashable, Identifiable {
 
 enum SidebarSelection: Hashable {
     case destination(SidebarDestination)
-    case workflow(AutomationID)
+    case editor
 }
 
 @MainActor

@@ -5,7 +5,7 @@ import TaskOSCore
 struct ContentView: View {
     @State private var model = ComposerViewModel()
     @State private var selection = EditorSelection()
-    @State private var sidebarSelection: SidebarSelection = .destination(.workflows)
+    @State private var sidebarSelection: SidebarSelection = .editor
     @State private var columnVisibility: NavigationSplitViewVisibility = .all
     @State private var showReview = false
     @State private var composerFocusToken = 0
@@ -87,19 +87,14 @@ struct ContentView: View {
             DiscoveryView(
                 model: model,
                 selection: selection,
-                onEdit: { sidebarSelection = .destination(.workflows) }
+                onEdit: { sidebarSelection = .editor }
             )
         }
         .focusedSceneValue(\.taskOS, commandActions)
     }
 
     private var isEditorDestination: Bool {
-        switch sidebarSelection {
-        case .workflow, .destination(.workflows):
-            return true
-        default:
-            return false
-        }
+        sidebarSelection == .editor
     }
 
     private var showsInspector: Bool {
@@ -122,11 +117,13 @@ struct ContentView: View {
     @ViewBuilder
     private var detail: some View {
         switch sidebarSelection {
+        case .destination(.workflows):
+            WorkflowsLibraryView(model: model, onOpen: openWorkflow, onNew: newWorkflow)
         case .destination(.templates):
             TemplatesGalleryView(model: model) { template in
                 requestDocumentReplacement {
                     model.loadTemplate(template)
-                    sidebarSelection = .destination(.workflows)
+                    sidebarSelection = .editor
                     selection.clear()
                     selection.isInspectorPresented = false
                 }
@@ -135,7 +132,7 @@ struct ContentView: View {
             HistoryView(model: model)
         case .destination(.settings):
             SettingsView(model: model)
-        default:
+        case .editor:
             WorkflowEditorView(
                 model: model,
                 selection: selection,
@@ -154,11 +151,11 @@ struct ContentView: View {
         TaskOSCommandActions(
             newWorkflow: newWorkflow,
             focusComposer: {
-                sidebarSelection = .destination(.workflows)
+                sidebarSelection = .editor
                 composerFocusToken += 1
             },
             run: {
-                sidebarSelection = .destination(.workflows)
+                sidebarSelection = .editor
                 run()
             },
             cancelRun: { model.cancelCurrentRun() },
@@ -167,7 +164,7 @@ struct ContentView: View {
             redo: { model.redo() },
             openSettings: { sidebarSelection = .destination(.settings) },
             browseCapabilities: {
-                sidebarSelection = .destination(.workflows)
+                sidebarSelection = .editor
                 model.showDiscovery = true
             }
         )
@@ -185,24 +182,22 @@ struct ContentView: View {
 
     private func selectSidebar(_ target: SidebarSelection) {
         guard target != sidebarSelection else { return }
-        switch target {
-        case .workflow(let id):
-            guard let workflow = model.savedWorkflows.first(where: { $0.id == id }) else { return }
-            requestDocumentReplacement {
-                sidebarSelection = target
-                model.loadForEditing(workflow)
-                selection.clear()
-                selection.isInspectorPresented = false
-            }
-        case .destination:
-            sidebarSelection = target
+        sidebarSelection = target
+    }
+
+    private func openWorkflow(_ workflow: SavedWorkflow) {
+        requestDocumentReplacement {
+            model.loadForEditing(workflow)
+            sidebarSelection = .editor
+            selection.clear()
+            selection.isInspectorPresented = false
         }
     }
 
     private func newWorkflow() {
         requestDocumentReplacement {
             model.newWorkflow()
-            sidebarSelection = .destination(.workflows)
+            sidebarSelection = .editor
             selection.clear()
             selection.isInspectorPresented = false
         }

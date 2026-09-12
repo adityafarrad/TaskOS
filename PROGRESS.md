@@ -2262,3 +2262,22 @@ record isolation/recovery) is deferred to Phase 3 with the migration fixtures.
   Debug + Release build.
 - Next: Phase B (B1–B5).
 
+### Increment U-ia — Workflows library destination
+
+- Status: done
+- Behavior delivered: the Workflows destination is now a saved-workflows
+  library in the main pane (search field, prominent **New** button, rows with
+  status dot, step count, trigger summary, updated time, attention state, and a
+  context menu for Open/Run/Rename/Duplicate/Export/Delete). Selecting a row
+  opens it in the editor. The sidebar no longer carries the workflow list; it
+  shows Workflows, a prominent dark **New** action (plus icon + "New"), Templates,
+  History, and Settings. First launch still opens a fresh New Workflow editor;
+  the icon rail keeps a filled **+** for New.
+- Interfaces changed: `SidebarSelection` is now `.destination(...)` or `.editor`
+  (the `.workflow` case and the in-sidebar list were removed); new
+  `WorkflowsLibraryView`; `ContentView` routes the library and adds
+  `openWorkflow`.
+- Tests performed: UI tests 7/7 pass (sidebar navigation updated for the library);
+  Debug + Release build.
+- Next: Phase B (B1–B5).
+

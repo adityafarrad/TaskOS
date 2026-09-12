@@ -51,7 +51,7 @@ final class TaskOSUITests: XCTestCase {
         XCTAssertTrue(element(app, "settings.view").waitForExistence(timeout: 5))
 
         element(app, "sidebar.workflows").click()
-        XCTAssertTrue(element(app, "editor.view").waitForExistence(timeout: 5))
+        XCTAssertTrue(element(app, "workflows.view").waitForExistence(timeout: 5))
     }
 
     @MainActor
