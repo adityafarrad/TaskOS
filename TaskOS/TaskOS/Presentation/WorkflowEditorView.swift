@@ -15,6 +15,9 @@ struct WorkflowEditorView: View {
     @FocusState private var composerFocused: Bool
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var pendingDelete: SavedWorkflow?
+    @State private var dropTargetID: UUID?
+    @FocusState private var titleFocused: Bool
+    @State private var titleHovered = false
 
     private var finishedRecord: RunRecord? {
         if case .finished(let record) = model.stage,
@@ -308,8 +311,25 @@ struct WorkflowEditorView: View {
             .textFieldStyle(.plain)
             .font(.system(size: 26, weight: .semibold))
             .lineLimit(1)
+            .focused($titleFocused)
+            .padding(.horizontal, 6)
+            .padding(.vertical, 2)
+            .background(
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .fill(titleFocused || titleHovered ? Color.primary.opacity(0.06) : Color.clear)
+            )
+            .overlay(alignment: .bottom) {
+                Rectangle()
+                    .fill(titleFocused ? Color.accentColor : (titleHovered ? Color.secondary.opacity(0.4) : Color.clear))
+                    .frame(height: 1)
+                    .padding(.horizontal, 6)
+            }
             .frame(maxWidth: .infinity, alignment: .leading)
+            .onHover { titleHovered = $0 }
+            .animation(.taskOSQuick, value: titleFocused)
+            .animation(.taskOSQuick, value: titleHovered)
             .accessibilityLabel("Workflow name")
+            .accessibilityHint("Edit the workflow name")
             .accessibilityIdentifier("editor.title")
 
             if model.supportsAutomaticRuns {
@@ -357,7 +377,9 @@ struct WorkflowEditorView: View {
             }
 
             if model.actions.isEmpty {
-                emptySteps
+                if !isEmptyWorkflow {
+                    emptySteps
+                }
             } else {
                 VStack(spacing: TaskOSSpacing.xs) {
                     ForEach(Array(model.actions.enumerated()), id: \.element.id) { index, action in
@@ -366,6 +388,8 @@ struct WorkflowEditorView: View {
                             action: action,
                             model: model,
                             isSelected: selection.selectedStepID == action.id,
+                            isLast: index == model.actions.count - 1,
+                            isDropTarget: dropTargetID == action.id,
                             onSelect: { selection.selectStep(action.id) },
                             onMoveUp: { model.moveUp(id: action.id) },
                             onMoveDown: { model.moveDown(id: action.id) },
@@ -378,6 +402,7 @@ struct WorkflowEditorView: View {
                             }
                         )
                         .dropDestination(for: String.self) { items, _ in
+                            dropTargetID = nil
                             guard let raw = items.first,
                                   let draggedID = UUID(uuidString: raw),
                                   let from = model.actions.firstIndex(where: { $0.id == draggedID }) else {
@@ -387,6 +412,12 @@ struct WorkflowEditorView: View {
                                 model.moveActions(fromOffsets: IndexSet(integer: from), toOffset: index)
                             }
                             return true
+                        } isTargeted: { targeted in
+                            if targeted {
+                                dropTargetID = action.id
+                            } else if dropTargetID == action.id {
+                                dropTargetID = nil
+                            }
                         }
                     }
                 }

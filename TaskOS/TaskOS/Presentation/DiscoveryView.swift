@@ -122,6 +122,10 @@ struct DiscoveryView: View {
         guard let draft = actionDraft(for: guide.id) else { return }
         model.add(draft)
         onEdit()
+        if let newID = model.actions.last?.id {
+            selection.selectStep(newID)
+        }
+        model.showDiscovery = false
     }
 
     private func triggerFamily(for id: String) -> ComposerViewModel.TriggerFamily? {

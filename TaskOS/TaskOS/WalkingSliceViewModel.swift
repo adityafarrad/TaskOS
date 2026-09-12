@@ -64,6 +64,7 @@ final class ComposerViewModel {
     private var lastDefinition: AutomationDefinition?
     private var applicationsLoaded = false
     private var autosaveTask: Task<Void, Never>?
+    private var previewResetTask: Task<Void, Never>?
     private var runMonitor: Task<Void, Never>?
 
     var currentRevision: WorkflowRevision {
@@ -1078,8 +1079,13 @@ final class ComposerViewModel {
 
     func updateName(_ value: String) {
         draftName = value
-        resetPreview()
         scheduleDraftAutosave()
+        previewResetTask?.cancel()
+        previewResetTask = Task { [weak self] in
+            try? await Task.sleep(for: .milliseconds(400))
+            guard !Task.isCancelled else { return }
+            self?.resetPreview()
+        }
     }
 
     func loadForEditing(_ workflow: SavedWorkflow) {
@@ -1147,6 +1153,19 @@ final class ComposerViewModel {
     func refreshForAttention() {
         refreshPermissions()
         loadLibrary()
+    }
+
+    func setAutomaticTriggersPaused(_ paused: Bool) {
+        Task { [weak self] in
+            guard let self else { return }
+            if paused {
+                await self.composition.coordinator.pauseAutomaticTriggers()
+            } else {
+                await self.composition.coordinator.resumeAutomaticTriggers()
+            }
+            self.refreshRuntimeActivity()
+            NotificationCenter.default.post(name: .taskOSRuntimeStateDidChange, object: nil)
+        }
     }
 
     func refreshRuntimeActivity() {

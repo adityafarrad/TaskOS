@@ -33,6 +33,28 @@ struct SettingsView: View {
                 )
             }
 
+            Section("Automatic triggers") {
+                Toggle(
+                    "Run automatic triggers",
+                    isOn: Binding(
+                        get: { !model.automaticTriggersPaused },
+                        set: { model.setAutomaticTriggersPaused(!$0) }
+                    )
+                )
+                if model.automaticTriggersPaused {
+                    Label(
+                        "Automatic triggers are paused. Scheduled and event workflows will not start.",
+                        systemImage: "pause.circle"
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.orange)
+                } else {
+                    Text("Scheduled and event workflows can start in the background.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+
             Section("History") {
                 Text("TaskOS keeps up to \(RunHistoryRetention.maximumRuns) runs for 30 days, whichever is reached first.")
                     .font(.callout)

@@ -2294,3 +2294,31 @@ record isolation/recovery) is deferred to Phase 3 with the migration fixtures.
   New → suggestions appear); UI tests 8/8 pass; Debug + Release build.
 - Next: Phase B (B1–B5).
 
+### Increment B1–B5 — Phase B UX polish
+
+- Status: done
+- Behavior delivered:
+  - **B1** Step cards keep the drag handle visible and gained an always-present
+    `•••` menu (Configure, Move Up/Down, Duplicate, Delete); inline controls
+    remain on hover/selection, and dragging now shows an accent insertion line
+    on the target card.
+  - **B2** The workflow title field shows a hover tint, underlined on hover and
+    accent-underlined on focus; name edits no longer invalidate the preview on
+    every keystroke (400 ms debounce) and autosave stays debounced.
+  - **B3** An empty workflow no longer stacks the "Get started" panel with a
+    redundant "No steps yet" hint, so `+ Add step` stays above the fold.
+  - **B4** Settings has an **Automatic triggers** section with a
+    Run/Pause switch and a paused explanation, backed by the coordinator and
+    reflected in the sidebar footer.
+  - **B5** Discovery's **Add Step** now appends the step, switches to the
+    editor, selects the new step (opening its inspector), and closes the sheet;
+    **Use Trigger** already did the equivalent.
+- Interfaces changed: `ComposerViewModel.setAutomaticTriggersPaused`,
+  `previewResetTask`; `StepCardView` gained `isLast`/`isDropTarget` and a step
+  menu; `WorkflowEditorView` tracks `dropTargetID` and title focus/hover.
+- Tests performed: UI tests 10/10 pass (new: discovery Add Step creates a step,
+  step menu offers Duplicate, settings shows the automatic-triggers switch);
+  app tests pass; Core 270/35 pass; Debug + Release build.
+- Next: Phase C polish (onboarding restyle, focus rings, full Reduce-Motion,
+  contrast) or Phase 3.1 validation.
+

@@ -133,5 +133,50 @@ final class TaskOSUITests: XCTestCase {
         let app = launchApp()
         element(app, "sidebar.settings").click()
         XCTAssertTrue(app.staticTexts["Launch TaskOS at login"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Run automatic triggers"].waitForExistence(timeout: 5))
+    }
+
+    @MainActor
+    func testDiscoveryAddStepCreatesAStep() throws {
+        let app = launchApp()
+        XCTAssertTrue(element(app, "editor.view").waitForExistence(timeout: 10))
+
+        element(app, "editor.capabilities").click()
+        XCTAssertTrue(app.staticTexts["Supported actions and triggers"].waitForExistence(timeout: 5))
+
+        let search = element(app, "discovery.search")
+        search.click()
+        Thread.sleep(forTimeInterval: 0.3)
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+        pasteboard.setString("Wait", forType: .string)
+        search.typeKey("v", modifierFlags: .command)
+        Thread.sleep(forTimeInterval: 0.3)
+
+        let addButton = app.buttons["Add Step"].firstMatch
+        XCTAssertTrue(addButton.waitForExistence(timeout: 5))
+        XCTAssertTrue(addButton.isHittable, "filtered Add Step should be reachable")
+        addButton.click()
+
+        XCTAssertTrue(element(app, "editor.view").waitForExistence(timeout: 5))
+        XCTAssertTrue(element(app, "step.card.0").waitForExistence(timeout: 5))
+    }
+
+    @MainActor
+    func testStepMenuOffersDuplicate() throws {
+        let app = launchApp()
+        XCTAssertTrue(element(app, "editor.view").waitForExistence(timeout: 10))
+
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+        pasteboard.setString("wait 1 second", forType: .string)
+        let composer = element(app, "composer.field")
+        composer.click()
+        Thread.sleep(forTimeInterval: 0.4)
+        composer.typeKey("v", modifierFlags: .command)
+
+        XCTAssertTrue(element(app, "step.card.0").waitForExistence(timeout: 5))
+        element(app, "step.menu.0").click()
+        XCTAssertTrue(app.menuItems["Duplicate"].waitForExistence(timeout: 5))
     }
 }

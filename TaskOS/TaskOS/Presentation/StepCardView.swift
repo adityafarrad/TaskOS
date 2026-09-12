@@ -6,6 +6,8 @@ struct StepCardView: View {
     let action: ComposerAction
     let model: ComposerViewModel
     let isSelected: Bool
+    let isLast: Bool
+    var isDropTarget: Bool = false
     let onSelect: () -> Void
     let onMoveUp: () -> Void
     let onMoveDown: () -> Void
@@ -51,12 +53,23 @@ struct StepCardView: View {
                 controls
                     .transition(.opacity)
             }
+
+            moreMenu
         }
         .padding(.vertical, TaskOSSpacing.xs)
         .padding(.horizontal, TaskOSSpacing.sm)
         .frame(maxWidth: .infinity, alignment: .leading)
         .contentShape(Rectangle())
         .taskOSCard(isSelected: isSelected, isHovered: isHovered)
+        .overlay(alignment: .top) {
+            if isDropTarget {
+                Capsule()
+                    .fill(Color.accentColor)
+                    .frame(height: 3)
+                    .padding(.horizontal, 6)
+                    .offset(y: -5)
+            }
+        }
         .onHover { isHovered = $0 }
         .onTapGesture(perform: onSelect)
         .accessibilityElement(children: .contain)
@@ -96,11 +109,37 @@ struct StepCardView: View {
     private var controls: some View {
         HStack(spacing: 2) {
             iconButton("arrow.up", help: "Move up", action: onMoveUp)
+                .disabled(index == 0)
             iconButton("arrow.down", help: "Move down", action: onMoveDown)
+                .disabled(isLast)
             iconButton("plus.on.square", help: "Duplicate step", action: onDuplicate)
             iconButton("trash", help: "Delete step", action: onDelete)
         }
         .buttonStyle(.borderless)
+    }
+
+    private var moreMenu: some View {
+        Menu {
+            Button("Configure") { onSelect() }
+            Divider()
+            Button("Move Up") { onMoveUp() }
+                .disabled(index == 0)
+            Button("Move Down") { onMoveDown() }
+                .disabled(isLast)
+            Button("Duplicate") { onDuplicate() }
+            Divider()
+            Button("Delete", role: .destructive) { onDelete() }
+        } label: {
+            Image(systemName: "ellipsis")
+                .frame(width: 22, height: 22)
+                .contentShape(Rectangle())
+        }
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .help("Step actions")
+        .accessibilityLabel("Step actions")
+        .accessibilityIdentifier("step.menu.\(index)")
     }
 
     private func iconButton(_ systemImage: String, help: String, action: @escaping () -> Void) -> some View {
