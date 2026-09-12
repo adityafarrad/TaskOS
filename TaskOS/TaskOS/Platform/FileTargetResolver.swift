@@ -1,6 +1,12 @@
 import Foundation
 import TaskOSCore
 
+enum FileTargetStatus: Equatable {
+    case available
+    case moved(String)
+    case missing
+}
+
 enum FileTargetResolver {
     static func url(for target: FileTarget) -> URL? {
         if let bookmark = target.bookmark {
@@ -21,5 +27,14 @@ enum FileTargetResolver {
     static func exists(_ target: FileTarget) -> Bool {
         guard let url = url(for: target) else { return false }
         return FileManager.default.fileExists(atPath: url.path)
+    }
+
+    static func status(_ target: FileTarget) -> FileTargetStatus {
+        guard let url = url(for: target) else { return .missing }
+        guard FileManager.default.fileExists(atPath: url.path) else { return .missing }
+        if !target.path.isEmpty, url.path != target.path {
+            return .moved(url.lastPathComponent)
+        }
+        return .available
     }
 }

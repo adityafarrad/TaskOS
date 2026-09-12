@@ -129,6 +129,13 @@ struct TaskOSStatusChip: View {
     }
 }
 
+struct WindowWidthKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = max(value, nextValue())
+    }
+}
+
 struct TaskOSInspectorField<Content: View>: View {
     let title: String
     @ViewBuilder var content: () -> Content

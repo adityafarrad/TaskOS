@@ -71,7 +71,7 @@ enum ActionPresentation {
         tint(for: draft.actionID)
     }
 
-    static func summary(for draft: ComposerActionDraft, missingFile: (FileTarget) -> Bool) -> String {
+    static func summary(for draft: ComposerActionDraft, fileStatus: (FileTarget) -> FileTargetStatus) -> String {
         switch draft {
         case .openApplication(_, let resolved):
             return resolved?.label ?? "Choose an application"
@@ -80,11 +80,9 @@ enum ActionPresentation {
         case .quitApplication(_, let resolved):
             return resolved?.label ?? "Choose an application"
         case .openFile(let target):
-            guard let target else { return "Choose a file or folder" }
-            return missingFile(target) ? "\(target.displayName) · moved or deleted" : target.displayName
+            return fileSummary(target, fileStatus: fileStatus, prompt: "Choose a file or folder")
         case .revealInFinder(let target):
-            guard let target else { return "Choose a file or folder" }
-            return missingFile(target) ? "\(target.displayName) · moved or deleted" : target.displayName
+            return fileSummary(target, fileStatus: fileStatus, prompt: "Choose a file or folder")
         case .openWebsite(let url, let browser):
             let host = URL(string: url)?.host() ?? url
             if let browser {
@@ -103,7 +101,23 @@ enum ActionPresentation {
         }
     }
 
-    static func isUnresolved(_ draft: ComposerActionDraft, missingFile: (FileTarget) -> Bool) -> Bool {
+    private static func fileSummary(
+        _ target: FileTarget?,
+        fileStatus: (FileTarget) -> FileTargetStatus,
+        prompt: String
+    ) -> String {
+        guard let target else { return prompt }
+        switch fileStatus(target) {
+        case .available:
+            return target.displayName
+        case .moved(let name):
+            return "\(name) · moved"
+        case .missing:
+            return "\(target.displayName) · missing"
+        }
+    }
+
+    static func isUnresolved(_ draft: ComposerActionDraft, fileStatus: (FileTarget) -> FileTargetStatus) -> Bool {
         switch draft {
         case .openApplication(_, let resolved),
              .hideApplication(_, let resolved),
@@ -111,7 +125,8 @@ enum ActionPresentation {
              .arrangeWindow(_, let resolved, _, _):
             return resolved == nil
         case .openFile(let target), .revealInFinder(let target):
-            return target == nil
+            guard let target else { return true }
+            return fileStatus(target) != .available
         case .openWebsite(let url, _):
             return !OpenWebsiteAction.isAbsoluteHTTPURL(url)
         case .copyText(let value):

@@ -2187,3 +2187,35 @@ record isolation/recovery) is deferred to Phase 3 with the migration fixtures.
   light/dark.
 - Next: run the D2 matrix, then Phase B (UX friction) items B1–B5.
 
+### Increment U-d2 — D2 regression fixes
+
+- Status: done
+- Defects fixed from the user's D2 pass:
+  - **Inspector-open resize clipping.** Replaced the SwiftUI `.inspector`
+    modifier (which squeezed/clipped the trailing column when the editor had a
+    larger minimum) with a controllable trailing column inside the detail:
+    editor flexes, inspector keeps a fixed adaptive width (200/240/290 by
+    available width) and animates in/out. Nothing clips; the sidebar still
+    collapses automatically.
+  - **Save visibility.** Added a bottom action bar to the editor with a clear
+    status ("Unsaved changes" / "All changes saved") and visible **Review** and
+    **Save** buttons, instead of the small conditional toolbar icon.
+  - **Moved/deleted files.** Added `FileTargetStatus` (available/moved/missing);
+    the step card and inspector now show "· moved" or "· missing" and mark the
+    step as needing input. The view model now watches the current draft's file
+    directories, so moving/deleting a chosen file refreshes the UI instead of
+    waiting for an unrelated edit.
+  - **Stale permissions/attention.** The window now refreshes permissions and
+    library attention on a 5-second timer while active, in addition to
+    activation, so revoking a permission or a missing resource updates without
+    clicking a task first.
+- Interfaces changed: `FileTargetResolver.status`; `FileTargetStatus`; VM
+  `fileStatus`, `refreshFileStatus`, `fileStatusToken`, `updateWatchedDirectories`,
+  `refreshForAttention`; `ActionPresentation` now takes a file-status closure;
+  `ContentView` measures width and renders the inspector column itself.
+- Tests performed: `swift test` 270/35 pass; app tests pass; UI tests 6/6 pass;
+  Debug + Release build.
+- Next: the remaining Phase B items (B1 step controls/drag feedback, B2 title
+  affordance/debounce, B3 empty-state consolidation incl. the Add-step fold, B4
+  Settings pause/resume, B5 discovery follow-through).
+

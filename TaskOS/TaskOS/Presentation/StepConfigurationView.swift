@@ -166,8 +166,15 @@ struct StepConfigurationView: View {
         VStack(alignment: .leading, spacing: TaskOSSpacing.xs) {
             if let target {
                 Label(target.displayName, systemImage: target.kind == .folder ? "folder" : "doc")
-                if model.isMissingFile(target) {
-                    Label("Moved or deleted", systemImage: "exclamationmark.triangle")
+                switch model.fileStatus(target) {
+                case .available:
+                    EmptyView()
+                case .moved(let name):
+                    Label("Moved to \(name). Choose it again to update the shortcut.", systemImage: "arrow.triangle.swap")
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                case .missing:
+                    Label("This item is missing. Choose it again.", systemImage: "exclamationmark.triangle")
                         .font(.caption)
                         .foregroundStyle(.orange)
                 }

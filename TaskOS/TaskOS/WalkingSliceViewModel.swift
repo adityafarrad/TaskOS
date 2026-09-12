@@ -36,6 +36,7 @@ final class ComposerViewModel {
     private(set) var history: [RunRecord] = []
     private(set) var admissionEvents: [AdmissionEvent] = []
     private(set) var workflowAttention: [AutomationID: String] = [:]
+    private(set) var fileStatusToken = 0
     private(set) var automaticTriggersPaused = false
     private(set) var draftName = "Untitled"
     var librarySearch = ""
@@ -90,6 +91,7 @@ final class ComposerViewModel {
             }
         }
         fileMonitor.onChange = { [weak self] in
+            self?.refreshFileStatus()
             self?.loadLibrary()
         }
     }
@@ -658,7 +660,17 @@ final class ComposerViewModel {
     }
 
     func isMissingFile(_ target: FileTarget) -> Bool {
-        !FileTargetResolver.exists(target)
+        _ = fileStatusToken
+        return FileTargetResolver.status(target) == .missing
+    }
+
+    func fileStatus(_ target: FileTarget) -> FileTargetStatus {
+        _ = fileStatusToken
+        return FileTargetResolver.status(target)
+    }
+
+    func refreshFileStatus() {
+        fileStatusToken += 1
     }
 
     func exportWorkflow(_ workflow: SavedWorkflow) {
@@ -734,6 +746,7 @@ final class ComposerViewModel {
             document.updateAction(id: id, draft: .openFile(target: target))
         }
         afterEdit()
+        updateWatchedDirectories()
     }
 
     func undo() {
@@ -800,11 +813,27 @@ final class ComposerViewModel {
                 self.savedWorkflows = workflows
                 self.libraryError = nil
                 self.workflowAttention = await self.computeAttention(for: workflows)
-                self.fileMonitor.update(directories: Self.watchedDirectories(for: workflows))
+                self.updateWatchedDirectories()
             } catch {
                 self.libraryError = "Could not load saved workflows: \(error.localizedDescription)"
             }
         }
+    }
+
+    private func updateWatchedDirectories() {
+        var directories = Self.watchedDirectories(for: savedWorkflows)
+        for action in document.actions {
+            switch action.draft {
+            case .openFile(let target), .revealInFinder(let target):
+                if let target {
+                    directories.insert(Self.directory(for: target))
+                }
+            default:
+                break
+            }
+        }
+        directories.remove("")
+        fileMonitor.update(directories: directories)
     }
 
     private func computeAttention(for workflows: [SavedWorkflow]) async -> [AutomationID: String] {
@@ -1014,6 +1043,7 @@ final class ComposerViewModel {
         }
         resetPreview()
         notice = "Started a new workflow."
+        updateWatchedDirectories()
     }
 
     private var currentSignature: String {
@@ -1067,6 +1097,7 @@ final class ComposerViewModel {
             notice = "Editing \"\(workflow.name)\" (revision \(workflow.definition.revision.value))."
         }
         scrollToTopToken += 1
+        updateWatchedDirectories()
     }
 
     private func recoverInterruptedRuns() {
@@ -1105,6 +1136,11 @@ final class ComposerViewModel {
     }
 
     func recheckPermissions() {
+        refreshPermissions()
+        loadLibrary()
+    }
+
+    func refreshForAttention() {
         refreshPermissions()
         loadLibrary()
     }

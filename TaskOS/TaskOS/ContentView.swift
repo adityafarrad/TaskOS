@@ -11,6 +11,7 @@ struct ContentView: View {
     @State private var composerFocusToken = 0
     @State private var pendingReplace: (() -> Void)?
     @State private var showDiscardPrompt = false
+    @State private var contentWidth: CGFloat = 0
 
     var body: some View {
         NavigationSplitView(columnVisibility: $columnVisibility) {
@@ -21,21 +22,36 @@ struct ContentView: View {
                 onNewWorkflow: newWorkflow
             )
         } detail: {
-            detail
-                .id(sidebarSelection)
-        }
-        .inspector(isPresented: $selection.isInspectorPresented) {
-            InspectorView(model: model, selection: selection)
-                .inspectorColumnWidth(
-                    min: TaskOSMetrics.inspectorMin,
-                    ideal: TaskOSMetrics.inspectorIdeal,
-                    max: TaskOSMetrics.inspectorMax
-                )
+            HStack(spacing: 0) {
+                detail
+                    .frame(maxWidth: .infinity)
+
+                if showsInspector {
+                    Divider()
+                    InspectorView(model: model, selection: selection)
+                        .frame(width: inspectorWidth)
+                        .transition(.move(edge: .trailing).combined(with: .opacity))
+                }
+            }
+            .id(sidebarSelection)
+            .background(
+                GeometryReader { proxy in
+                    Color.clear.preference(key: WindowWidthKey.self, value: proxy.size.width)
+                }
+            )
+            .onPreferenceChange(WindowWidthKey.self) { contentWidth = $0 }
+            .animation(.taskOSStandard, value: selection.isInspectorPresented)
         }
         .frame(minWidth: TaskOSMetrics.windowMinWidth, minHeight: TaskOSMetrics.windowMinHeight)
         .onAppear { model.loadApplicationsIfNeeded() }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             model.refreshAll()
+        }
+        .task {
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(5))
+                model.refreshForAttention()
+            }
         }
         .confirmationDialog(
             "You have unsaved changes",
@@ -63,6 +79,32 @@ struct ContentView: View {
             )
         }
         .focusedSceneValue(\.taskOS, commandActions)
+    }
+
+    private var isEditorDestination: Bool {
+        switch sidebarSelection {
+        case .workflow, .destination(.workflows):
+            return true
+        default:
+            return false
+        }
+    }
+
+    private var showsInspector: Bool {
+        selection.isInspectorPresented && isEditorDestination
+    }
+
+    private var inspectorWidth: CGFloat {
+        if contentWidth == 0 {
+            return TaskOSMetrics.inspectorIdeal
+        }
+        if contentWidth < 640 {
+            return 200
+        }
+        if contentWidth < 820 {
+            return 240
+        }
+        return TaskOSMetrics.inspectorIdeal
     }
 
     @ViewBuilder

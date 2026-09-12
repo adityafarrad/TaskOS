@@ -15,7 +15,7 @@ struct StepCardView: View {
     @State private var isHovered = false
 
     private var unresolved: Bool {
-        ActionPresentation.isUnresolved(action.draft, missingFile: model.isMissingFile)
+        ActionPresentation.isUnresolved(action.draft, fileStatus: model.fileStatus)
     }
 
     var body: some View {
@@ -31,7 +31,7 @@ struct StepCardView: View {
                         TaskOSStatusChip(text: "Needs input", systemImage: "exclamationmark.triangle", tint: .orange)
                     }
                 }
-                Text(ActionPresentation.summary(for: action.draft, missingFile: model.isMissingFile))
+                Text(ActionPresentation.summary(for: action.draft, fileStatus: model.fileStatus))
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)

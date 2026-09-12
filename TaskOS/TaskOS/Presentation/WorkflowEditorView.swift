@@ -65,6 +65,7 @@ struct WorkflowEditorView: View {
         .toolbar { toolbarContent }
         .navigationTitle(model.draftName)
         .accessibilityIdentifier("editor.view")
+        .safeAreaInset(edge: .bottom) { editorActionBar }
         .onChange(of: composerFocusToken) { _, _ in
             composerFocused = true
         }
@@ -85,6 +86,32 @@ struct WorkflowEditorView: View {
         } message: { workflow in
             Text("“\(workflow.name)” and its history metadata will be removed. This cannot be undone.")
         }
+    }
+
+    private var editorActionBar: some View {
+        HStack(spacing: TaskOSSpacing.sm) {
+            Image(systemName: model.hasUnsavedChanges ? "pencil.circle.fill" : "checkmark.circle.fill")
+                .foregroundStyle(model.hasUnsavedChanges ? Color.orange : Color.green)
+                .font(.system(size: 15))
+
+            Text(model.hasUnsavedChanges ? "Unsaved changes" : "All changes saved")
+                .font(.callout)
+                .foregroundStyle(.secondary)
+
+            Spacer()
+
+            Button("Review") { showReview = true }
+                .disabled(model.actions.isEmpty)
+
+            Button("Save") { onSave() }
+                .buttonStyle(.borderedProminent)
+                .disabled(!model.hasUnsavedChanges)
+                .accessibilityIdentifier("editor.saveBottom")
+        }
+        .padding(.horizontal, TaskOSSpacing.lg)
+        .padding(.vertical, TaskOSSpacing.xs)
+        .background(.bar)
+        .overlay(alignment: .top) { Divider() }
     }
 
     private var runningBanner: some View {
