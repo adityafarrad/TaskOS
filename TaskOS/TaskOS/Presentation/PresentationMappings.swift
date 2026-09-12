@@ -36,34 +36,6 @@ enum ActionPresentation {
         }
     }
 
-    static func suggestedName(for draft: ComposerActionDraft) -> String {
-        switch draft {
-        case .openApplication(_, let resolved):
-            return resolved.map { "Open \($0.label)" } ?? "Open Application"
-        case .hideApplication(_, let resolved):
-            return resolved.map { "Hide \($0.label)" } ?? "Hide Application"
-        case .quitApplication(_, let resolved):
-            return resolved.map { "Quit \($0.label)" } ?? "Quit Application"
-        case .arrangeWindow(_, let resolved, _, _):
-            return resolved.map { "Arrange \($0.label)" } ?? "Arrange Window"
-        case .openWebsite(let url, _):
-            if OpenWebsiteAction.isAbsoluteHTTPURL(url), let host = URL(string: url)?.host(), !host.isEmpty {
-                return "Open \(host)"
-            }
-            return "Open Website"
-        case .openFile(let target):
-            return target.map { "Open \($0.displayName)" } ?? "Open File or Folder"
-        case .revealInFinder(let target):
-            return target.map { "Reveal \($0.displayName)" } ?? "Reveal in Finder"
-        case .wait:
-            return "Wait"
-        case .showNotification(let title, _):
-            return title.isEmpty ? "Notification" : title
-        case .copyText(let value):
-            return value.isEmpty ? "Copy Text" : "Copy \(value.prefix(40))"
-        }
-    }
-
     static func symbol(for id: ActionID) -> String {
         switch id {
         case .openApplication: return "macwindow"

@@ -173,38 +173,4 @@ struct WorkflowStatusPresentationTests {
         )
         #expect(ActionPresentation.missingRequirement(for: .wait(1), fileStatus: available) == nil)
     }
-
-    @Test func newWorkflowAutoNamesFromFirstStep() {
-        let model = ComposerViewModel()
-        #expect(model.draftName == "Untitled")
-
-        model.add(.wait(1))
-        #expect(model.draftName == "Wait")
-    }
-
-    @Test func autoNameUsesResolvedResources() {
-        let model = ComposerViewModel()
-        model.add(.openApplication(name: "Safari", resolved: nil))
-        model.resolve(
-            id: model.actions[0].id,
-            application: ApplicationResource(bundleIdentifier: "com.apple.Safari", displayName: "Safari")
-        )
-        #expect(model.draftName == "Open Safari")
-    }
-
-    @Test func userNameIsNotOverwritten() {
-        let model = ComposerViewModel()
-        model.add(.wait(1))
-        model.updateName("My Flow")
-
-        model.add(.wait(2))
-        #expect(model.draftName == "My Flow")
-    }
-
-    @Test func savedWorkflowIsNotAutoRenamed() {
-        let model = ComposerViewModel()
-        model.loadForEditing(workflow())
-        model.add(.wait(1))
-        #expect(model.draftName == "Test")
-    }
 }

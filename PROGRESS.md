@@ -2451,26 +2451,24 @@ record isolation/recovery) is deferred to Phase 3 with the migration fixtures.
 - Next: stop here per owner decision; D2 manual regression / Phase 3.1 remain
   the next contract steps when requested.
 
-### Increment UX-5 — Auto-name new workflows from the first step
+### Increment UX-5 — Default name prompt (replaces auto-naming)
 
 - Status: done
-- Behavior delivered: a new, unnamed workflow is automatically given a
-  meaningful name from its first step as soon as one exists (for example
-  `Wait`, `Open Website`, `Copy Text`, `Open Safari` once the app resolves).
-  The name refreshes with that first step until the user types their own name,
-  after which it is never overwritten. Saved workflows and loaded templates are
-  never auto-renamed.
-- Interfaces changed: `ActionPresentation.suggestedName(for:)`;
-  `ComposerViewModel` gained `nameWasEdited` bookkeeping and
-  `autoNameIfNeeded()` (called from `afterEdit`), reset on New/Template and on
-  editing/recovering a named draft.
+- Behavior delivered: reverted the auto-name-from-first-step behavior at the
+  owner's request so a new workflow keeps the `Untitled` name. To make the name
+  discoverable instead, the editor title now shows a small "Enter a name" hint
+  under the `Untitled` field whenever the name is still the default. Typing a
+  name replaces it; clearing the field returns to the `Untitled` default.
+- Interfaces changed: reverted `ActionPresentation.suggestedName`,
+  `ComposerViewModel.nameWasEdited`/`autoNameIfNeeded`, and the auto-name tests
+  (`git revert c37a620`); `WorkflowEditorView.titleHeader` gained the default
+  name hint.
 - Tests performed:
-  - App tests — TEST SUCCEEDED, including 4 new auto-name cases (first step,
-    resolved resource, user name preserved, saved workflow not renamed).
+  - App tests — TEST SUCCEEDED.
   - Debug + Release builds — BUILD SUCCEEDED.
-- Physical checks: pending owner Mac pass — New Workflow, add a step, and
-  confirm the title becomes the step name; type your own name and confirm it
-  sticks; open a saved workflow and confirm its name is unchanged.
+- Physical checks: pending owner Mac pass — add a step to a new workflow and
+  confirm the title reads `Untitled` with an "Enter a name" hint; type a name
+  and confirm the hint disappears.
 - Next: stop here per owner decision.
 
 

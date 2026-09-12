@@ -320,35 +320,49 @@ struct WorkflowEditorView: View {
         [.manual, .schedule, .applicationLifecycle, .wake, .displayConnection, .externalVolume, .powerSource, .batteryThreshold]
     }
 
+    private var isDefaultName: Bool {
+        model.draftName.trimmingCharacters(in: .whitespacesAndNewlines) == "Untitled"
+    }
+
     private var titleHeader: some View {
         HStack(alignment: .firstTextBaseline, spacing: TaskOSSpacing.sm) {
-            TextField(
-                "Untitled Workflow",
-                text: Binding(get: { model.draftName }, set: { model.updateName($0) })
-            )
-            .textFieldStyle(.plain)
-            .font(.system(size: 26, weight: .semibold))
-            .lineLimit(1)
-            .focused($titleFocused)
-            .padding(.horizontal, 6)
-            .padding(.vertical, 2)
-            .background(
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .fill(titleFocused || titleHovered ? Color.primary.opacity(0.06) : Color.clear)
-            )
-            .overlay(alignment: .bottom) {
-                Rectangle()
-                    .fill(titleFocused ? Color.accentColor : (titleHovered ? Color.secondary.opacity(0.4) : Color.clear))
-                    .frame(height: 1)
-                    .padding(.horizontal, 6)
+            VStack(alignment: .leading, spacing: 1) {
+                TextField(
+                    "Untitled Workflow",
+                    text: Binding(get: { model.draftName }, set: { model.updateName($0) })
+                )
+                .textFieldStyle(.plain)
+                .font(.system(size: 26, weight: .semibold))
+                .lineLimit(1)
+                .focused($titleFocused)
+                .padding(.horizontal, 6)
+                .padding(.vertical, 2)
+                .background(
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .fill(titleFocused || titleHovered ? Color.primary.opacity(0.06) : Color.clear)
+                )
+                .overlay(alignment: .bottom) {
+                    Rectangle()
+                        .fill(titleFocused ? Color.accentColor : (titleHovered ? Color.secondary.opacity(0.4) : Color.clear))
+                        .frame(height: 1)
+                        .padding(.horizontal, 6)
+                }
+                .onHover { titleHovered = $0 }
+                .animation(.taskOSQuick, value: titleFocused)
+                .animation(.taskOSQuick, value: titleHovered)
+                .accessibilityLabel("Workflow name")
+                .accessibilityHint("Enter a name for this workflow")
+                .accessibilityIdentifier("editor.title")
+
+                if isDefaultName {
+                    Label("Enter a name", systemImage: "pencil")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, 6)
+                        .allowsHitTesting(false)
+                }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            .onHover { titleHovered = $0 }
-            .animation(.taskOSQuick, value: titleFocused)
-            .animation(.taskOSQuick, value: titleHovered)
-            .accessibilityLabel("Workflow name")
-            .accessibilityHint("Edit the workflow name")
-            .accessibilityIdentifier("editor.title")
 
             if model.supportsAutomaticRuns {
                 Toggle(
