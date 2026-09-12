@@ -2105,3 +2105,34 @@ record isolation/recovery) is deferred to Phase 3 with the migration fixtures.
   relaunched.
 - Next eligible work package: U4 accessibility/responsive polish, then Phase 3.1.
 
+### Increment U-stab-A — Run lifecycle, enable state, navigation guards (A1–A6)
+
+- Status: done
+- Defects fixed:
+  - A1: the editor had no running state or cancel; a run looked like nothing was
+    happening. Now a running banner shows a spinner, the run name, queued count,
+    and Cancel; the toolbar Run button shows "Running…" and is disabled while
+    busy; ⌘. cancels.
+  - A2: added an explicit inspector toggle to the editor toolbar.
+  - A3: `setEnabled` ignored event triggers, so event-based workflows could not
+    be enabled; it now registers/unregisters schedules and event triggers. The
+    editor switch is authoritative for saved workflows (persists immediately and
+    syncs the sidebar dot) and draft-state for new ones.
+  - A4: replacing the document (selecting another workflow, New, template Use,
+    Import) now prompts Save / Discard / Cancel when there are unsaved changes.
+  - A5: renaming a saved workflow from the sidebar updates the open editor
+    title; deleting the open workflow starts a clean draft and returns the
+    sidebar to Workflows; run-result banners are gated to the run's own workflow.
+  - A6: step cards no longer merge their buttons into one VoiceOver element;
+    the summary is a labeled selectable element and move/duplicate/delete remain
+    individually reachable.
+- Interfaces changed: `ComposerViewModel` gained `isRunning`, `runningName`,
+  `queuedCount`, `cancelCurrentRun`, `currentAutomationID`; `setEnabled` covers
+  event triggers. `TaskOSCommandActions.cancelRun`. `SidebarView` now takes
+  `onSelect`/`onNewWorkflow`; `TemplatesGalleryView.onUse` passes the template;
+  `WorkflowEditorView` gained `onImport`.
+- Tests performed:
+  - App tests (`xcodebuild ... test -only-testing:TaskOSTests`) — TEST SUCCEEDED.
+  - Debug build — BUILD SUCCEEDED.
+- Next: D1 UI smoke tests, then D2 regression matrix.
+

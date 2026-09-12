@@ -4,6 +4,8 @@ import TaskOSCore
 struct SidebarView: View {
     let model: ComposerViewModel
     @Binding var selection: SidebarSelection
+    var onSelect: (SidebarSelection) -> Void
+    var onNewWorkflow: () -> Void
 
     @State private var pendingDelete: SavedWorkflow?
 
@@ -53,6 +55,9 @@ struct SidebarView: View {
             presenting: pendingDelete
         ) { workflow in
             Button("Delete", role: .destructive) {
+                if selection == .workflow(workflow.id) {
+                    onSelect(.destination(.workflows))
+                }
                 model.deleteSaved(workflow)
                 pendingDelete = nil
             }
@@ -85,7 +90,7 @@ struct SidebarView: View {
 
     private func destinationButton(_ destination: SidebarDestination, badge: Int? = nil) -> some View {
         Button {
-            selection = .destination(destination)
+            onSelect(.destination(destination))
         } label: {
             HStack(spacing: TaskOSSpacing.xs) {
                 Label(destination.title, systemImage: SidebarPresentation.symbol(for: destination))
@@ -128,8 +133,7 @@ struct SidebarView: View {
             .textFieldStyle(.plain)
             .font(.subheadline)
             Button {
-                model.newWorkflow()
-                selection = .destination(.workflows)
+                onNewWorkflow()
             } label: {
                 Image(systemName: "plus")
             }
@@ -142,7 +146,7 @@ struct SidebarView: View {
 
         ForEach(model.filteredWorkflows) { workflow in
             Button {
-                selection = .workflow(workflow.id)
+                onSelect(.workflow(workflow.id))
             } label: {
                 WorkflowSidebarRow(
                     workflow: workflow,
@@ -155,8 +159,7 @@ struct SidebarView: View {
             .listRowBackground(rowBackground(isSelected: selection == .workflow(workflow.id)))
             .contextMenu {
                 Button("Edit") {
-                    model.loadForEditing(workflow)
-                    selection = .workflow(workflow.id)
+                    onSelect(.workflow(workflow.id))
                 }
                 Button("Run") { model.runSaved(workflow) }
                 Divider()

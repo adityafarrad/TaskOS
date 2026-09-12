@@ -9,10 +9,17 @@ struct ContentView: View {
     @State private var columnVisibility: NavigationSplitViewVisibility = .all
     @State private var showReview = false
     @State private var composerFocusToken = 0
+    @State private var pendingReplace: (() -> Void)?
+    @State private var showDiscardPrompt = false
 
     var body: some View {
         NavigationSplitView(columnVisibility: $columnVisibility) {
-            SidebarView(model: model, selection: $sidebarSelection)
+            SidebarView(
+                model: model,
+                selection: $sidebarSelection,
+                onSelect: selectSidebar,
+                onNewWorkflow: newWorkflow
+            )
         } detail: {
             detail
                 .id(sidebarSelection)
@@ -30,8 +37,16 @@ struct ContentView: View {
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             model.refreshAll()
         }
-        .onChange(of: sidebarSelection) { _, newValue in
-            handleSidebarChange(newValue)
+        .confirmationDialog(
+            "You have unsaved changes",
+            isPresented: $showDiscardPrompt,
+            titleVisibility: .visible
+        ) {
+            Button("Save and Continue") { saveAndContinue() }
+            Button("Discard Changes", role: .destructive) { performPendingReplace() }
+            Button("Cancel", role: .cancel) { pendingReplace = nil }
+        } message: {
+            Text("Your current workflow has changes that haven’t been saved.")
         }
         .sheet(
             isPresented: Binding(get: { model.showOnboarding }, set: { model.showOnboarding = $0 })
@@ -54,8 +69,13 @@ struct ContentView: View {
     private var detail: some View {
         switch sidebarSelection {
         case .destination(.templates):
-            TemplatesGalleryView(model: model) {
-                sidebarSelection = .destination(.workflows)
+            TemplatesGalleryView(model: model) { template in
+                requestDocumentReplacement {
+                    model.loadTemplate(template)
+                    sidebarSelection = .destination(.workflows)
+                    selection.clear()
+                    selection.isInspectorPresented = false
+                }
             }
         case .destination(.history):
             HistoryView(model: model)
@@ -70,6 +90,7 @@ struct ContentView: View {
                 composerFocusToken: $composerFocusToken,
                 onRun: run,
                 onSave: { model.save() },
+                onImport: { requestDocumentReplacement { model.importWorkflow() } },
                 onViewHistory: { sidebarSelection = .destination(.history) }
             )
         }
@@ -77,10 +98,7 @@ struct ContentView: View {
 
     private var commandActions: TaskOSCommandActions {
         TaskOSCommandActions(
-            newWorkflow: {
-                model.newWorkflow()
-                sidebarSelection = .destination(.workflows)
-            },
+            newWorkflow: newWorkflow,
             focusComposer: {
                 sidebarSelection = .destination(.workflows)
                 composerFocusToken += 1
@@ -89,6 +107,7 @@ struct ContentView: View {
                 sidebarSelection = .destination(.workflows)
                 run()
             },
+            cancelRun: { model.cancelCurrentRun() },
             save: { model.save() },
             undo: { model.undo() },
             redo: { model.redo() },
@@ -101,6 +120,7 @@ struct ContentView: View {
     }
 
     private func run() {
+        guard !model.isBusy else { return }
         if model.canTest {
             model.test()
         } else {
@@ -109,18 +129,48 @@ struct ContentView: View {
         }
     }
 
-    private func handleSidebarChange(_ newValue: SidebarSelection) {
-        switch newValue {
+    private func selectSidebar(_ target: SidebarSelection) {
+        guard target != sidebarSelection else { return }
+        switch target {
         case .workflow(let id):
-            if let workflow = model.savedWorkflows.first(where: { $0.id == id }) {
+            guard let workflow = model.savedWorkflows.first(where: { $0.id == id }) else { return }
+            requestDocumentReplacement {
+                sidebarSelection = target
                 model.loadForEditing(workflow)
+                selection.clear()
+                selection.isInspectorPresented = false
             }
+        case .destination:
+            sidebarSelection = target
+        }
+    }
+
+    private func newWorkflow() {
+        requestDocumentReplacement {
+            model.newWorkflow()
+            sidebarSelection = .destination(.workflows)
             selection.clear()
             selection.isInspectorPresented = false
-        case .destination(.workflows):
-            break
-        case .destination:
-            selection.isInspectorPresented = false
         }
+    }
+
+    private func requestDocumentReplacement(_ action: @escaping () -> Void) {
+        guard model.hasUnsavedChanges else {
+            action()
+            return
+        }
+        pendingReplace = action
+        showDiscardPrompt = true
+    }
+
+    private func performPendingReplace() {
+        let action = pendingReplace
+        pendingReplace = nil
+        action?()
+    }
+
+    private func saveAndContinue() {
+        model.save()
+        performPendingReplace()
     }
 }

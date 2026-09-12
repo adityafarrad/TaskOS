@@ -9,6 +9,7 @@ struct WorkflowEditorView: View {
     @Binding var composerFocusToken: Int
     let onRun: () -> Void
     let onSave: () -> Void
+    let onImport: () -> Void
     let onViewHistory: () -> Void
 
     @FocusState private var composerFocused: Bool
@@ -16,7 +17,8 @@ struct WorkflowEditorView: View {
     @State private var pendingDelete: SavedWorkflow?
 
     private var finishedRecord: RunRecord? {
-        if case .finished(let record) = model.stage {
+        if case .finished(let record) = model.stage,
+           record.automationID == model.currentAutomationID {
             return record
         }
         return nil
@@ -35,7 +37,9 @@ struct WorkflowEditorView: View {
                     onBrowseActions: { model.showDiscovery = true }
                 )
 
-                if let record = finishedRecord {
+                if model.isRunning {
+                    runningBanner
+                } else if let record = finishedRecord {
                     RunBannerView(
                         record: record,
                         onViewHistory: onViewHistory,
@@ -72,6 +76,7 @@ struct WorkflowEditorView: View {
             presenting: pendingDelete
         ) { workflow in
             Button("Delete", role: .destructive) {
+                sidebarSelection = .destination(.workflows)
                 model.deleteSaved(workflow)
                 pendingDelete = nil
             }
@@ -79,6 +84,36 @@ struct WorkflowEditorView: View {
         } message: { workflow in
             Text("“\(workflow.name)” and its history metadata will be removed. This cannot be undone.")
         }
+    }
+
+    private var runningBanner: some View {
+        HStack(spacing: TaskOSSpacing.sm) {
+            ProgressView()
+                .controlSize(.small)
+
+            VStack(alignment: .leading, spacing: 1) {
+                Text(model.runningName.map { "Running \($0)…" } ?? "Running…")
+                    .font(.subheadline.weight(.semibold))
+                if model.queuedCount > 0 {
+                    Text(model.queuedCount == 1 ? "1 run queued" : "\(model.queuedCount) runs queued")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            Spacer()
+
+            Button("Cancel") { model.cancelCurrentRun() }
+                .controlSize(.small)
+        }
+        .padding(.horizontal, TaskOSSpacing.md)
+        .padding(.vertical, TaskOSSpacing.xs)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: TaskOSRadius.card, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: TaskOSRadius.card, style: .continuous)
+                .strokeBorder(Color(nsColor: .separatorColor), lineWidth: 1)
+        )
+        .transition(.move(edge: .top).combined(with: .opacity))
     }
 
     private var triggerRow: some View {
@@ -215,18 +250,36 @@ struct WorkflowEditorView: View {
 
             if model.supportsAutomaticRuns {
                 Toggle(
-                    "Run automatically",
-                    isOn: Binding(get: { model.autoRunEnabled }, set: { model.autoRunEnabled = $0 })
+                    model.activeWorkflow == nil ? "Run automatically" : "Enabled",
+                    isOn: enabledBinding
                 )
                 .toggleStyle(.switch)
                 .controlSize(.small)
                 .labelsHidden()
                 .fixedSize()
-                .help("Run automatically on its trigger")
-                .accessibilityLabel("Run automatically")
+                .help(model.activeWorkflow == nil ? "Run automatically after saving" : "Enable or disable this workflow")
+                .accessibilityLabel("Enabled")
             }
         }
         .padding(.vertical, 2)
+    }
+
+    private var enabledBinding: Binding<Bool> {
+        Binding(
+            get: {
+                if let workflow = model.activeWorkflow {
+                    return workflow.isEnabled
+                }
+                return model.autoRunEnabled
+            },
+            set: { newValue in
+                if let workflow = model.activeWorkflow {
+                    model.setEnabled(workflow, enabled: newValue)
+                } else {
+                    model.autoRunEnabled = newValue
+                }
+            }
+        )
     }
 
     @ViewBuilder
@@ -349,10 +402,15 @@ struct WorkflowEditorView: View {
             Button {
                 onRun()
             } label: {
-                Label("Run", systemImage: "play.fill")
+                if model.isRunning {
+                    Label("Running", systemImage: "hourglass")
+                } else {
+                    Label("Run", systemImage: "play.fill")
+                }
             }
             .buttonStyle(.borderedProminent)
-            .help("Run workflow (⌘R)")
+            .disabled(model.isBusy)
+            .help(model.isRunning ? "Running…" : "Run workflow (⌘R)")
             .popover(isPresented: $showReview, arrowEdge: .bottom) {
                 RunReviewView(
                     model: model,
@@ -375,6 +433,14 @@ struct WorkflowEditorView: View {
             }
             .menuIndicator(.hidden)
             .help("More actions")
+
+            Button {
+                selection.isInspectorPresented.toggle()
+            } label: {
+                Label("Inspector", systemImage: "sidebar.right")
+            }
+            .help("Show or hide the inspector")
+            .accessibilityIdentifier("inspectorToggle")
         }
     }
 
@@ -393,7 +459,7 @@ struct WorkflowEditorView: View {
 
         Divider()
         Button("Actions & Triggers…") { model.showDiscovery = true }
-        Button("Import Workflow…") { model.importWorkflow() }
+        Button("Import Workflow…") { onImport() }
         Button("Save") { onSave() }
             .disabled(!model.hasUnsavedChanges)
     }

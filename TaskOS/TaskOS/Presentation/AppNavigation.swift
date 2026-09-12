@@ -64,6 +64,7 @@ struct TaskOSCommandActions {
     var newWorkflow: () -> Void
     var focusComposer: () -> Void
     var run: () -> Void
+    var cancelRun: () -> Void
     var save: () -> Void
     var undo: () -> Void
     var redo: () -> Void
@@ -107,6 +108,9 @@ struct TaskOSCommands: Commands {
                 .disabled(actions == nil)
             Button("Run Workflow") { actions?.run() }
                 .keyboardShortcut("r", modifiers: .command)
+                .disabled(actions == nil)
+            Button("Cancel Run") { actions?.cancelRun() }
+                .keyboardShortcut(".", modifiers: .command)
                 .disabled(actions == nil)
             Divider()
             Button("Find in Composer") { actions?.focusComposer() }

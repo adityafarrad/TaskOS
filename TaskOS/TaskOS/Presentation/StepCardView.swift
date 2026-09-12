@@ -37,6 +37,13 @@ struct StepCardView: View {
                     .lineLimit(1)
                     .truncationMode(.middle)
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(Rectangle())
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel("Step \(index + 1), \(ActionPresentation.title(for: action.draft))")
+            .accessibilityHint("Double-tap to configure this step")
+            .accessibilityAddTraits(.isButton)
+            .accessibilityAction { onSelect() }
 
             Spacer(minLength: TaskOSSpacing.xs)
 
@@ -52,9 +59,7 @@ struct StepCardView: View {
         .taskOSCard(isSelected: isSelected, isHovered: isHovered)
         .onHover { isHovered = $0 }
         .onTapGesture(perform: onSelect)
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel("Step \(index + 1), \(ActionPresentation.title(for: action.draft))")
-        .accessibilityAddTraits(isSelected ? [.isSelected] : [])
+        .accessibilityElement(children: .contain)
     }
 
     private var dragHandle: some View {

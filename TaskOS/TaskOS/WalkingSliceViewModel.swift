@@ -27,6 +27,8 @@ final class ComposerViewModel {
         hasRemovableVolume: false
     )
     private(set) var stage: Stage = .composing
+    private(set) var runningName: String?
+    private(set) var queuedCount = 0
     private(set) var approvedRevision: WorkflowRevision?
     private(set) var notice: String?
     private(set) var savedWorkflows: [SavedWorkflow] = []
@@ -60,6 +62,7 @@ final class ComposerViewModel {
     private var lastDefinition: AutomationDefinition?
     private var applicationsLoaded = false
     private var autosaveTask: Task<Void, Never>?
+    private var runMonitor: Task<Void, Never>?
 
     var currentRevision: WorkflowRevision {
         WorkflowRevision(startingRevision.value + document.revision.value - 1)
@@ -144,6 +147,20 @@ final class ComposerViewModel {
         }
     }
 
+    var isRunning: Bool {
+        if case .running = stage {
+            return true
+        }
+        return false
+    }
+
+    func cancelCurrentRun() {
+        Task { [weak self] in
+            guard let self else { return }
+            await self.composition.coordinator.cancelAll()
+        }
+    }
+
     var canTest: Bool {
         guard let preview, preview.revision == currentRevision, preview.isRunnable else {
             return false
@@ -153,6 +170,10 @@ final class ComposerViewModel {
 
     var isEditingSavedWorkflow: Bool {
         editingWorkflowID != nil
+    }
+
+    var currentAutomationID: AutomationID {
+        currentID
     }
 
     var activeWorkflow: SavedWorkflow? {
@@ -747,15 +768,21 @@ final class ComposerViewModel {
     func test() {
         guard canTest, let definition = lastDefinition else { return }
         stage = .running
+        runningName = draftName
+        queuedCount = 0
+        startRunMonitoring()
 
         Task { [weak self] in
             guard let self else { return }
             guard let record = await self.composition.coordinator.submitAndWait(definition, source: .manual) else {
                 self.stage = .composing
+                self.runningName = nil
                 self.notice = "Could not start the test run. Try again in a moment."
                 return
             }
             self.stage = .finished(record)
+            self.runningName = nil
+            self.queuedCount = 0
         }
     }
 
@@ -999,14 +1026,20 @@ final class ComposerViewModel {
 
     func runSaved(_ workflow: SavedWorkflow) {
         stage = .running
+        runningName = workflow.name
+        queuedCount = 0
+        startRunMonitoring()
         Task { [weak self] in
             guard let self else { return }
             guard let record = await self.composition.coordinator.submitAndWait(workflow.definition, source: .manual) else {
                 self.stage = .composing
+                self.runningName = nil
                 self.notice = "Could not start this workflow."
                 return
             }
             self.stage = .finished(record)
+            self.runningName = nil
+            self.queuedCount = 0
         }
     }
 
@@ -1081,33 +1114,73 @@ final class ComposerViewModel {
             guard let self else { return }
             let status = await self.composition.coordinator.status()
             self.automaticTriggersPaused = status.isPaused
+            if status.isRunning || status.queuedCount > 0 {
+                self.queuedCount = status.queuedCount
+                if self.runningName == nil {
+                    self.runningName = status.currentName
+                }
+            }
             self.admissionEvents = (try? await self.composition.admissionEvents.recentEvents(limit: 50)) ?? []
         }
     }
 
+    private func startRunMonitoring() {
+        runMonitor?.cancel()
+        runMonitor = Task { [weak self] in
+            while !Task.isCancelled {
+                guard let self else { return }
+                let status = await self.composition.coordinator.status()
+                if !status.isRunning, status.queuedCount == 0 {
+                    self.queuedCount = 0
+                    return
+                }
+                self.queuedCount = status.queuedCount
+                try? await Task.sleep(for: .milliseconds(500))
+            }
+        }
+    }
+
     func deleteSaved(_ workflow: SavedWorkflow) {
+        let wasEditing = editingWorkflowID == workflow.id
         Task { [weak self] in
             guard let self else { return }
             try? await self.composition.repository.delete(id: workflow.id)
             await self.composition.scheduleRegistry.unregister(workflow.id)
             await self.composition.eventTriggerRegistry.unregister(workflow.id)
+            if wasEditing {
+                self.newWorkflow()
+            }
             self.loadLibrary()
         }
     }
 
     func setEnabled(_ workflow: SavedWorkflow, enabled: Bool) {
-        guard workflow.definition.trigger.schedule != nil else { return }
+        let trigger = workflow.definition.trigger
+        guard trigger.schedule != nil || trigger.isEventTrigger else { return }
         var updated = workflow
         updated.isEnabled = enabled
         updated.updatedAt = Date()
 
+        if editingWorkflowID == workflow.id {
+            autoRunEnabled = enabled
+        }
+
         Task { [weak self] in
             guard let self else { return }
             try? await self.composition.repository.save(updated)
-            if updated.isEnabled {
-                await self.composition.scheduleRegistry.register(updated.definition)
-            } else {
-                await self.composition.scheduleRegistry.unregister(updated.id)
+            if trigger.schedule != nil {
+                if updated.isEnabled {
+                    await self.composition.scheduleRegistry.register(updated.definition)
+                } else {
+                    await self.composition.scheduleRegistry.unregister(updated.id)
+                }
+            }
+            if trigger.isEventTrigger {
+                if updated.isEnabled {
+                    await self.composition.eventTriggerRegistry.register(updated.definition)
+                } else {
+                    await self.composition.eventTriggerRegistry.unregister(updated.id)
+                }
             }
             self.loadLibrary()
         }
@@ -1147,6 +1220,10 @@ final class ComposerViewModel {
             actions: workflow.definition.actions
         )
         let updated = SavedWorkflow(definition: renamed, isEnabled: workflow.isEnabled, updatedAt: Date())
+
+        if editingWorkflowID == workflow.id {
+            draftName = trimmed
+        }
 
         Task { [weak self] in
             guard let self else { return }

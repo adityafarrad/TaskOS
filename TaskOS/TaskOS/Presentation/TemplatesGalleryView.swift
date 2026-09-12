@@ -3,7 +3,7 @@ import TaskOSCore
 
 struct TemplatesGalleryView: View {
     let model: ComposerViewModel
-    let onUse: () -> Void
+    let onUse: (AutomationTemplate) -> Void
 
     @State private var showAll = false
 
@@ -33,8 +33,7 @@ struct TemplatesGalleryView: View {
                     ) {
                         ForEach(visibleTemplates) { template in
                             TemplateCard(template: template) {
-                                model.loadTemplate(template)
-                                onUse()
+                                onUse(template)
                             }
                         }
                     }
