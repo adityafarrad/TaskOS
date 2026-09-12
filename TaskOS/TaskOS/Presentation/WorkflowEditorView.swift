@@ -177,7 +177,7 @@ struct WorkflowEditorView: View {
             RoundedRectangle(cornerRadius: TaskOSRadius.card, style: .continuous)
                 .strokeBorder(Color(nsColor: .separatorColor), lineWidth: 1)
         )
-        .transition(.move(edge: .top).combined(with: .opacity))
+        .transition(reduceMotion ? .opacity : .move(edge: .top).combined(with: .opacity))
     }
 
     private var triggerRow: some View {

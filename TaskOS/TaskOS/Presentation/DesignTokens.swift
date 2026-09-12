@@ -39,6 +39,8 @@ struct TaskOSCardModifier: ViewModifier {
     var isHovered: Bool
     var cornerRadius: CGFloat
 
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     func body(content: Content) -> some View {
         content
             .background(
@@ -57,8 +59,8 @@ struct TaskOSCardModifier: ViewModifier {
                 radius: isHovered ? 6 : 2,
                 y: 1
             )
-            .animation(.taskOSQuick, value: isHovered)
-            .animation(.taskOSQuick, value: isSelected)
+            .animation(reduceMotion ? nil : .taskOSQuick, value: isHovered)
+            .animation(reduceMotion ? nil : .taskOSQuick, value: isSelected)
     }
 }
 

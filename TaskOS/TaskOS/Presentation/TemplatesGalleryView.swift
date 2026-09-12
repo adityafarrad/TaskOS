@@ -87,6 +87,8 @@ private struct TemplateCard: View {
     let template: AutomationTemplate
     let onUse: () -> Void
 
+    @State private var isHovered = false
+
     var body: some View {
         VStack(alignment: .leading, spacing: TaskOSSpacing.xs) {
             Image(systemName: TemplatePresentation.symbol(for: template.id))
@@ -102,15 +104,17 @@ private struct TemplateCard: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .lineLimit(3)
+                .fixedSize(horizontal: false, vertical: true)
 
             if let limitations = template.limitations {
                 Text(limitations)
                     .font(.caption2)
                     .foregroundStyle(.orange)
                     .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
             }
 
-            Spacer(minLength: 0)
+            Spacer(minLength: TaskOSSpacing.xxs)
 
             HStack {
                 Spacer()
@@ -120,8 +124,8 @@ private struct TemplateCard: View {
             }
         }
         .padding(TaskOSSpacing.sm)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .frame(height: 184, alignment: .top)
-        .taskOSCard()
+        .frame(maxWidth: .infinity, minHeight: 176, alignment: .topLeading)
+        .taskOSCard(isHovered: isHovered)
+        .onHover { isHovered = $0 }
     }
 }

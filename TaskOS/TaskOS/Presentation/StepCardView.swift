@@ -15,6 +15,7 @@ struct StepCardView: View {
     let onDelete: () -> Void
 
     @State private var isHovered = false
+    @FocusState private var isFocused: Bool
 
     private var unresolved: Bool {
         ActionPresentation.isUnresolved(action.draft, fileStatus: model.fileStatus)
@@ -70,8 +71,16 @@ struct StepCardView: View {
                     .offset(y: -5)
             }
         }
+        .overlay {
+            RoundedRectangle(cornerRadius: TaskOSRadius.card, style: .continuous)
+                .strokeBorder(Color.accentColor, lineWidth: 2)
+                .opacity(isFocused ? 1 : 0)
+                .allowsHitTesting(false)
+        }
         .onHover { isHovered = $0 }
         .onTapGesture(perform: onSelect)
+        .focusable(true)
+        .focused($isFocused)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("step.card.\(index)")
     }

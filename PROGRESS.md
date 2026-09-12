@@ -2322,3 +2322,25 @@ record isolation/recovery) is deferred to Phase 3 with the migration fixtures.
 - Next: Phase C polish (onboarding restyle, focus rings, full Reduce-Motion,
   contrast) or Phase 3.1 validation.
 
+### Increment C — Phase C polish
+
+- Status: done
+- Behavior delivered:
+  - **Onboarding** restyled to match the app: accent TaskOS mark, concise
+    feature rows with SF Symbols, and a prominent Got it button.
+  - **Focus rings**: step cards are keyboard-focusable and show an accent focus
+    ring; the composer and title already had visible focus treatment, so custom
+    controls now have a consistent focus affordance.
+  - **Reduce Motion**: card hover/selection animation, inspector slide, and run
+    banner transitions now fall back to opacity-only when Reduce Motion is on
+    (matching the composer and step-list animations).
+  - **Templates**: cards use a minimum height instead of a fixed one so longer
+    titles/limitations don't clip, summaries wrap, and cards lift subtly on
+    hover.
+- Interfaces changed: `OnboardingView` restyle; `TaskOSCardModifier` and
+  `RunBannerView` read `accessibilityReduceMotion`; `StepCardView` gained
+  keyboard focus; `TemplateCard` is hover-aware.
+- Tests performed: UI tests 10/10 pass; app tests pass (one rerun past the known
+  SwiftData in-memory flake); Core 270/35 pass; Debug + Release build.
+- Next: Phase 3.1 validation (per PLAN.md) when requested.
+

@@ -178,6 +178,8 @@ struct RunBannerView: View {
     var onViewHistory: () -> Void
     var onDismiss: () -> Void
 
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     var body: some View {
         HStack(spacing: TaskOSSpacing.sm) {
             Image(systemName: RunPresentation.symbol(for: record.status))
@@ -217,7 +219,7 @@ struct RunBannerView: View {
             RoundedRectangle(cornerRadius: TaskOSRadius.card, style: .continuous)
                 .strokeBorder(Color(nsColor: .separatorColor), lineWidth: 1)
         )
-        .transition(.move(edge: .top).combined(with: .opacity))
+        .transition(reduceMotion ? .opacity : .move(edge: .top).combined(with: .opacity))
     }
 
     private var firstFailure: String? {

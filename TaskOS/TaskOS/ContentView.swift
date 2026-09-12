@@ -13,6 +13,7 @@ struct ContentView: View {
     @State private var showDiscardPrompt = false
     @State private var contentWidth: CGFloat = 0
     @State private var appWidth: CGFloat = 0
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private var compactSidebar: Bool {
         appWidth > 0 && appWidth < 820
@@ -36,7 +37,7 @@ struct ContentView: View {
                     Divider()
                     InspectorView(model: model, selection: selection)
                         .frame(width: inspectorWidth)
-                        .transition(.move(edge: .trailing).combined(with: .opacity))
+                        .transition(reduceMotion ? .opacity : .move(edge: .trailing).combined(with: .opacity))
                 }
             }
             .id(sidebarSelection)
@@ -46,7 +47,7 @@ struct ContentView: View {
                 }
             )
             .onPreferenceChange(WindowWidthKey.self) { contentWidth = $0 }
-            .animation(.taskOSStandard, value: selection.isInspectorPresented)
+            .animation(reduceMotion ? nil : .taskOSStandard, value: selection.isInspectorPresented)
         }
         .frame(minWidth: TaskOSMetrics.windowMinWidth, minHeight: TaskOSMetrics.windowMinHeight)
         .background(

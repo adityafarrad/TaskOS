@@ -21,30 +21,58 @@ struct OnboardingView: View {
     let onDismiss: () -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text("Welcome to TaskOS")
-                .font(.title2)
+        VStack(alignment: .leading, spacing: TaskOSSpacing.lg) {
+            HStack(spacing: TaskOSSpacing.sm) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .fill(Color.accentColor.gradient)
+                    Image(systemName: "command")
+                        .font(.system(size: 20, weight: .bold))
+                        .foregroundStyle(.white)
+                }
+                .frame(width: 40, height: 40)
 
-            Text("Start typing what you want your Mac to do, for example \"open Safari and put it on the left half\".")
-                .fixedSize(horizontal: false, vertical: true)
-
-            VStack(alignment: .leading, spacing: 8) {
-                Label("Choose suggestions and edit the live step cards.", systemImage: "text.cursor")
-                Label("Preview and test the exact steps before you save.", systemImage: "play.circle")
-                Label("Start with a Template, or type a trigger like \"every weekday at 9\" or \"when Safari opens\".", systemImage: "square.grid.2x2")
-                Label("Choose \"Browse supported actions\" to see examples, permissions, and limitations.", systemImage: "magnifyingglass")
-                Label("TaskOS keeps running in the menu bar after you close the window.", systemImage: "menubar.rectangle")
-                Label("Arranging windows needs Accessibility permission, granted from Preview or Settings.", systemImage: "lock.shield")
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Welcome to TaskOS")
+                        .font(.title2.weight(.semibold))
+                    Text("Automate your Mac without writing a script.")
+                        .foregroundStyle(.secondary)
+                }
             }
-            .font(.callout)
+
+            VStack(alignment: .leading, spacing: TaskOSSpacing.sm) {
+                featureRow("text.cursor", "Type what you want", "Describe a command and choose from live suggestions.")
+                featureRow("square.stack.3d.up", "Review the steps", "Edit each trigger and action before anything runs.")
+                featureRow("play.circle", "Preview and test", "Testing runs for real, so you always know what happens.")
+                featureRow("clock.arrow.circlepath", "Save and automate", "Run manually, on a schedule, or on a system event.")
+                featureRow("menubar.rectangle", "Stays in the menu bar", "TaskOS keeps running after you close the window.")
+            }
 
             HStack {
                 Spacer()
                 Button("Got it") { onDismiss() }
+                    .buttonStyle(.borderedProminent)
                     .keyboardShortcut(.defaultAction)
             }
         }
-        .padding(24)
-        .frame(width: 480)
+        .padding(TaskOSSpacing.lg)
+        .frame(width: 500)
+    }
+
+    private func featureRow(_ symbol: String, _ title: String, _ detail: String) -> some View {
+        HStack(alignment: .top, spacing: TaskOSSpacing.sm) {
+            Image(systemName: symbol)
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(.tint)
+                .frame(width: 24)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(title)
+                    .font(.callout.weight(.medium))
+                Text(detail)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
     }
 }
