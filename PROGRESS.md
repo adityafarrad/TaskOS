@@ -2446,6 +2446,8 @@ record isolation/recovery) is deferred to Phase 3 with the migration fixtures.
   - Debug build — BUILD SUCCEEDED.
 - Physical checks: pending owner Mac pass — open a new workflow and confirm no
   title chrome; add a step and confirm the title appears and is editable.
+- Final slice gate: Release build — BUILD SUCCEEDED on the combined UX-1–UX-4
+  tree.
 - Next: stop here per owner decision; D2 manual regression / Phase 3.1 remain
   the next contract steps when requested.
 
