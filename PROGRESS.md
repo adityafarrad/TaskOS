@@ -2219,3 +2219,18 @@ record isolation/recovery) is deferred to Phase 3 with the migration fixtures.
   affordance/debounce, B3 empty-state consolidation incl. the Add-step fold, B4
   Settings pause/resume, B5 discovery follow-through).
 
+### Increment U-d2b — Compact sidebar icon rail
+
+- Status: done
+- Behavior delivered: below ~820pt window width the sidebar collapses to a
+  ~64pt icon-only rail (destinations + a `+` new-workflow button, tooltips,
+  accessibility labels, subtle selection highlight); above that threshold the
+  full sidebar with labels, search, and the workflow list returns. The window
+  content width is measured with a preference key and drives the mode, so the
+  editor keeps its space at the narrowest sizes instead of squeezing. The
+  toolbar sidebar toggle still expands/collapses the column.
+- Interfaces changed: `SidebarView` gained `compact`; `AppWidthKey` added;
+  `ContentView` measures `appWidth` and passes `compactSidebar`.
+- Tests performed: UI tests 6/6 pass; Debug + Release build.
+- Next: Phase B (B1–B5).
+

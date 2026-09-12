@@ -4,6 +4,7 @@ import TaskOSCore
 struct SidebarView: View {
     let model: ComposerViewModel
     @Binding var selection: SidebarSelection
+    var compact: Bool = false
     var onSelect: (SidebarSelection) -> Void
     var onNewWorkflow: () -> Void
 
@@ -18,20 +19,27 @@ struct SidebarView: View {
         }
     }
 
+    private var sidebarMaxWidth: CGFloat? {
+        compact ? 76 : nil
+    }
+
     var body: some View {
         List {
             Section {
-                destinationButton(.workflows, badge: model.savedWorkflows.count)
-                if isWorkflowsActive {
+                destinationButton(.workflows, badge: compact ? nil : model.savedWorkflows.count)
+                if isWorkflowsActive && !compact {
                     workflowChildren
                 }
                 destinationButton(.templates)
                 destinationButton(.history)
                 destinationButton(.settings)
+                if compact {
+                    compactNewWorkflowButton
+                }
             } header: {
                 brand
             } footer: {
-                if model.automaticTriggersPaused {
+                if !compact, model.automaticTriggersPaused {
                     Label("Automatic triggers are paused from the menu bar.", systemImage: "pause.circle")
                         .font(.caption2)
                         .foregroundStyle(.orange)
@@ -40,7 +48,11 @@ struct SidebarView: View {
             }
         }
         .listStyle(.sidebar)
-        .navigationSplitViewColumnWidth(min: TaskOSMetrics.sidebarMin, ideal: TaskOSMetrics.sidebarIdeal)
+        .navigationSplitViewColumnWidth(
+            min: compact ? 56 : TaskOSMetrics.sidebarMin,
+            ideal: compact ? 64 : TaskOSMetrics.sidebarIdeal,
+            max: sidebarMaxWidth
+        )
         .alert("Rename Workflow", isPresented: renamePresented) {
             TextField("Name", text: Binding(get: { model.renameText }, set: { model.renameText = $0 }))
             Button("Save") { model.commitRename() }
@@ -77,9 +89,12 @@ struct SidebarView: View {
                     .foregroundStyle(.white)
             }
             .frame(width: 24, height: 24)
-            Text(TaskOSInfo.displayName)
-                .font(.headline)
+            if !compact {
+                Text(TaskOSInfo.displayName)
+                    .font(.headline)
+            }
         }
+        .frame(maxWidth: compact ? .infinity : nil, alignment: compact ? .center : .leading)
         .padding(.vertical, 6)
         .textCase(nil)
     }
@@ -92,22 +107,46 @@ struct SidebarView: View {
         Button {
             onSelect(.destination(destination))
         } label: {
-            HStack(spacing: TaskOSSpacing.xs) {
-                Label(destination.title, systemImage: SidebarPresentation.symbol(for: destination))
-                Spacer(minLength: 0)
-                if let badge, badge > 0 {
-                    Text("\(badge)")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .monospacedDigit()
+            if compact {
+                Image(systemName: SidebarPresentation.symbol(for: destination))
+                    .font(.system(size: 16, weight: .medium))
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .contentShape(Rectangle())
+            } else {
+                HStack(spacing: TaskOSSpacing.xs) {
+                    Label(destination.title, systemImage: SidebarPresentation.symbol(for: destination))
+                    Spacer(minLength: 0)
+                    if let badge, badge > 0 {
+                        Text("\(badge)")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .monospacedDigit()
+                    }
                 }
+                .contentShape(Rectangle())
             }
-            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .listRowBackground(rowBackground(isSelected: isDestinationSelected(destination)))
         .accessibilityAddTraits(isDestinationSelected(destination) ? [.isSelected] : [])
+        .accessibilityLabel(destination.title)
         .accessibilityIdentifier("sidebar.\(destination.rawValue)")
+    }
+
+    private var compactNewWorkflowButton: some View {
+        Button {
+            onNewWorkflow()
+        } label: {
+            Image(systemName: "plus")
+                .font(.system(size: 15, weight: .semibold))
+                .frame(maxWidth: .infinity, alignment: .center)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .listRowBackground(Color.clear)
+        .help("New workflow (⌘N)")
+        .accessibilityLabel("New workflow")
+        .accessibilityIdentifier("sidebar.newWorkflow")
     }
 
     @ViewBuilder

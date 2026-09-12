@@ -12,12 +12,18 @@ struct ContentView: View {
     @State private var pendingReplace: (() -> Void)?
     @State private var showDiscardPrompt = false
     @State private var contentWidth: CGFloat = 0
+    @State private var appWidth: CGFloat = 0
+
+    private var compactSidebar: Bool {
+        appWidth > 0 && appWidth < 820
+    }
 
     var body: some View {
         NavigationSplitView(columnVisibility: $columnVisibility) {
             SidebarView(
                 model: model,
                 selection: $sidebarSelection,
+                compact: compactSidebar,
                 onSelect: selectSidebar,
                 onNewWorkflow: newWorkflow
             )
@@ -43,6 +49,12 @@ struct ContentView: View {
             .animation(.taskOSStandard, value: selection.isInspectorPresented)
         }
         .frame(minWidth: TaskOSMetrics.windowMinWidth, minHeight: TaskOSMetrics.windowMinHeight)
+        .background(
+            GeometryReader { proxy in
+                Color.clear.preference(key: AppWidthKey.self, value: proxy.size.width)
+            }
+        )
+        .onPreferenceChange(AppWidthKey.self) { appWidth = $0 }
         .onAppear { model.loadApplicationsIfNeeded() }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             model.refreshAll()
