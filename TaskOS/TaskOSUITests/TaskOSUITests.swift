@@ -80,6 +80,23 @@ final class TaskOSUITests: XCTestCase {
     }
 
     @MainActor
+    func testNewWorkflowShowsSuggestions() throws {
+        let app = launchApp()
+        XCTAssertTrue(element(app, "editor.view").waitForExistence(timeout: 10))
+
+        element(app, "sidebar.workflows").click()
+        XCTAssertTrue(element(app, "workflows.view").waitForExistence(timeout: 5))
+
+        element(app, "sidebar.newWorkflow").click()
+        XCTAssertTrue(element(app, "editor.view").waitForExistence(timeout: 5))
+
+        let suggestion = app.buttons
+            .matching(NSPredicate(format: "label BEGINSWITH %@", "Arrange a window"))
+            .firstMatch
+        XCTAssertTrue(suggestion.waitForExistence(timeout: 5), "New workflow should offer suggestions like first launch")
+    }
+
+    @MainActor
     func testAddStepMenuCreatesAStep() throws {
         let app = launchApp()
         XCTAssertTrue(element(app, "editor.view").waitForExistence(timeout: 10))

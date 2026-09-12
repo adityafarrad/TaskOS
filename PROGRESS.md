@@ -2281,3 +2281,16 @@ record isolation/recovery) is deferred to Phase 3 with the migration fixtures.
   Debug + Release build.
 - Next: Phase B (B1–B5).
 
+### Increment U-fix7 — New workflow matches first launch
+
+- Status: done
+- Defect: after navigating to another destination and choosing **New**, the fresh
+  editor showed no suggestions, while the first-launch editor did. `newWorkflow`
+  cleared `suggestions` but never recomputed them.
+- Behavior delivered: `newWorkflow` now calls `refreshSuggestions()`, so New
+  reproduces the first-launch editor (default action suggestions, discovery
+  shortcuts, Get started panel).
+- Tests performed: new UI test `testNewWorkflowShowsSuggestions` (Workflows →
+  New → suggestions appear); UI tests 8/8 pass; Debug + Release build.
+- Next: Phase B (B1–B5).
+

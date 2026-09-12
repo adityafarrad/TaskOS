@@ -1038,12 +1038,12 @@ final class ComposerViewModel {
         draftName = "Untitled"
         autoRunEnabled = false
         document = ComposerDocument()
-        suggestions = []
         recoverableDraft = nil
         autosaveTask?.cancel()
         Task { [weak self] in
             try? await self?.composition.drafts.clearDraft()
         }
+        refreshSuggestions()
         resetPreview()
         notice = "Started a new workflow."
         updateWatchedDirectories()
