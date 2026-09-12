@@ -107,6 +107,7 @@ struct SidebarView: View {
         .buttonStyle(.plain)
         .listRowBackground(rowBackground(isSelected: isDestinationSelected(destination)))
         .accessibilityAddTraits(isDestinationSelected(destination) ? [.isSelected] : [])
+        .accessibilityIdentifier("sidebar.\(destination.rawValue)")
     }
 
     @ViewBuilder
@@ -140,6 +141,7 @@ struct SidebarView: View {
             .buttonStyle(.borderless)
             .help("New workflow (⌘N)")
             .accessibilityLabel("New workflow")
+            .accessibilityIdentifier("sidebar.newWorkflow")
         }
         .padding(.leading, 20)
         .padding(.trailing, 2)
@@ -157,6 +159,7 @@ struct SidebarView: View {
             .buttonStyle(.plain)
             .padding(.leading, 20)
             .listRowBackground(rowBackground(isSelected: selection == .workflow(workflow.id)))
+            .accessibilityIdentifier("sidebar.workflow.\(workflow.name)")
             .contextMenu {
                 Button("Edit") {
                     onSelect(.workflow(workflow.id))

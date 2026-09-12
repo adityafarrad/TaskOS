@@ -60,6 +60,7 @@ struct StepCardView: View {
         .onHover { isHovered = $0 }
         .onTapGesture(perform: onSelect)
         .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("step.card.\(index)")
     }
 
     private var dragHandle: some View {

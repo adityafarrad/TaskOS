@@ -64,6 +64,7 @@ struct WorkflowEditorView: View {
         }
         .toolbar { toolbarContent }
         .navigationTitle(model.draftName)
+        .accessibilityIdentifier("editor.view")
         .onChange(of: composerFocusToken) { _, _ in
             composerFocused = true
         }
@@ -134,6 +135,7 @@ struct WorkflowEditorView: View {
             }
             .buttonStyle(.link)
             .help("Browse every supported action and trigger")
+            .accessibilityIdentifier("editor.capabilities")
         }
     }
 
@@ -230,6 +232,7 @@ struct WorkflowEditorView: View {
         .fixedSize()
         .help("Change when this workflow runs")
         .accessibilityLabel("Trigger: \(TriggerPresentation.title(for: model.triggerFamily))")
+        .accessibilityIdentifier("editor.triggerPill")
     }
 
     private var triggerFamilies: [ComposerViewModel.TriggerFamily] {
@@ -247,6 +250,7 @@ struct WorkflowEditorView: View {
             .lineLimit(1)
             .frame(maxWidth: .infinity, alignment: .leading)
             .accessibilityLabel("Workflow name")
+            .accessibilityIdentifier("editor.title")
 
             if model.supportsAutomaticRuns {
                 Toggle(
@@ -375,6 +379,7 @@ struct WorkflowEditorView: View {
             Label("Add step", systemImage: "plus")
         }
         .fixedSize()
+        .accessibilityIdentifier("editor.addStep")
     }
 
     private func noticeRow(_ notice: String) -> some View {
@@ -397,6 +402,7 @@ struct WorkflowEditorView: View {
                     Label("Save", systemImage: "square.and.arrow.down")
                 }
                 .help("Save workflow (⌘S)")
+                .accessibilityIdentifier("editor.save")
             }
 
             Button {
@@ -411,6 +417,7 @@ struct WorkflowEditorView: View {
             .buttonStyle(.borderedProminent)
             .disabled(model.isBusy)
             .help(model.isRunning ? "Running…" : "Run workflow (⌘R)")
+            .accessibilityIdentifier("editor.run")
             .popover(isPresented: $showReview, arrowEdge: .bottom) {
                 RunReviewView(
                     model: model,

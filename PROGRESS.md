@@ -2136,3 +2136,35 @@ record isolation/recovery) is deferred to Phase 3 with the migration fixtures.
   - Debug build — BUILD SUCCEEDED.
 - Next: D1 UI smoke tests, then D2 regression matrix.
 
+### Increment U-stab-D — Test safety net (D1–D3)
+
+- Status: done (UI tests authored; execution pending automation permission)
+- Behavior delivered:
+  - Added a deterministic test launch: `-uiTesting` (and any XCTest run) makes
+    `AppComposition` use an in-memory SwiftData container, skips onboarding, and
+    skips notification/event-source startup, so tests never touch the user's
+    store.
+  - Added accessibility identifiers across the UI (`sidebar.*`, `editor.*`,
+    `composer.field`, `step.card.N`, `discovery.*`, `templates.view`,
+    `history.view`, `settings.view`, `inspectorToggle`) for stable UI queries.
+  - Authored XCUITest smoke journeys in `TaskOSUITests`: launch/editor, sidebar
+    navigation, composer creates a step, discovery open/close, settings startup
+    row.
+  - Added `ComposerViewModelTests` (5 tests) covering duplicate placement,
+    reorder, unsaved-change tracking, new-workflow reset, and card resolution.
+- Interfaces changed: `AppComposition.isUITesting`/`isTesting`;
+  `TaskOSUITests` now launches with `-uiTesting`; `ComposerViewModelTests` added.
+- Tests performed:
+  - `swift test --package-path Packages/TaskOSCore` — 270 tests, 35 suites, pass.
+  - App tests (`xcodebuild ... test -only-testing:TaskOSTests`) — TEST SUCCEEDED,
+    including the 5 new view-model tests.
+  - Debug + Release builds — BUILD SUCCEEDED; UI test target builds.
+  - UI test execution: **blocked in this environment** — the runner cannot
+    enable automation mode (same TCC restriction that blocks screenshots). Run
+    `TaskOSUITests` from Xcode (⌘U, with automation permission) to execute them.
+- D2 regression matrix: pending user-run physical pass — Phase 1 canonical
+  journey; 2.1 schedule A–E; 2.4 all six event families; 2.5 templates/discovery;
+  2.6 attention/permissions/retention; 2.3 export/import; plus compact resize and
+  light/dark.
+- Next: run the D2 matrix, then Phase B (UX friction) items B1–B5.
+

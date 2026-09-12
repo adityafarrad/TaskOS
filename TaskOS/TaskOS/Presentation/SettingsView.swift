@@ -55,6 +55,7 @@ struct SettingsView: View {
         }
         .formStyle(.grouped)
         .navigationTitle("Settings")
+        .accessibilityIdentifier("settings.view")
         .confirmationDialog(
             "Clear all run history?",
             isPresented: $confirmClearHistory

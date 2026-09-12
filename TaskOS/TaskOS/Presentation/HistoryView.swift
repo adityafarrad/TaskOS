@@ -38,6 +38,7 @@ struct HistoryView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .navigationTitle("History")
+        .accessibilityIdentifier("history.view")
     }
 
     private var header: some View {

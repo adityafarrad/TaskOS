@@ -14,6 +14,14 @@ struct HardwareAvailability: Sendable, Equatable {
 final class AppComposition {
     static let shared = AppComposition()
 
+    static var isUITesting: Bool {
+        ProcessInfo.processInfo.arguments.contains("-uiTesting")
+    }
+
+    static var isTesting: Bool {
+        isUITesting || ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
+    }
+
     let clock: any CoreClock
     let runner: WorkflowRunner
     let coordinator: RunCoordinator
@@ -44,14 +52,22 @@ final class AppComposition {
         let catalog = WorkspaceResourceCatalog()
 
         let container: ModelContainer
-        do {
-            container = try ModelContainer(
+        if Self.isTesting {
+            container = try! ModelContainer(
                 for: WorkflowRecord.self,
                 RunRecordEntry.self,
                 AdmissionEventRecord.self,
-                DraftRecord.self
+                DraftRecord.self,
+                configurations: ModelConfiguration(isStoredInMemoryOnly: true)
             )
-        } catch {
+        } else if let onDisk = try? ModelContainer(
+            for: WorkflowRecord.self,
+            RunRecordEntry.self,
+            AdmissionEventRecord.self,
+            DraftRecord.self
+        ) {
+            container = onDisk
+        } else {
             container = try! ModelContainer(
                 for: WorkflowRecord.self,
                 RunRecordEntry.self,

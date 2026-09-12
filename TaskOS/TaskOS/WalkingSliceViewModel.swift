@@ -50,7 +50,7 @@ final class ComposerViewModel {
     private(set) var accessibilityPermission: PermissionState = .notDetermined
     private(set) var launchAtLogin = LaunchAtLogin.isEnabled
     private(set) var settingsNotice: String?
-    var showOnboarding = !OnboardingStore.hasCompleted
+    var showOnboarding = !OnboardingStore.hasCompleted && !AppComposition.isTesting
 
     private let composition: AppComposition
     private let fileMonitor = FileSystemChangeMonitor()

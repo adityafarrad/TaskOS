@@ -19,6 +19,7 @@ struct DiscoveryView: View {
                 Spacer()
                 Button("Done") { model.showDiscovery = false }
                     .keyboardShortcut(.defaultAction)
+                    .accessibilityIdentifier("discovery.done")
             }
             .padding(TaskOSSpacing.md)
 
@@ -29,6 +30,7 @@ struct DiscoveryView: View {
                     .foregroundStyle(.secondary)
                 TextField("Search", text: Binding(get: { model.discoverySearch }, set: { model.discoverySearch = $0 }))
                     .textFieldStyle(.plain)
+                    .accessibilityIdentifier("discovery.search")
             }
             .padding(.horizontal, TaskOSSpacing.sm)
             .padding(.vertical, 6)

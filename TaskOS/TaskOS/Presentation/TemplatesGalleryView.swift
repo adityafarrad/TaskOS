@@ -49,6 +49,7 @@ struct TemplatesGalleryView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .navigationTitle("Templates")
+        .accessibilityIdentifier("templates.view")
     }
 
     private var header: some View {

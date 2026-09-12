@@ -26,6 +26,7 @@ struct CommandComposerView: View {
                 .lineLimit(2...6)
                 .focused($isFocused)
                 .accessibilityLabel("Automation command")
+                .accessibilityIdentifier("composer.field")
                 .onAppear { localText = model.text }
                 .onChange(of: localText) { _, newValue in
                     guard newValue.trimmingCharacters(in: .whitespacesAndNewlines)

@@ -27,6 +27,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        guard !AppComposition.isUITesting else { return }
         NotificationPresenter.shared.activate()
         MenuBarViewModel.shared.load()
         MenuBarViewModel.shared.refreshStatus()
