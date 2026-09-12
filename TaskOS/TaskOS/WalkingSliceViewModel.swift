@@ -59,6 +59,7 @@ final class ComposerViewModel {
     private var draftID = AutomationID()
     private var startingRevision = WorkflowRevision(1)
     private var editingWorkflowID: AutomationID?
+    private var nameWasEdited = false
     private var lastSavedSignature: String?
     private var lastSavedID: AutomationID?
     private var lastDefinition: AutomationDefinition?
@@ -1059,6 +1060,7 @@ final class ComposerViewModel {
         lastSavedID = nil
         startingRevision = WorkflowRevision(1)
         draftName = template.name
+        nameWasEdited = false
         autoRunEnabled = false
         document = template.document()
         autoResolveApplications()
@@ -1074,6 +1076,7 @@ final class ComposerViewModel {
         lastSavedID = nil
         startingRevision = WorkflowRevision(1)
         draftName = "Untitled"
+        nameWasEdited = false
         autoRunEnabled = false
         document = ComposerDocument()
         recoverableDraft = nil
@@ -1127,6 +1130,7 @@ final class ComposerViewModel {
 
     func updateName(_ value: String) {
         draftName = value
+        nameWasEdited = true
         scheduleDraftAutosave()
         previewResetTask?.cancel()
         previewResetTask = Task { [weak self] in
@@ -1139,6 +1143,7 @@ final class ComposerViewModel {
     func loadForEditing(_ workflow: SavedWorkflow) {
         draftID = workflow.id
         draftName = workflow.name
+        nameWasEdited = false
         startingRevision = workflow.definition.revision
         editingWorkflowID = workflow.id
         lastSavedID = workflow.id
@@ -1359,9 +1364,18 @@ final class ComposerViewModel {
 
     private func afterEdit() {
         autoResolveApplications()
+        autoNameIfNeeded()
         refreshSuggestions()
         resetPreview()
         scheduleDraftAutosave()
+    }
+
+    private func autoNameIfNeeded() {
+        guard !nameWasEdited,
+              editingWorkflowID == nil,
+              lastSavedID == nil,
+              let first = document.actions.first else { return }
+        draftName = ActionPresentation.suggestedName(for: first.draft)
     }
 
     private var currentID: AutomationID {
@@ -1396,6 +1410,7 @@ final class ComposerViewModel {
         recoverableDraft = nil
         draftID = draft.id
         draftName = draft.name
+        nameWasEdited = draft.name != "Untitled"
         document = ComposerDocument(text: draft.text)
         autoResolveApplications()
         refreshSuggestions()

@@ -2451,5 +2451,28 @@ record isolation/recovery) is deferred to Phase 3 with the migration fixtures.
 - Next: stop here per owner decision; D2 manual regression / Phase 3.1 remain
   the next contract steps when requested.
 
+### Increment UX-5 — Auto-name new workflows from the first step
+
+- Status: done
+- Behavior delivered: a new, unnamed workflow is automatically given a
+  meaningful name from its first step as soon as one exists (for example
+  `Wait`, `Open Website`, `Copy Text`, `Open Safari` once the app resolves).
+  The name refreshes with that first step until the user types their own name,
+  after which it is never overwritten. Saved workflows and loaded templates are
+  never auto-renamed.
+- Interfaces changed: `ActionPresentation.suggestedName(for:)`;
+  `ComposerViewModel` gained `nameWasEdited` bookkeeping and
+  `autoNameIfNeeded()` (called from `afterEdit`), reset on New/Template and on
+  editing/recovering a named draft.
+- Tests performed:
+  - App tests — TEST SUCCEEDED, including 4 new auto-name cases (first step,
+    resolved resource, user name preserved, saved workflow not renamed).
+  - Debug + Release builds — BUILD SUCCEEDED.
+- Physical checks: pending owner Mac pass — New Workflow, add a step, and
+  confirm the title becomes the step name; type your own name and confirm it
+  sticks; open a saved workflow and confirm its name is unchanged.
+- Next: stop here per owner decision.
+
+
 
 
