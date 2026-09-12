@@ -2344,3 +2344,43 @@ record isolation/recovery) is deferred to Phase 3 with the migration fixtures.
   SwiftData in-memory flake); Core 270/35 pass; Debug + Release build.
 - Next: Phase 3.1 validation (per PLAN.md) when requested.
 
+### Increment UX-1 — Truthful lifecycle and library status (pre-Phase-3 polish)
+
+- Status: done
+- Behavior delivered:
+  - The Workflows library now states each workflow's real lifecycle
+    (`Manual · Ready to run`, `Schedule · On/Off`, `Event · On/Off`) with a
+    matching status dot, the next scheduled run for enabled schedules, and a
+    paused note when automatic triggers are paused. Enabled automatic workflows
+    can be turned on/off from the row context menu without opening the editor.
+  - The editor's bottom action bar reports a truthful lifecycle state
+    (`New workflow`, `Draft · not saved yet`, `Unsaved changes`,
+    `Saved · Ready to run`, `Saved · Off/On`, `Saved · On · Paused`) instead of a
+    binary saved/unsaved label.
+  - Fixed a truthfulness defect: the unsaved-changes signature omitted the
+    trigger and automatic-run intent, so changing a schedule/time, trigger kind,
+    or the run-automatically switch on a saved workflow did not mark it unsaved
+    or enable Save.
+  - Fixed save identity: after saving, further edits update the same record
+    (reusing `lastSavedID`) instead of minting a new identity, matching the F1
+    "update in place" contract.
+- Interfaces changed: added `WorkflowStatusPresentation` and
+  `EditorLifecycleState` (`Presentation/WorkflowStatusPresentation.swift`);
+  `ComposerViewModel` gained `editorLifecycleState`, `hasDraftContent`,
+  `nextRunDate(for:)`, and a trigger/intent-aware `currentSignature`;
+  `WorkflowsLibraryView` shows status text + detail and a Turn On/Off context
+  item; `WorkflowEditorView` action bar uses the lifecycle state.
+- Tests performed:
+  - App tests (`xcodebuild ... test -only-testing:TaskOSTests`) — TEST
+    SUCCEEDED, including 9 new `WorkflowStatusPresentationTests` covering
+    manual/schedule/event labels, next-run and paused details, attention tint,
+    editor lifecycle transitions, and trigger edits marking a saved workflow
+    unsaved.
+  - Debug build — BUILD SUCCEEDED.
+- Physical checks: pending owner Mac pass — confirm library status labels and
+  next run; turn a schedule off/on from the row menu; change a saved workflow's
+  trigger time and confirm "Unsaved changes" with Save enabled; pause from the
+  menu bar and confirm the row detail.
+- Next: UX-2 (blocking reason and field guidance).
+
+

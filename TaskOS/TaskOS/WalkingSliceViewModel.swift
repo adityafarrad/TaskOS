@@ -192,6 +192,32 @@ final class ComposerViewModel {
         return !document.actions.isEmpty
     }
 
+    private var hasDraftContent: Bool {
+        !document.actions.isEmpty
+            || !document.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            || triggerFamily != .manual
+    }
+
+    var editorLifecycleState: EditorLifecycleState {
+        if hasUnsavedChanges {
+            return .unsaved
+        }
+        if lastSavedSignature != nil {
+            if supportsAutomaticRuns {
+                let enabled = activeWorkflow?.isEnabled ?? autoRunEnabled
+                return .savedAutomatic(enabled: enabled, paused: enabled && automaticTriggersPaused)
+            }
+            return .savedManual
+        }
+        return hasDraftContent ? .draft : .empty
+    }
+
+    func nextRunDate(for workflow: SavedWorkflow) -> Date? {
+        guard workflow.isEnabled, let schedule = workflow.definition.trigger.schedule else { return nil }
+        let now = composition.clock.now()
+        return composition.scheduleCalculator.nextOccurrences(of: schedule, after: now, count: 1).first
+    }
+
     func dismissResult() {
         if case .finished = stage {
             stage = .composing
@@ -854,13 +880,12 @@ final class ComposerViewModel {
     func save() {
         notice = nil
         let signature = currentSignature
-        let isUpdatingExisting = editingWorkflowID != nil
-            || (lastSavedSignature != nil && lastSavedSignature == signature)
+        let isUpdatingExisting = editingWorkflowID != nil || lastSavedID != nil
 
         let targetID: AutomationID
         if let editingWorkflowID {
             targetID = editingWorkflowID
-        } else if lastSavedSignature == signature, let lastSavedID {
+        } else if let lastSavedID {
             targetID = lastSavedID
         } else {
             targetID = AutomationID()
@@ -1055,7 +1080,18 @@ final class ComposerViewModel {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.sortedKeys]
         let payload = (try? encoder.encode(actions)).map { String(decoding: $0, as: UTF8.self) } ?? document.text
-        return "\(draftName)|\(payload)"
+        return "\(draftName)|\(triggerSignature)|\(autoRunEnabled)|\(payload)"
+    }
+
+    private var triggerSignature: String {
+        let now = composition.clock.now()
+        guard let configuration = document.triggerConfiguration(relativeTo: now) else {
+            return String(describing: document.trigger)
+        }
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys]
+        return (try? encoder.encode(configuration)).map { String(decoding: $0, as: UTF8.self) }
+            ?? String(describing: configuration)
     }
 
     func runSaved(_ workflow: SavedWorkflow) {

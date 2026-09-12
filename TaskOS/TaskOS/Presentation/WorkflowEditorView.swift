@@ -126,11 +126,11 @@ struct WorkflowEditorView: View {
 
     private var editorActionBar: some View {
         HStack(spacing: TaskOSSpacing.sm) {
-            Image(systemName: model.hasUnsavedChanges ? "pencil.circle.fill" : "checkmark.circle.fill")
-                .foregroundStyle(model.hasUnsavedChanges ? Color.orange : Color.green)
+            Image(systemName: model.editorLifecycleState.symbol)
+                .foregroundStyle(model.editorLifecycleState.tint)
                 .font(.system(size: 15))
 
-            Text(model.hasUnsavedChanges ? "Unsaved changes" : "All changes saved")
+            Text(model.editorLifecycleState.label)
                 .font(.callout)
                 .foregroundStyle(.secondary)
 

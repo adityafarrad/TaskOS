@@ -18,8 +18,15 @@ struct WorkflowsLibraryView: View {
                 } else {
                     VStack(spacing: TaskOSSpacing.xs) {
                         ForEach(model.filteredWorkflows) { workflow in
+                            let status = WorkflowStatusPresentation.make(
+                                for: workflow,
+                                needsAttention: model.workflowAttention[workflow.id] != nil,
+                                paused: model.automaticTriggersPaused,
+                                nextRun: model.nextRunDate(for: workflow)
+                            )
                             WorkflowLibraryRow(
                                 workflow: workflow,
+                                status: status,
                                 needsAttention: model.workflowAttention[workflow.id] != nil
                             ) {
                                 onOpen(workflow)
@@ -27,6 +34,12 @@ struct WorkflowsLibraryView: View {
                             .contextMenu {
                                 Button("Open") { onOpen(workflow) }
                                 Button("Run") { model.runSaved(workflow) }
+                                if status.isAutomatic {
+                                    Divider()
+                                    Button(status.isEnabled ? "Turn Off" : "Turn On") {
+                                        model.setEnabled(workflow, enabled: !status.isEnabled)
+                                    }
+                                }
                                 Divider()
                                 Button("Rename…") { model.beginRename(workflow) }
                                 Button("Duplicate") { model.duplicate(workflow) }
@@ -130,6 +143,7 @@ struct WorkflowsLibraryView: View {
 
 private struct WorkflowLibraryRow: View {
     let workflow: SavedWorkflow
+    let status: WorkflowStatusPresentation
     let needsAttention: Bool
     let onOpen: () -> Void
 
@@ -139,7 +153,7 @@ private struct WorkflowLibraryRow: View {
         Button(action: onOpen) {
             HStack(spacing: TaskOSSpacing.sm) {
                 Circle()
-                    .fill(needsAttention ? Color.orange : (workflow.isEnabled ? Color.green : Color.secondary.opacity(0.4)))
+                    .fill(status.tint)
                     .frame(width: 8, height: 8)
 
                 VStack(alignment: .leading, spacing: 2) {
@@ -154,12 +168,17 @@ private struct WorkflowLibraryRow: View {
                     HStack(spacing: TaskOSSpacing.xs) {
                         Text(workflow.definition.actions.count == 1 ? "1 step" : "\(workflow.definition.actions.count) steps")
                         Text("·")
-                        Text(triggerLabel)
+                        Text(status.label)
+                        if let detail = status.detail {
+                            Text("·")
+                            Text(detail)
+                        }
                         Text("·")
                         Text(workflow.updatedAt.formatted(date: .abbreviated, time: .shortened))
                     }
                     .font(.caption)
                     .foregroundStyle(.secondary)
+                    .lineLimit(2)
                 }
 
                 Spacer(minLength: TaskOSSpacing.xs)
@@ -176,18 +195,7 @@ private struct WorkflowLibraryRow: View {
         .buttonStyle(.plain)
         .onHover { isHovered = $0 }
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(workflow.name), \(workflow.definition.actions.count) steps")
+        .accessibilityLabel("\(workflow.name), \(workflow.definition.actions.count) steps, \(status.label)\(status.detail.map { ", \($0)" } ?? "")")
         .accessibilityHint("Open this workflow")
-    }
-
-    private var triggerLabel: String {
-        let trigger = workflow.definition.trigger
-        if trigger.schedule != nil {
-            return workflow.isEnabled ? "Scheduled" : "Schedule"
-        }
-        if trigger.isEventTrigger {
-            return workflow.isEnabled ? "Automatic" : "Event"
-        }
-        return "Manual"
     }
 }
