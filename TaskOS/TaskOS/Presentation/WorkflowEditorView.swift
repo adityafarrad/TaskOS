@@ -27,6 +27,10 @@ struct WorkflowEditorView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: TaskOSSpacing.md) {
+                if model.recoverableDraft != nil, isEmptyWorkflow {
+                    draftRecoveryBanner
+                }
+
                 titleHeader
 
                 triggerRow
@@ -86,6 +90,35 @@ struct WorkflowEditorView: View {
         } message: { workflow in
             Text("“\(workflow.name)” and its history metadata will be removed. This cannot be undone.")
         }
+    }
+
+    private var draftRecoveryBanner: some View {
+        HStack(spacing: TaskOSSpacing.sm) {
+            Image(systemName: "clock.arrow.circlepath")
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundStyle(.orange)
+
+            VStack(alignment: .leading, spacing: 1) {
+                Text("Recover your unsaved draft?")
+                    .font(.subheadline.weight(.semibold))
+                Text("TaskOS has work from your last session that wasn’t saved.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Spacer()
+
+            Button("Discard") { model.discardRecoverableDraft() }
+            Button("Recover") { model.recoverDraft() }
+                .buttonStyle(.borderedProminent)
+        }
+        .padding(TaskOSSpacing.sm)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: TaskOSRadius.card, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: TaskOSRadius.card, style: .continuous)
+                .strokeBorder(Color(nsColor: .separatorColor), lineWidth: 1)
+        )
+        .accessibilityIdentifier("editor.recoverDraft")
     }
 
     private var editorActionBar: some View {

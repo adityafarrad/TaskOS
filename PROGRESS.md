@@ -2234,3 +2234,31 @@ record isolation/recovery) is deferred to Phase 3 with the migration fixtures.
 - Tests performed: UI tests 6/6 pass; Debug + Release build.
 - Next: Phase B (B1–B5).
 
+### Increment U-fix6 — New-workflow default, draft recovery prompt, and test appearance
+
+- Status: done
+- Defects fixed:
+  - Launch silently restored the last unsaved draft, so the app appeared to open
+    a saved workflow ("Editing 'action new'") instead of a new workflow, which
+    was confusing.
+  - The XCUITest launch test set
+    `runsForEachTargetApplicationUIConfiguration = true`, so it ran a second
+    pass in the dark appearance and left the user's system in dark mode.
+- Behavior delivered:
+  - Launch now shows a fresh **New Workflow**. If an unsaved draft exists, a
+    non-intrusive banner offers **Recover** / **Discard** instead of silently
+    loading it; the draft is cleared on save, new workflow, or explicit discard.
+  - The sidebar now has an explicit **New Workflow** row (with ⌘N tooltip) at
+    the top of the Workflows section; the small `+` next to search is removed.
+  - The launch test now runs a single light configuration
+    (`runsForEachTargetApplicationUIConfiguration = false`) and launches with
+    the in-memory `-uiTesting` mode, so UI testing no longer changes system
+    appearance or touches the real store.
+- Interfaces changed: `ComposerViewModel.recoverableDraft`, `recoverDraft()`,
+  `discardRecoverableDraft()`; `SidebarView` New Workflow row;
+  `WorkflowEditorView` recovery banner.
+- Tests performed: UI tests 7/7 pass (single launch pass); app tests pass;
+  `defaults read -g AppleInterfaceStyle` confirms no dark override after tests;
+  Debug + Release build.
+- Next: Phase B (B1–B5).
+

@@ -37,6 +37,7 @@ final class ComposerViewModel {
     private(set) var admissionEvents: [AdmissionEvent] = []
     private(set) var workflowAttention: [AutomationID: String] = [:]
     private(set) var fileStatusToken = 0
+    private(set) var recoverableDraft: ComposerDraft?
     private(set) var automaticTriggersPaused = false
     private(set) var draftName = "Untitled"
     var librarySearch = ""
@@ -895,6 +896,7 @@ final class ComposerViewModel {
                 self.autosaveTask?.cancel()
                 try? await self.composition.drafts.clearDraft()
                 self.editingWorkflowID = nil
+                self.recoverableDraft = nil
                 self.lastSavedSignature = signature
                 self.lastSavedID = targetID
                 self.startingRevision = revision
@@ -1037,6 +1039,7 @@ final class ComposerViewModel {
         autoRunEnabled = false
         document = ComposerDocument()
         suggestions = []
+        recoverableDraft = nil
         autosaveTask?.cancel()
         Task { [weak self] in
             try? await self?.composition.drafts.clearDraft()
@@ -1087,6 +1090,7 @@ final class ComposerViewModel {
         lastSavedID = workflow.id
         document = ComposerDocument(definition: workflow.definition)
         autoRunEnabled = workflow.isEnabled
+        recoverableDraft = nil
         autoResolveApplications()
         lastSavedSignature = currentSignature
         refreshSuggestions()
@@ -1315,13 +1319,28 @@ final class ComposerViewModel {
                   !draft.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
                 return
             }
-            self.draftID = draft.id
-            self.draftName = draft.name
-            self.document = ComposerDocument(text: draft.text)
-            self.autoResolveApplications()
-            self.refreshSuggestions()
-            self.resetPreview()
-            self.notice = "Recovered your unsaved draft."
+            guard self.document.text.isEmpty, self.document.actions.isEmpty else { return }
+            self.recoverableDraft = draft
+        }
+    }
+
+    func recoverDraft() {
+        guard let draft = recoverableDraft else { return }
+        recoverableDraft = nil
+        draftID = draft.id
+        draftName = draft.name
+        document = ComposerDocument(text: draft.text)
+        autoResolveApplications()
+        refreshSuggestions()
+        resetPreview()
+        updateWatchedDirectories()
+        notice = "Recovered your unsaved draft."
+    }
+
+    func discardRecoverableDraft() {
+        recoverableDraft = nil
+        Task { [weak self] in
+            try? await self?.composition.drafts.clearDraft()
         }
     }
 

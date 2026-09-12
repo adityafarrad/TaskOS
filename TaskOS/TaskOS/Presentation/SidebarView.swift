@@ -162,6 +162,24 @@ struct SidebarView: View {
 
     @ViewBuilder
     private var workflowChildren: some View {
+        Button {
+            onNewWorkflow()
+        } label: {
+            HStack(spacing: TaskOSSpacing.xs) {
+                Image(systemName: "plus.circle.fill")
+                    .foregroundStyle(.tint)
+                Text("New Workflow")
+                    .fontWeight(.medium)
+                Spacer(minLength: 0)
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .padding(.leading, 20)
+        .listRowBackground(Color.clear)
+        .help("New workflow (⌘N)")
+        .accessibilityIdentifier("sidebar.newWorkflow")
+
         HStack(spacing: TaskOSSpacing.xxs) {
             Image(systemName: "magnifyingglass")
                 .font(.caption)
@@ -172,15 +190,6 @@ struct SidebarView: View {
             )
             .textFieldStyle(.plain)
             .font(.subheadline)
-            Button {
-                onNewWorkflow()
-            } label: {
-                Image(systemName: "plus")
-            }
-            .buttonStyle(.borderless)
-            .help("New workflow (⌘N)")
-            .accessibilityLabel("New workflow")
-            .accessibilityIdentifier("sidebar.newWorkflow")
         }
         .padding(.leading, 20)
         .padding(.trailing, 2)
