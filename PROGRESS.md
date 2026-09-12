@@ -2160,11 +2160,24 @@ record isolation/recovery) is deferred to Phase 3 with the migration fixtures.
     including the 5 new view-model tests.
   - Debug + Release builds — BUILD SUCCEEDED; UI test target builds.
   - UI tests (`xcodebuild ... test -only-testing:TaskOSUITests`) — TEST
-    SUCCEEDED: launch/editor, sidebar navigation, Add-step creates a step,
-    discovery open/close, settings startup row (5 tests), plus the launch test.
-    (Synthetic keyboard typing into the SwiftUI composer times out in this
-    environment, so composer input is covered by the Core parser tests and the
-    view-model tests instead; the menu path is UI-covered.)
+    SUCCEEDED: launch/editor, sidebar navigation, composer typing creates a
+    step, Add-step creates a step, discovery open/close, settings startup row
+    (6 tests), plus the launch test.
+- Composer input reliability (fix after the first D1 run):
+  - The first composer test failed because `.descendants(matching: .any)`
+    resolved the identifier on the composer field as a generic element and
+    `typeText` timed out; direct character typing also arrived garbled
+    (`"wait 1 second"` became `"t1eond"`), a known macOS XCUITest/SwiftUI
+    character-delivery problem.
+  - Fixed by: reading the launch flag from `UI_TESTING=1` as well as
+    `-uiTesting`; querying the concrete `app.textFields`/`app.textViews`
+    element; calling `app.activate()` and asserting `.runningForeground`; and
+    entering text by paste (`⌘V` from an `NSPasteboard` string) instead of
+    per-character synthesis. The composer is again covered by an automated UI
+    test, alongside the deterministic Add-step test.
+  - Reverted the composer's local text buffer back to a direct model binding;
+    the Core identity-aware merge (U-fix3) preserves card-only values, so the
+    buffer was unnecessary and added a second source of truth.
   - Note: on an empty workflow the Add-step control sits below the fold because
     the "Get started" panel and the empty-steps hint stack; folded into Phase B
     item B3.

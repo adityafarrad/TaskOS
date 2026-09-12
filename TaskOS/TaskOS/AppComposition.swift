@@ -16,6 +16,7 @@ final class AppComposition {
 
     static var isUITesting: Bool {
         ProcessInfo.processInfo.arguments.contains("-uiTesting")
+            || ProcessInfo.processInfo.environment["UI_TESTING"] == "1"
     }
 
     static var isTesting: Bool {
