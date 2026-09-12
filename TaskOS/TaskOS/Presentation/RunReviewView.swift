@@ -157,6 +157,11 @@ struct RunResultView: View {
                     .foregroundStyle(.secondary)
             }
 
+            Text(RunPresentation.summary(for: record))
+                .font(.callout)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+
             ForEach(record.actions, id: \.index) { item in
                 HStack(spacing: TaskOSSpacing.xs) {
                     Image(systemName: RunPresentation.symbol(for: item.outcome))
@@ -177,6 +182,7 @@ struct RunBannerView: View {
     let record: RunRecord
     var onViewHistory: () -> Void
     var onDismiss: () -> Void
+    var onFixPermission: ((PermissionKind) -> Void)?
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -189,18 +195,22 @@ struct RunBannerView: View {
             VStack(alignment: .leading, spacing: 1) {
                 Text(RunPresentation.title(for: record.status))
                     .font(.subheadline.weight(.semibold))
-                Text("\(record.automationName) · \(String(format: "%.2f s", record.duration)) · \(record.actions.count) steps")
+                Text(RunPresentation.summary(for: record))
                     .font(.caption)
                     .foregroundStyle(.secondary)
+                    .lineLimit(2)
+                Text("\(record.automationName) · \(String(format: "%.2f s", record.duration))")
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
             }
 
             Spacer()
 
-            if let failure = firstFailure {
-                Text(failure)
-                    .font(.caption)
-                    .foregroundStyle(.orange)
-                    .lineLimit(1)
+            if let fix = RunPresentation.permissionFix(for: record), let onFixPermission {
+                Button(fix == .accessibility ? "Accessibility Settings" : "Notification Settings") {
+                    onFixPermission(fix)
+                }
+                .controlSize(.small)
             }
 
             Button("View in History", action: onViewHistory)
@@ -220,14 +230,5 @@ struct RunBannerView: View {
                 .strokeBorder(Color(nsColor: .separatorColor), lineWidth: 1)
         )
         .transition(reduceMotion ? .opacity : .move(edge: .top).combined(with: .opacity))
-    }
-
-    private var firstFailure: String? {
-        for item in record.actions {
-            if case .failed(let failure) = item.outcome {
-                return failure.message
-            }
-        }
-        return nil
     }
 }

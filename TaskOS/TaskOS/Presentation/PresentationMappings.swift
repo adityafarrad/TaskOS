@@ -74,23 +74,24 @@ enum ActionPresentation {
     static func summary(for draft: ComposerActionDraft, fileStatus: (FileTarget) -> FileTargetStatus) -> String {
         switch draft {
         case .openApplication(_, let resolved):
-            return resolved?.label ?? "Choose an application"
+            return resolved?.label ?? "Choose an app"
         case .hideApplication(_, let resolved):
-            return resolved?.label ?? "Choose an application"
+            return resolved?.label ?? "Choose an app"
         case .quitApplication(_, let resolved):
-            return resolved?.label ?? "Choose an application"
+            return resolved?.label ?? "Choose an app"
         case .openFile(let target):
             return fileSummary(target, fileStatus: fileStatus, prompt: "Choose a file or folder")
         case .revealInFinder(let target):
             return fileSummary(target, fileStatus: fileStatus, prompt: "Choose a file or folder")
         case .openWebsite(let url, let browser):
+            guard OpenWebsiteAction.isAbsoluteHTTPURL(url) else { return "Add a web address" }
             let host = URL(string: url)?.host() ?? url
             if let browser {
                 return "\(host) · \(browser.label)"
             }
-            return host.isEmpty ? "Enter a web address" : host
+            return host
         case .arrangeWindow(_, let resolved, let preset, _):
-            let app = resolved?.label ?? "Choose an application"
+            let app = resolved?.label ?? "Choose an app"
             return "\(app) · \(preset.displayName)"
         case .wait(let duration):
             return String(format: "%.1f seconds", duration)
@@ -98,6 +99,35 @@ enum ActionPresentation {
             return title.isEmpty ? "Notification" : title
         case .copyText(let value):
             return value.isEmpty ? "Enter text to copy" : value
+        }
+    }
+
+    static func missingRequirement(
+        for draft: ComposerActionDraft,
+        fileStatus: (FileTarget) -> FileTargetStatus
+    ) -> String? {
+        switch draft {
+        case .openApplication(_, let resolved),
+             .hideApplication(_, let resolved),
+             .quitApplication(_, let resolved),
+             .arrangeWindow(_, let resolved, _, _):
+            return resolved == nil ? "an app" : nil
+        case .openFile(let target), .revealInFinder(let target):
+            guard let target else { return "a file or folder" }
+            switch fileStatus(target) {
+            case .available:
+                return nil
+            case .moved:
+                return "the file again — it moved"
+            case .missing:
+                return "the file again — it is missing"
+            }
+        case .openWebsite(let url, _):
+            return OpenWebsiteAction.isAbsoluteHTTPURL(url) ? nil : "a full http:// or https:// address"
+        case .copyText(let value):
+            return value.isEmpty ? "text to copy" : nil
+        case .wait, .showNotification:
+            return nil
         }
     }
 
@@ -224,6 +254,45 @@ enum RunPresentation {
         case .cancelled: return "Cancelled"
         case .notExecuted: return "Not executed"
         }
+    }
+
+    static func summary(for record: RunRecord) -> String {
+        let total = record.actions.count
+        let completed = record.actions.filter { $0.outcome.isSuccess }.count
+        let stepWord = total == 1 ? "step" : "steps"
+
+        switch record.status {
+        case .running:
+            return "Running…"
+        case .succeeded:
+            return total == 1 ? "The step completed." : "All \(total) steps completed."
+        case .failed:
+            if let failed = record.actions.first(where: { if case .failed = $0.outcome { return true } else { return false } }),
+               case .failed(let failure) = failed.outcome {
+                return "Completed \(completed) of \(total) \(stepWord). Step \(failed.index + 1) failed: \(failure.message)"
+            }
+            return "Failed after \(completed) of \(total) \(stepWord)."
+        case .timedOut:
+            return "Timed out after \(completed) of \(total) \(stepWord)."
+        case .cancelled:
+            return "Stopped after \(completed) of \(total) \(stepWord). Steps already completed are not undone."
+        case .interrupted:
+            return "Interrupted after \(completed) of \(total) \(stepWord). Steps already completed are not undone."
+        }
+    }
+
+    static func permissionFix(for record: RunRecord) -> PermissionKind? {
+        for item in record.actions {
+            guard case .failed(let failure) = item.outcome else { continue }
+            let message = failure.message.lowercased()
+            if message.contains("notification permission") {
+                return .notifications
+            }
+            if message.contains("accessibility") {
+                return .accessibility
+            }
+        }
+        return nil
     }
 }
 

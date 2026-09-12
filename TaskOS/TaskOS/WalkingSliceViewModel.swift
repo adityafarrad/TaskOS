@@ -135,6 +135,18 @@ final class ComposerViewModel {
         !document.actions.isEmpty && !hasUnresolved
     }
 
+    var blockingReason: String? {
+        if canPrepare { return nil }
+        if document.actions.isEmpty { return "Add at least one step to review or save." }
+        if document.hasUnresolvedTrigger { return "Finish configuring the trigger." }
+        for (index, action) in document.actions.enumerated() {
+            if let requirement = ActionPresentation.missingRequirement(for: action.draft, fileStatus: fileStatus) {
+                return "Step \(index + 1) needs \(requirement)."
+            }
+        }
+        return "Finish resolving every step before reviewing or saving."
+    }
+
     var preview: WorkflowPreview? {
         if case .previewed(let preview) = stage {
             return preview

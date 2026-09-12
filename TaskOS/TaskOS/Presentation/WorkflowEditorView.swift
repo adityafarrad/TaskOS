@@ -34,7 +34,9 @@ struct WorkflowEditorView: View {
                     draftRecoveryBanner
                 }
 
-                titleHeader
+                if !isEmptyWorkflow {
+                    titleHeader
+                }
 
                 triggerRow
 
@@ -50,7 +52,15 @@ struct WorkflowEditorView: View {
                     RunBannerView(
                         record: record,
                         onViewHistory: onViewHistory,
-                        onDismiss: { model.dismissResult() }
+                        onDismiss: { model.dismissResult() },
+                        onFixPermission: { kind in
+                            switch kind {
+                            case .accessibility:
+                                model.openAccessibilitySettings()
+                            case .notifications:
+                                model.openNotificationSettings()
+                            }
+                        }
                     )
                 }
 
@@ -125,14 +135,22 @@ struct WorkflowEditorView: View {
     }
 
     private var editorActionBar: some View {
-        HStack(spacing: TaskOSSpacing.sm) {
+        HStack(alignment: .center, spacing: TaskOSSpacing.sm) {
             Image(systemName: model.editorLifecycleState.symbol)
                 .foregroundStyle(model.editorLifecycleState.tint)
                 .font(.system(size: 15))
 
-            Text(model.editorLifecycleState.label)
-                .font(.callout)
-                .foregroundStyle(.secondary)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(model.editorLifecycleState.label)
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                if let reason = model.blockingReason {
+                    Text(reason)
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                        .lineLimit(1)
+                }
+            }
 
             Spacer()
 

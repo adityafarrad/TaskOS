@@ -127,4 +127,50 @@ struct WorkflowStatusPresentationTests {
 
         #expect(model.editorLifecycleState == .savedAutomatic(enabled: true, paused: false))
     }
+
+    @Test func blockingReasonNamesEmptySteps() {
+        let model = ComposerViewModel()
+        #expect(model.blockingReason == "Add at least one step to review or save.")
+    }
+
+    @Test func blockingReasonNamesTheUnresolvedStep() {
+        let model = ComposerViewModel()
+        model.add(.openApplication(name: "Safari", resolved: nil))
+        #expect(model.blockingReason == "Step 1 needs an app.")
+
+        model.add(.openWebsite(url: "https://", browser: nil))
+        #expect(model.blockingReason == "Step 1 needs an app.")
+    }
+
+    @Test func blockingReasonNamesWebsiteAddress() {
+        let model = ComposerViewModel()
+        model.add(.openWebsite(url: "https://", browser: nil))
+        #expect(model.blockingReason == "Step 1 needs a full http:// or https:// address.")
+    }
+
+    @Test func resolvedWorkflowHasNoBlockingReason() {
+        let model = ComposerViewModel()
+        model.add(.wait(1))
+        #expect(model.blockingReason == nil)
+    }
+
+    @Test func blockingReasonReportsUnresolvedTrigger() {
+        let model = ComposerViewModel()
+        model.add(.wait(1))
+        model.setTriggerFamily(.applicationLifecycle)
+        #expect(model.blockingReason == "Finish configuring the trigger.")
+    }
+
+    @Test func missingRequirementDescribesFields() {
+        let available: (FileTarget) -> FileTargetStatus = { _ in .available }
+        #expect(ActionPresentation.missingRequirement(for: .copyText(""), fileStatus: available) == "text to copy")
+        #expect(ActionPresentation.missingRequirement(for: .copyText("hi"), fileStatus: available) == nil)
+        #expect(
+            ActionPresentation.missingRequirement(
+                for: .openWebsite(url: "not a url", browser: nil),
+                fileStatus: available
+            ) == "a full http:// or https:// address"
+        )
+        #expect(ActionPresentation.missingRequirement(for: .wait(1), fileStatus: available) == nil)
+    }
 }

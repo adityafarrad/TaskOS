@@ -48,7 +48,7 @@ struct StepConfigurationView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 if !OpenWebsiteAction.isAbsoluteHTTPURL(websiteURL) {
-                    Label("Enter an absolute http or https address.", systemImage: "exclamationmark.triangle")
+                    Label("Add a full http:// or https:// address.", systemImage: "exclamationmark.triangle")
                         .font(.caption)
                         .foregroundStyle(.orange)
                 }
@@ -58,7 +58,7 @@ struct StepConfigurationView: View {
             VStack(alignment: .leading, spacing: TaskOSSpacing.sm) {
                 applicationRow(
                     label: arrangementResolved?.label,
-                    missing: arrangementName.isEmpty ? "Choose an application" : "Unresolved: \(arrangementName)"
+                    missing: arrangementName.isEmpty ? "Choose an app" : "Unresolved: \(arrangementName)"
                 )
 
                 TaskOSInspectorField(title: "Position") {

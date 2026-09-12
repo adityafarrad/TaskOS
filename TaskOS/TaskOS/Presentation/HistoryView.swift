@@ -60,7 +60,7 @@ struct HistoryView: View {
 
                     VStack(spacing: TaskOSSpacing.xs) {
                         ForEach(group.runs) { run in
-                            RunHistoryRow(run: run)
+                            RunHistoryRow(run: run, model: model)
                         }
                     }
                 }
@@ -108,12 +108,18 @@ struct HistoryView: View {
 
 private struct RunHistoryRow: View {
     let run: RunRecord
+    let model: ComposerViewModel
 
     @State private var isExpanded = false
 
     var body: some View {
         DisclosureGroup(isExpanded: $isExpanded) {
             VStack(alignment: .leading, spacing: TaskOSSpacing.xs) {
+                Text(RunPresentation.summary(for: run))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+
                 ForEach(run.actions, id: \.index) { item in
                     HStack(spacing: TaskOSSpacing.xs) {
                         Image(systemName: RunPresentation.symbol(for: item.outcome))
@@ -124,6 +130,18 @@ private struct RunHistoryRow: View {
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
+                }
+
+                if let fix = RunPresentation.permissionFix(for: run) {
+                    Button(fix == .accessibility ? "Open Accessibility Settings" : "Open Notification Settings") {
+                        switch fix {
+                        case .accessibility:
+                            model.openAccessibilitySettings()
+                        case .notifications:
+                            model.openNotificationSettings()
+                        }
+                    }
+                    .controlSize(.small)
                 }
             }
             .padding(.top, TaskOSSpacing.xxs)

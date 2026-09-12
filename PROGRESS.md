@@ -2383,4 +2383,71 @@ record isolation/recovery) is deferred to Phase 3 with the migration fixtures.
   menu bar and confirm the row detail.
 - Next: UX-2 (blocking reason and field guidance).
 
+### Increment UX-2 — Blocking reason and field guidance
+
+- Status: done
+- Behavior delivered: when Review/Save are disabled, the editor action bar now
+  says why and which step to fix, instead of leaving the buttons greyed without
+  explanation. Examples: "Add at least one step to review or save.", "Step 1
+  needs an app.", "Step 1 needs a full http:// or https:// address.", "Step 1
+  needs a file or folder.", "Finish configuring the trigger." Step summaries use
+  concrete wording ("Choose an app", "Add a web address") and the website
+  inspector error reads "Add a full http:// or https:// address."
+- Interfaces changed: `ActionPresentation.missingRequirement(for:fileStatus:)`
+  and sharpened `summary` prompts; `ComposerViewModel.blockingReason`;
+  `WorkflowEditorView` action bar shows the reason; `StepConfigurationView`
+  copy.
+- Tests performed:
+  - App tests — TEST SUCCEEDED, including new blocking-reason cases (empty
+    steps, unresolved app/website, unresolved trigger, resolved workflow) and
+    `missingRequirement` copy checks.
+  - Debug build — BUILD SUCCEEDED.
+- Physical checks: pending owner Mac pass — add a step without choosing an app
+  and confirm the bar names the step; choose the app and confirm the message
+  clears; enter a bad URL and confirm the address prompt.
+- Next: UX-3 (run-result honesty).
+
+### Increment UX-3 — Run-result honesty
+
+- Status: done
+- Behavior delivered: run results now lead with a plain sentence instead of only
+  a status word. Success reads "All N steps completed." (or "The step
+  completed."); failures read "Completed X of N steps. Step Y failed: <reason>";
+  cancellation and sleep interruption read "Stopped/Interrupted after X of N
+  steps. Steps already completed are not undone."; timeouts report how far the
+  run got. A permission-related failure exposes a one-click **Accessibility
+  Settings** / **Notification Settings** action in the post-run banner and the
+  expanded history row. History still lists each action's outcome.
+- Interfaces changed: `RunPresentation.summary(for:)` and
+  `RunPresentation.permissionFix(for:)`; `RunBannerView` and `RunResultView`
+  show the summary and permission action; `HistoryView.RunHistoryRow` shows the
+  summary and permission action.
+- Tests performed:
+  - App tests — TEST SUCCEEDED, including 6 new `RunPresentationTests`
+    (success, failure with step/reason, cancellation, interruption, timeout,
+    permission detection).
+  - Debug build — BUILD SUCCEEDED.
+- Physical checks: pending owner Mac pass — run a workflow with a failure and
+  read the summary; cancel a multi-step run and confirm the "not undone"
+  message; expand a history row.
+- Next: UX-4 (empty-state micro-fix).
+
+### Increment UX-4 — Empty-state title micro-fix
+
+- Status: done
+- Behavior delivered: a truly empty editor no longer shows the "Untitled
+  Workflow" title field before there is anything to name; the Get-started panel
+  is the first thing shown. The title (and automatic-run switch) appear with the
+  first step or trigger.
+- Interfaces changed: `WorkflowEditorView` renders `titleHeader` only when the
+  workflow is not empty.
+- Tests performed:
+  - App tests — TEST SUCCEEDED (no logic change).
+  - Debug build — BUILD SUCCEEDED.
+- Physical checks: pending owner Mac pass — open a new workflow and confirm no
+  title chrome; add a step and confirm the title appears and is editable.
+- Next: stop here per owner decision; D2 manual regression / Phase 3.1 remain
+  the next contract steps when requested.
+
+
 
