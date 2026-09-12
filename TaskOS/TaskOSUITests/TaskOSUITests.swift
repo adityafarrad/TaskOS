@@ -45,22 +45,23 @@ final class TaskOSUITests: XCTestCase {
     }
 
     @MainActor
-    func testComposerCreatesAStep() throws {
+    func testAddStepMenuCreatesAStep() throws {
         let app = launchApp()
         XCTAssertTrue(element(app, "editor.view").waitForExistence(timeout: 10))
+        XCTAssertTrue(element(app, "composer.field").exists, "composer field should be visible")
 
-        let composer = element(app, "composer.field")
-        composer.click()
-        composer.typeText("open an application")
-
-        let suggestion = app.buttons
-            .matching(NSPredicate(format: "label BEGINSWITH %@", "Open an application"))
-            .firstMatch
-        if suggestion.waitForExistence(timeout: 3) {
-            suggestion.click()
+        element(app, "editor.view").swipeUp()
+        let addStep = element(app, "editor.addStep")
+        XCTAssertTrue(addStep.waitForExistence(timeout: 5))
+        if !addStep.isHittable {
+            element(app, "editor.view").swipeUp()
         }
+        addStep.click()
+        let waitItem = app.menuItems["Wait 1 second"]
+        XCTAssertTrue(waitItem.waitForExistence(timeout: 5))
+        waitItem.click()
 
-        XCTAssertTrue(element(app, "step.card.0").waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["1 step"].waitForExistence(timeout: 5))
     }
 
     @MainActor

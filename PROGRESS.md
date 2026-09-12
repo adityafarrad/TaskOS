@@ -2159,9 +2159,15 @@ record isolation/recovery) is deferred to Phase 3 with the migration fixtures.
   - App tests (`xcodebuild ... test -only-testing:TaskOSTests`) — TEST SUCCEEDED,
     including the 5 new view-model tests.
   - Debug + Release builds — BUILD SUCCEEDED; UI test target builds.
-  - UI test execution: **blocked in this environment** — the runner cannot
-    enable automation mode (same TCC restriction that blocks screenshots). Run
-    `TaskOSUITests` from Xcode (⌘U, with automation permission) to execute them.
+  - UI tests (`xcodebuild ... test -only-testing:TaskOSUITests`) — TEST
+    SUCCEEDED: launch/editor, sidebar navigation, Add-step creates a step,
+    discovery open/close, settings startup row (5 tests), plus the launch test.
+    (Synthetic keyboard typing into the SwiftUI composer times out in this
+    environment, so composer input is covered by the Core parser tests and the
+    view-model tests instead; the menu path is UI-covered.)
+  - Note: on an empty workflow the Add-step control sits below the fold because
+    the "Get started" panel and the empty-steps hint stack; folded into Phase B
+    item B3.
 - D2 regression matrix: pending user-run physical pass — Phase 1 canonical
   journey; 2.1 schedule A–E; 2.4 all six event families; 2.5 templates/discovery;
   2.6 attention/permissions/retention; 2.3 export/import; plus compact resize and
