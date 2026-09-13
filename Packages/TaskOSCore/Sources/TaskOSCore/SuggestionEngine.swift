@@ -132,7 +132,7 @@ public struct SuggestionEngine: Sendable {
         let needle = prefix.lowercased()
         var results: [Suggestion] = []
 
-        for application in applications {
+        for application in applications.prefix(CommandLimits.maximumApplications) {
             let label = application.displayName
             let haystack = label.lowercased()
 
@@ -143,7 +143,7 @@ public struct SuggestionEngine: Sendable {
                 match = .exact
             } else if haystack.hasPrefix(needle) {
                 match = .prefix
-            } else if needle.count >= 3, levenshtein(haystack, needle) <= 2 {
+            } else if typoMatches(haystack, needle) {
                 match = .typo
             } else {
                 match = nil
@@ -202,11 +202,31 @@ public struct SuggestionEngine: Sendable {
 
         var seen = Set<String>()
         var unique: [Suggestion] = []
+        var typoCount = 0
         for suggestion in sorted where seen.insert(suggestion.id).inserted {
+            if suggestion.match == .typo {
+                guard typoCount < 3 else { continue }
+                typoCount += 1
+            }
             unique.append(suggestion)
         }
 
         return Array(unique.prefix(limit))
+    }
+
+    private func typoMatches(_ haystack: String, _ needle: String) -> Bool {
+        let length = needle.count
+        guard length >= 5, length <= 64 else { return false }
+
+        let distance = levenshtein(haystack, needle)
+        if length <= 8 {
+            return distance <= 1
+        }
+
+        let longest = max(haystack.count, length)
+        guard longest > 0 else { return false }
+        let normalized = Double(distance) / Double(longest)
+        return distance <= 2 && normalized <= 0.20
     }
 
     private static func rank(_ match: SuggestionMatch) -> Int {

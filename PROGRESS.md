@@ -55,7 +55,7 @@ of this file). No 2.7 implementation has started.
 | 2.7B3 | Friendly frames and finite rationale | done | Increment 2.7B3 | Leading frames/fillers/final punctuation, journaling sentence, four rationale endings only |
 | 2.7C1 | Versioned app snapshots and list ambiguity | done | Increment 2.7C1 | Revisioned snapshots, exact resolution with aliases, ambiguity (no first match), bounded list grouping, 5,000-app cap |
 | 2.7C2 | Native command editor and completion | done | Increment 2.7C2 | `NSTextView` wrapper, UTF-16 edits/selection, marked-text rules, keyboard completion, VoiceOver |
-| 2.7C3 | Result validity and bounded typo help | not started | — | Completion, resource-selection, and preparation keys |
+| 2.7C3 | Result validity and bounded typo help | done | Increment 2.7C3 | Completion/preparation/resource keys and rechecks; typo bounds (5/8/64, ≤3, 5,000) |
 | 2.7D1 | Independent language corpus | not started | — | At least 2,000 positive, 100 negative, ambiguity fixtures |
 | 2.7D2 | Integration, persistence, privacy | not started | — | Serialized fixtures inspected directly |
 | 2.7D3 | Performance and physical proof | not started | — | Release build; targets met or changed by owner decision |
@@ -3082,6 +3082,58 @@ Second run before starting 2.7C, performed at commit `0f50f73`:
     2.7C3.
   - Native `NSUndoManager` is not used; model snapshots are authoritative.
 - Next eligible work package: 2.7C3 — Result validity and bounded typo help.
+
+### Increment 2.7C3 — Result validity and bounded typo help (plan 2.7C3)
+
+- Status: done
+- Behavior delivered: asynchronous results can no longer publish or apply after a
+  later edit. Completion carries a composite key (session, source generation,
+  cursor, marked-text state, language revision, app snapshot revision); it is
+  rechecked before results are stored and again before a suggestion is accepted,
+  so a suggestion produced for an older generation or cursor is rejected.
+  Preparation carries a preparation key and is discarded if the authoring
+  revision changed while it ran. Resource selection carries a resource key and
+  refuses to bind when the target node is gone, the authoring revision moved, or
+  the app snapshot changed. Cursor movement alone does not change the authoring
+  revision, so an unchanged Preview survives it, while any card-only change still
+  invalidates preparation. Typo help is explicit and bounded: no proposals below
+  five characters or above sixty-four; distance one for five to eight
+  characters; distance two with a normalized distance of at most 0.20 for nine
+  to sixty-four; at most three typo proposals inside the eight-suggestion limit;
+  and searches are capped at 5,000 applications.
+- Interfaces changed:
+  - Core: added `CompletionKey`, `ResourceSelectionKey`, and `PreparationKey`.
+  - `SuggestionEngine`: `typoMatches` implements the thresholds; typo proposals
+    are capped at three; application search is limited to the 5,000-app cap.
+  - `ComposerViewModel`: `sessionID`, `sourceGeneration`, and `completionKey`;
+    `currentCompletionKey()`; `refreshSuggestions` rechecks the key before
+    storing; `accept` rechecks it before applying; `prepare` and `save` capture
+    and recheck a `PreparationKey`; `resolve(id:application:)` and `chooseFile`
+    validate the target node before binding.
+- Tests performed:
+  - `swift test --package-path Packages/TaskOSCore` — 377 tests, 43 suites, pass
+    (was 369/42; +8 `ResultValidityTests`). New coverage: no typo proposals
+    below five or above sixty-four characters; distance-one only for five to
+    eight; distance-two with the normalized bound; at most three typo proposals;
+    the 5,000-app search cap; and completion/resource/preparation key equality.
+  - App tests (`xcodebuild ... test -only-testing:TaskOSTests`) — TEST
+    SUCCEEDED, including new stale-result tests: a completion is rejected after
+    the cursor moves; a stale preparation does not publish a preview; a resource
+    selection for a deleted node does not bind.
+  - UI tests (`xcodebuild ... test -only-testing:TaskOSUITests`) — TEST
+    SUCCEEDED.
+  - Debug and Release builds — BUILD SUCCEEDED.
+- Physical checks: pending owner pass for the non-Latin input method and
+  VoiceOver reading order (2.7D3).
+- Remaining defects / gaps:
+  - Completion and typo search run synchronously (the engine is deterministic and
+    fast), but the keys and rechecks are in place for any future async search.
+  - Typo matching is Levenshtein over lowercased names; no locale folding.
+- Next eligible work package: 2.7D1 — Independent language corpus. Phase 2.7C is
+  complete: stale completion cannot publish or apply, stale resource selection
+  cannot bind, stale preparation cannot publish Preview or approval, cursor-only
+  movement does not invalidate an unchanged Preview, card-only changes always
+  invalidate old preparation, and typo help is explicit and bounded.
 
 
 

@@ -71,6 +71,9 @@ final class ComposerViewModel {
     private var isRefreshingSnapshot = false
     private var isAutoRewriting = false
     private var highlightMovedByUser = false
+    private let sessionID = UUID()
+    private var sourceGeneration = 0
+    private var completionKey: CompletionKey?
     private var autosaveTask: Task<Void, Never>?
     private var previewResetTask: Task<Void, Never>?
     private var runMonitor: Task<Void, Never>?
@@ -628,6 +631,7 @@ final class ComposerViewModel {
     }
 
     func accept(_ suggestion: Suggestion) {
+        guard completionKey == currentCompletionKey() else { return }
         document.accept(suggestion)
         afterEdit()
     }
@@ -707,6 +711,20 @@ final class ComposerViewModel {
     }
 
     func resolve(id: UUID, application: ApplicationResource) {
+        let key = ResourceSelectionKey(
+            sessionID: sessionID,
+            nodeID: id,
+            slot: "application",
+            nodeRevision: currentRevision,
+            snapshotRevision: applicationSnapshot.revision
+        )
+        guard key.sessionID == sessionID,
+              key.nodeRevision == currentRevision,
+              key.snapshotRevision == applicationSnapshot.revision,
+              document.actions.contains(where: { $0.id == id }) else {
+            return
+        }
+
         document.resolveApplication(
             id: id,
             reference: .application(bundleIdentifier: application.bundleIdentifier, label: application.displayName)
@@ -795,6 +813,7 @@ final class ComposerViewModel {
         panel.allowsMultipleSelection = false
         panel.canCreateDirectories = false
         guard panel.runModal() == .OK, let url = panel.url else { return }
+        guard document.actions.contains(where: { $0.id == id }) else { return }
 
         let isDirectory = (try? url.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) ?? false
         let target = FileTarget(
@@ -833,10 +852,12 @@ final class ComposerViewModel {
 
         lastDefinition = definition
         stage = .preparing
+        let key = PreparationKey(sessionID: sessionID, authoringRevision: definition.revision)
 
         Task { [weak self] in
             guard let self else { return }
             let preview = await composition.preparer.prepare(definition)
+            guard key.sessionID == self.sessionID, key.authoringRevision == self.currentRevision else { return }
             await composition.approvals.approve(definition)
             self.approvedRevision = definition.revision
             self.stage = .previewed(preview)
@@ -937,9 +958,11 @@ final class ComposerViewModel {
 
         let isAutomatic = autoRunEnabled && supportsAutomaticRuns
         let workflow = SavedWorkflow(definition: definition, isEnabled: isAutomatic)
+        let key = PreparationKey(sessionID: sessionID, authoringRevision: revision)
 
         Task { [weak self] in
             guard let self else { return }
+            guard key.sessionID == self.sessionID, key.authoringRevision == self.currentRevision else { return }
             do {
                 try await self.composition.repository.save(workflow)
                 if definition.trigger.schedule != nil {
@@ -1386,6 +1409,7 @@ final class ComposerViewModel {
     }
 
     private func afterEdit() {
+        sourceGeneration += 1
         document.resolveSchedule(now: composition.clock.now(), calendar: .current)
         autoResolveApplications()
         refreshSuggestions()
@@ -1456,10 +1480,26 @@ final class ComposerViewModel {
     }
 
     private func refreshSuggestions() {
-        suggestions = composition.suggestions.suggestions(for: document.text, applications: applications)
+        let key = currentCompletionKey()
+        let computed = composition.suggestions.suggestions(for: document.text, applications: applications)
+        guard key == currentCompletionKey() else { return }
+        completionKey = key
+        suggestions = computed
         highlightedSuggestion = 0
         highlightMovedByUser = false
         suggestionsDismissed = false
+    }
+
+    private func currentCompletionKey() -> CompletionKey {
+        CompletionKey(
+            sessionID: sessionID,
+            sourceGeneration: sourceGeneration,
+            cursor: commandSelection
+                ?? SourceSpan(start: document.text.utf16.count, end: document.text.utf16.count),
+            hasMarkedText: isComposingMarkedText,
+            languageRevision: 1,
+            snapshotRevision: applicationSnapshot.revision
+        )
     }
 
     var visibleSuggestions: [Suggestion] {

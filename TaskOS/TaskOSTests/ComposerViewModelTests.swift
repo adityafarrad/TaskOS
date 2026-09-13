@@ -105,4 +105,46 @@ struct ComposerViewModelTests {
         #expect(model.moveHighlightInteractively(by: 1))
         #expect(model.acceptSelectedInteractively())
     }
+
+    @Test func staleCompletionIsRejectedAfterCursorMove() {
+        let model = ComposerViewModel()
+        model.updateFromEditor(text: "open", edit: nil)
+
+        guard let suggestion = model.visibleSuggestions.first else {
+            Issue.record("Expected a suggestion")
+            return
+        }
+
+        model.updateCommandSelection(SourceSpan(start: 2, end: 2))
+        model.accept(suggestion)
+        #expect(model.text == "open")
+    }
+
+    @Test func stalePreparationDoesNotPublishAPreview() async {
+        let model = ComposerViewModel()
+        model.updateFromEditor(text: "wait 1 second", edit: nil)
+
+        model.prepare()
+        model.updateFromEditor(text: "wait 2 seconds", edit: nil)
+
+        try? await Task.sleep(for: .milliseconds(250))
+
+        if case .previewed = model.stage {
+            Issue.record("A stale preparation must not publish a preview")
+        }
+    }
+
+    @Test func staleResourceSelectionDoesNotBind() {
+        let model = ComposerViewModel()
+        model.add(.openApplication(name: "Safari", resolved: nil))
+        let id = model.actions[0].id
+
+        model.updateFromEditor(text: "wait 1 second", edit: nil)
+        model.resolve(
+            id: id,
+            application: ApplicationResource(bundleIdentifier: "com.apple.Safari", displayName: "Safari")
+        )
+
+        #expect(!model.actions.contains { $0.id == id })
+    }
 }
