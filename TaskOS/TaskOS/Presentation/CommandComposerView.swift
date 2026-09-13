@@ -15,36 +15,40 @@ struct CommandComposerView: View {
                     .foregroundStyle(isFocused ? Color.accentColor : .secondary)
                     .padding(.top, 2)
 
-                TextField(
-                    "Describe what you want your Mac to do…",
-                    text: Binding(get: { model.text }, set: { model.setText($0) }),
-                    axis: .vertical
+                NativeCommandTextView(
+                    text: model.text,
+                    isFocused: isFocused,
+                    onTextChange: { value, edit in
+                        model.updateFromEditor(text: value, edit: edit)
+                    },
+                    onSelectionChange: { span in
+                        model.updateCommandSelection(span)
+                    },
+                    onMarkedTextChange: { active in
+                        model.setMarkedTextActive(active)
+                    },
+                    onFocusChange: { focused in
+                        isFocused = focused
+                    },
+                    onMoveHighlight: { delta in
+                        model.moveHighlightInteractively(by: delta)
+                    },
+                    onAcceptHighlighted: {
+                        model.acceptHighlightedInteractively()
+                    },
+                    onAcceptSelected: {
+                        model.acceptSelectedInteractively()
+                    },
+                    onEscape: {
+                        model.dismissSuggestionsInteractively()
+                    },
+                    hasSuggestions: {
+                        !model.visibleSuggestions.isEmpty
+                    }
                 )
-                .textFieldStyle(.plain)
-                .font(.body)
-                .lineLimit(2...6)
-                .focused($isFocused)
+                .frame(minHeight: 40, maxHeight: 140)
                 .accessibilityLabel("Automation command")
                 .accessibilityIdentifier("composer.field")
-                .onKeyPress(.upArrow) {
-                    model.moveHighlight(by: -1)
-                    return .handled
-                }
-                .onKeyPress(.downArrow) {
-                    model.moveHighlight(by: 1)
-                    return .handled
-                }
-                .onKeyPress(.return) {
-                    if !model.visibleSuggestions.isEmpty {
-                        model.acceptHighlighted()
-                        return .handled
-                    }
-                    return .ignored
-                }
-                .onKeyPress(.escape) {
-                    model.dismissSuggestions()
-                    return .handled
-                }
             }
 
             if !model.visibleSuggestions.isEmpty {
@@ -128,10 +132,13 @@ struct CommandComposerView: View {
         .shadow(color: .black.opacity(0.1), radius: 10, y: 4)
         .transition(reduceMotion ? .opacity : .opacity.combined(with: .move(edge: .top)))
         .animation(reduceMotion ? nil : .taskOSQuick, value: model.visibleSuggestions.count)
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel(model.suggestionCountAccessibilityLabel)
+        .accessibilityValue(model.selectedSuggestionAccessibilityLabel ?? "")
     }
 
     private func suggestionAccessibilityLabel(_ suggestion: Suggestion) -> String {
-        var parts = ["\(suggestion.title), \(suggestion.category.rawValue)"]
+        var parts = ["\(suggestion.title), \(suggestion.category.rawValue)", suggestion.replacementMeaning]
         if suggestion.requiresParameter {
             parts.append("needs more input")
         }

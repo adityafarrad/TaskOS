@@ -41,6 +41,8 @@ final class ComposerViewModel {
     private(set) var fileStatusToken = 0
     private(set) var recoverableDraft: ComposerDraft?
     private(set) var automaticTriggersPaused = false
+    private(set) var commandSelection: SourceSpan?
+    private(set) var isComposingMarkedText = false
     private(set) var draftName = "Untitled"
     var librarySearch = ""
     var templateSearch = ""
@@ -68,6 +70,7 @@ final class ComposerViewModel {
     private var lastSnapshotAt: Date?
     private var isRefreshingSnapshot = false
     private var isAutoRewriting = false
+    private var highlightMovedByUser = false
     private var autosaveTask: Task<Void, Never>?
     private var previewResetTask: Task<Void, Never>?
     private var runMonitor: Task<Void, Never>?
@@ -1455,16 +1458,19 @@ final class ComposerViewModel {
     private func refreshSuggestions() {
         suggestions = composition.suggestions.suggestions(for: document.text, applications: applications)
         highlightedSuggestion = 0
+        highlightMovedByUser = false
         suggestionsDismissed = false
     }
 
     var visibleSuggestions: [Suggestion] {
-        suggestionsDismissed ? [] : suggestions
+        if suggestionsDismissed || isComposingMarkedText { return [] }
+        return suggestions
     }
 
     func moveHighlight(by delta: Int) {
         guard !suggestions.isEmpty else { return }
         suggestionsDismissed = false
+        highlightMovedByUser = true
         let count = suggestions.count
         highlightedSuggestion = ((highlightedSuggestion + delta) % count + count) % count
     }
@@ -1476,6 +1482,70 @@ final class ComposerViewModel {
 
     func dismissSuggestions() {
         suggestionsDismissed = true
+    }
+
+    func updateFromEditor(text value: String, edit: CommandEdit?) {
+        guard value != document.text else {
+            if let edit, let selection = edit.resultingSelection {
+                commandSelection = selection
+            }
+            return
+        }
+        document.setText(value)
+        if let edit, let selection = edit.resultingSelection, selection.isValid(in: document.text) {
+            commandSelection = selection
+        }
+        afterEdit()
+    }
+
+    func updateCommandSelection(_ span: SourceSpan) {
+        commandSelection = span
+    }
+
+    func setMarkedTextActive(_ active: Bool) {
+        guard active != isComposingMarkedText else { return }
+        isComposingMarkedText = active
+        if !active {
+            refreshSuggestions()
+            autoResolveApplications()
+        }
+    }
+
+    func moveHighlightInteractively(by delta: Int) -> Bool {
+        guard !isComposingMarkedText, !visibleSuggestions.isEmpty else { return false }
+        moveHighlight(by: delta)
+        return true
+    }
+
+    func acceptHighlightedInteractively() -> Bool {
+        guard !isComposingMarkedText, !visibleSuggestions.isEmpty else { return false }
+        acceptHighlighted()
+        return true
+    }
+
+    func acceptSelectedInteractively() -> Bool {
+        guard !isComposingMarkedText, !visibleSuggestions.isEmpty, highlightMovedByUser else { return false }
+        acceptHighlighted()
+        return true
+    }
+
+    func dismissSuggestionsInteractively() -> Bool {
+        guard !isComposingMarkedText, !visibleSuggestions.isEmpty else { return false }
+        dismissSuggestions()
+        return true
+    }
+
+    var suggestionCountAccessibilityLabel: String {
+        let count = visibleSuggestions.count
+        if count == 0 { return "No suggestions" }
+        return count == 1 ? "1 suggestion" : "\(count) suggestions"
+    }
+
+    var selectedSuggestionAccessibilityLabel: String? {
+        let visible = visibleSuggestions
+        guard visible.indices.contains(highlightedSuggestion) else { return nil }
+        let suggestion = visible[highlightedSuggestion]
+        return "Selected: \(suggestion.title). \(suggestion.replacementMeaning)"
     }
 
     private func autoResolveApplications() {

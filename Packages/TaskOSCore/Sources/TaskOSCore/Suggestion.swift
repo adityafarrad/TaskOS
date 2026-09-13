@@ -38,4 +38,12 @@ public struct Suggestion: Hashable, Sendable {
         self.requiresParameter = requiresParameter
         self.match = match
     }
+
+    public var replacementMeaning: String {
+        "replaces the current word with \(phrase)"
+    }
+
+    public var kind: SuggestionMatch {
+        match
+    }
 }

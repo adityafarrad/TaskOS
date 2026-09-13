@@ -54,7 +54,7 @@ of this file). No 2.7 implementation has started.
 | 2.7B2 | Composition and schedules | done | Increment 2.7B2 | All connectors outside literals, one trigger first/last only, `closes` removed, full schedule forms incl. absolute `Once on` |
 | 2.7B3 | Friendly frames and finite rationale | done | Increment 2.7B3 | Leading frames/fillers/final punctuation, journaling sentence, four rationale endings only |
 | 2.7C1 | Versioned app snapshots and list ambiguity | done | Increment 2.7C1 | Revisioned snapshots, exact resolution with aliases, ambiguity (no first match), bounded list grouping, 5,000-app cap |
-| 2.7C2 | Native command editor and completion | not started | — | `NSTextView` wrapper, marked text, VoiceOver |
+| 2.7C2 | Native command editor and completion | done | Increment 2.7C2 | `NSTextView` wrapper, UTF-16 edits/selection, marked-text rules, keyboard completion, VoiceOver |
 | 2.7C3 | Result validity and bounded typo help | not started | — | Completion, resource-selection, and preparation keys |
 | 2.7D1 | Independent language corpus | not started | — | At least 2,000 positive, 100 negative, ambiguity fixtures |
 | 2.7D2 | Integration, persistence, privacy | not started | — | Serialized fixtures inspected directly |
@@ -3030,6 +3030,58 @@ Second run before starting 2.7C, performed at commit `0f50f73`:
   - The miss-triggered refresh is throttled to 60 seconds to avoid refresh loops;
     a dedicated refresh trigger is exposed as `refreshApplicationSnapshot()`.
 - Next eligible work package: 2.7C2 — Native command editor and completion.
+
+### Increment 2.7C2 — Native command editor and completion (plan 2.7C2)
+
+- Status: done
+- Behavior delivered: the command field is a real `NSTextView` wrapped for
+  SwiftUI. It reports the source text, the exact UTF-16 replacement range and
+  replacement text, the UTF-16 selection, and the marked-text state. The
+  completion panel stays connected to the suggestion engine, with Up/Down moving
+  the highlight, Return accepting the highlighted suggestion, Tab accepting only
+  when a suggestion was explicitly selected, Escape dismissing the panel, and
+  normal typing otherwise. Return never triggers Save or Test. While an input
+  method has marked text, the TaskOS panel is hidden, acceptance is rejected, and
+  Return/Tab/Escape/arrow keys are left to the input method; when composition
+  commits, text and selection are re-read and completion resumes. VoiceOver
+  reports the suggestion count, the selected suggestion, the replacement
+  meaning, and whether more input is needed.
+- Interfaces changed:
+  - Added `NativeCommandTextView` (`NSViewRepresentable` + `Coordinator`) that
+    wires `NSTextViewDelegate` edits, selection, marked text, focus, and
+    `doCommandBy` key commands.
+  - `CommandComposerView` now uses the native editor and exposes completion
+    count/selected accessibility values.
+  - `ComposerViewModel`: `updateFromEditor(text:edit:)`,
+    `updateCommandSelection(_:)`, `setMarkedTextActive(_:)`,
+    `moveHighlightInteractively(by:)`, `acceptHighlightedInteractively()`,
+    `acceptSelectedInteractively()`, `dismissSuggestionsInteractively()`,
+    `suggestionCountAccessibilityLabel`, and
+    `selectedSuggestionAccessibilityLabel`; new state `commandSelection`,
+    `isComposingMarkedText`, and `highlightMovedByUser`.
+  - Core `Suggestion` gained `replacementMeaning` and `kind`.
+- Intentional behavior notes:
+  - Text undo remains model-authoritative (the editor sets `allowsUndo = false`
+    and the app menu routes undo/redo to the composer document), so undo covers
+    typing, suggestion acceptance, and card edits uniformly.
+- Tests performed:
+  - App tests (`xcodebuild ... test -only-testing:TaskOSTests`) — TEST
+    SUCCEEDED, including new view-model tests for editor edits and UTF-16
+    selection, marked-text suspension/resume, and Tab accepting only after an
+    explicit selection.
+  - UI tests (`xcodebuild ... test -only-testing:TaskOSUITests`) — TEST
+    SUCCEEDED, 10/10 with the native editor (launch, sidebar, composer typing,
+    suggestions, discovery, step menu, settings).
+  - Core tests — 369 tests, 42 suites, pass.
+  - Debug and Release builds — BUILD SUCCEEDED.
+- Physical checks: pending owner pass for a non-Latin input method and VoiceOver
+  reading order (2.7D3 physical proof).
+- Remaining defects / gaps:
+  - Completion acceptance uses the exact current document fragment, but the
+    cross-generation validity key and stale-replacement rejection arrive in
+    2.7C3.
+  - Native `NSUndoManager` is not used; model snapshots are authoritative.
+- Next eligible work package: 2.7C3 — Result validity and bounded typo help.
 
 
 

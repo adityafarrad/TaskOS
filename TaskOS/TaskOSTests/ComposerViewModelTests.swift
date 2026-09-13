@@ -66,4 +66,43 @@ struct ComposerViewModelTests {
         }
         #expect(resolved?.label == "WhatsApp")
     }
+
+    @Test func editorEditUpdatesTextAndSelection() {
+        let model = ComposerViewModel()
+        model.updateFromEditor(text: "wait 1 second", edit: nil)
+        #expect(model.text == "wait 1 second")
+        #expect(model.actions.count == 1)
+
+        let edit = CommandEdit(
+            range: SourceSpan(start: 5, end: 6),
+            replacement: "2",
+            resultingSelection: SourceSpan(start: 6, end: 6)
+        )
+        model.updateFromEditor(text: "wait 2 second", edit: edit)
+        #expect(model.text == "wait 2 second")
+        #expect(model.commandSelection == SourceSpan(start: 6, end: 6))
+    }
+
+    @Test func markedTextSuspendsCompletion() {
+        let model = ComposerViewModel()
+        model.updateFromEditor(text: "open", edit: nil)
+        #expect(!model.visibleSuggestions.isEmpty)
+
+        model.setMarkedTextActive(true)
+        #expect(model.visibleSuggestions.isEmpty)
+        #expect(!model.acceptHighlightedInteractively())
+        #expect(!model.moveHighlightInteractively(by: 1))
+
+        model.setMarkedTextActive(false)
+        #expect(!model.visibleSuggestions.isEmpty)
+    }
+
+    @Test func tabAcceptsOnlyAfterExplicitSelection() {
+        let model = ComposerViewModel()
+        model.updateFromEditor(text: "open", edit: nil)
+
+        #expect(!model.acceptSelectedInteractively())
+        #expect(model.moveHighlightInteractively(by: 1))
+        #expect(model.acceptSelectedInteractively())
+    }
 }
