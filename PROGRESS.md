@@ -57,7 +57,7 @@ of this file). No 2.7 implementation has started.
 | 2.7C2 | Native command editor and completion | done | Increment 2.7C2 | `NSTextView` wrapper, UTF-16 edits/selection, marked-text rules, keyboard completion, VoiceOver |
 | 2.7C3 | Result validity and bounded typo help | done | Increment 2.7C3 | Completion/preparation/resource keys and rechecks; typo bounds (5/8/64, ≤3, 5,000) |
 | 2.7D1 | Independent language corpus | done | Increment 2.7D1 | Seeded 2,000-positive corpus, 114 negatives, ambiguity fixtures, literal oracle; quarter-preset round-trip fixed |
-| 2.7D2 | Integration, persistence, privacy | not started | — | Serialized fixtures inspected directly |
+| 2.7D2 | Integration, persistence, privacy | done | Increment 2.7D2 | Parser-free definition/preview, direct serialized-record inspection, draft v1/v2 restore, no private text in records/exports/logs |
 | 2.7D3 | Performance and physical proof | not started | — | Release build; targets met or changed by owner decision |
 
 ### Phase 3 — Qualify, beta-test, and distribute
@@ -3243,6 +3243,52 @@ Second run before starting 2.7C, performed at commit `0f50f73`:
   - The corpus is parser/composer level; UI and input-method behavior is covered
     by the UI tests and 2.7D3 physical checks.
 - Next eligible work package: 2.7D2 — Integration, persistence, and privacy.
+
+### Increment 2.7D2 — Integration, persistence, and privacy (plan 2.7D2)
+
+- Status: done
+- Behavior delivered: the full typed path is proven without the language layer,
+  and private text is kept out of stored and portable data.
+  - A typed definition round-trips through `AutomationCoding`, decodes, and
+    prepares to a runnable `WorkflowPreview` with no `CommandParser` involved;
+    the definition is unchanged by preparation.
+  - A saved workflow serialized for storage, a portable export, and a run
+    history record were inspected directly: none contains the command source
+    text, friendly framing, or the accepted rationale.
+  - A legacy version-1 draft (no payload) decodes and restores its text; a
+    version-2 draft restores the structured authoring state, including a
+    card-only notification message, after a store round trip.
+  - Recoverable draft records clear after Save/New/Discard (repository path).
+  - Core and app production sources contain no `print` calls, so private command
+    text, notification messages, paths, and bookmarks cannot be logged.
+  - Preview remains effect-free (no executors are reachable from
+    `CreationPreparer`); Test and Save remain explicit view-model actions that
+    reuse validation, permissions, approval, and runner paths.
+- Interfaces changed: none in production. Added
+  `Packages/TaskOSCore/Tests/TaskOSCoreTests/IntegrationPrivacyTests.swift` and
+  `TaskOS/TaskOSTests/PersistencePrivacyTests.swift`.
+- Tests performed:
+  - `swift test --package-path Packages/TaskOSCore` — 399 tests, 45 suites, pass
+    (was 393/44; +6). New coverage: source-text/rationale absence in the encoded
+    saved definition, portable export, and run history; parser-free
+    encode/decode/prepare; legacy draft decode and version-2 structured restore;
+    and a Core source scan for `print`.
+  - App tests (`xcodebuild ... test -only-testing:TaskOSTests`) — TEST
+    SUCCEEDED, including direct inspection of the stored `WorkflowRecord`
+    payload, the stored run-history payload, the draft record lifecycle, and a
+    version-2 structured draft in the SwiftData store, plus an app source scan
+    for `print`.
+  - UI tests (`xcodebuild ... test -only-testing:TaskOSUITests`) — TEST
+    SUCCEEDED.
+  - Debug and Release builds — BUILD SUCCEEDED.
+- Physical checks: pending owner pass for Preview effect-free, explicit Test and
+  Save, and the non-Latin input method / VoiceOver checks in 2.7D3.
+- Remaining defects / gaps:
+  - Run-history failure text can still include operator-supplied app or file
+    labels; it never includes the command source text.
+  - Effect-free preview and explicit Test/Save are asserted structurally here and
+    confirmed physically in 2.7D3.
+- Next eligible work package: 2.7D3 — Performance and physical proof.
 
 
 
