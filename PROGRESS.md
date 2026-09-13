@@ -2902,6 +2902,20 @@ Second run before starting 2.7B, performed at commit `c6db374`:
   form is equal, only the four rationale endings are nonexecuting, and every
   other unmatched suffix blocks completion.
 
+### Phase 2.7B verification pass (2026-09-13)
+
+Second run before starting 2.7C, performed at commit `0f50f73`:
+
+- Core: `swift test --package-path Packages/TaskOSCore` run twice — 347 tests,
+  41 suites, pass both times.
+- Focused B-phase suites: `ActionLanguageTests`, `CompositionAndScheduleTests`,
+  `FriendlyLanguageTests` — 32 tests, 3 suites, pass.
+- App tests: `xcodebuild ... test -only-testing:TaskOSTests` — TEST SUCCEEDED.
+- UI tests: `xcodebuild ... test -only-testing:TaskOSUITests` — TEST SUCCEEDED.
+- Debug and Release builds — BUILD SUCCEEDED.
+- Release app launch smoke: opened and quit cleanly.
+- No defects found. 2.7B is verified; 2.7C1 is next.
+
 
 
 
