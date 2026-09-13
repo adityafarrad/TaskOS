@@ -802,7 +802,7 @@ final class ComposerViewModel {
     func prepare() {
         notice = nil
         guard let definition = document.makeDefinition(name: draftName, id: draftID, revision: currentRevision) else {
-            notice = "Finish resolving every step before previewing."
+            notice = document.blockingParseMessage ?? "Finish resolving every step before previewing."
             return
         }
 
@@ -906,7 +906,7 @@ final class ComposerViewModel {
         let revision = isUpdatingExisting ? currentRevision : WorkflowRevision(1)
 
         guard let definition = document.makeDefinition(name: draftName, id: targetID, revision: revision) else {
-            notice = "Finish resolving every step before saving."
+            notice = document.blockingParseMessage ?? "Finish resolving every step before saving."
             return
         }
 

@@ -61,6 +61,15 @@ struct FriendlyLanguageTests {
         #expect(parser.parse("open Notes?").outcome == .complete)
         #expect(parser.parse("open Notes!").outcome == .complete)
         #expect(parser.parse("please open Notes ?").outcome == .complete)
+        #expect(parser.parse("wait 5 seconds.").outcome == .complete)
+        #expect(parser.parse("show a notification.").outcome == .complete)
+        #expect(parser.parse("once at 7 pm.").outcome == .complete)
+        #expect(parser.parse("maximize Safari.").outcome == .complete)
+
+        let names = parser.parse("open Notes?").clauses
+            .filter { $0.kind == .openApplication }
+            .flatMap(\.resourceNames)
+        #expect(names == ["Notes"])
     }
 
     @Test func makeSureDoesNotCreateATrigger() {

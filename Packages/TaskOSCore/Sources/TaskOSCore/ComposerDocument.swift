@@ -336,6 +336,11 @@ public struct ComposerDocument: Sendable {
         return false
     }
 
+    public var blockingParseMessage: String? {
+        guard parseOutcome != .complete else { return nil }
+        return diagnostics.first { $0.severity == .error }?.message
+    }
+
     public mutating func setText(_ newText: String) {
         guard newText != text else { return }
         recordHistory()
@@ -990,7 +995,7 @@ public struct ComposerDocument: Sendable {
         case .openApplication:
             return clause.resourceNames.map { name in
                 if ResourceNameHeuristics.isWebsite(name) {
-                    return .openWebsite(url: ResourceNameHeuristics.normalizedWebsiteURL(name), browser: nil)
+                    return .openWebsite(url: name, browser: nil)
                 }
                 return .openApplication(name: name, resolved: nil)
             }
@@ -1170,8 +1175,7 @@ public struct ComposerDocument: Sendable {
             return language.canonicalActionTemplate(.showNotification)?.render()
                 ?? "Show a notification"
         case .copyText(let value):
-            return language.canonicalActionTemplate(.copyText)?
-                .render(["text": value]) ?? "Copy \"\(value)\""
+            return language.copyTextPhrase(value)
         }
     }
 

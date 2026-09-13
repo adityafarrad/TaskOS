@@ -135,4 +135,86 @@ struct ActionLanguageTests {
             parser.parse("copy").clauses.first { $0.kind == .copyText }?.expectedSlots == [.text]
         )
     }
+
+    @Test func connectorWordAppNamesAreNotDropped() {
+        let parsed = parser.parse("open Safari and Next")
+        let names = parsed.clauses
+            .filter { $0.kind == .openApplication }
+            .flatMap(\.resourceNames)
+        #expect(names == ["Safari", "Next"])
+        #expect(parsed.outcome == .complete)
+        #expect(parsed.coverage.isComplete)
+    }
+
+    @Test func danglingConnectorsFailClosed() {
+        for command in ["open Safari and", "open Safari then", "wait 1 second and"] {
+            let parsed = parser.parse(command)
+            #expect(parsed.outcome != .complete, "\(command)")
+            #expect(!parsed.coverage.isComplete, "\(command)")
+        }
+    }
+
+    @Test func repeatedActionHeadsCreateBoundaries() {
+        let parsed = parser.parse("open Notes open Safari")
+        let names = parsed.clauses
+            .filter { $0.kind == .openApplication }
+            .map(\.resourceNames)
+        #expect(names == [["Notes"], ["Safari"]])
+        #expect(parsed.outcome == .complete)
+        #expect(parsed.coverage.isComplete)
+
+        let document = ComposerDocument(text: "open Notes open Safari")
+        #expect(document.actions.count == 2)
+    }
+
+    @Test func canonicalPhrasesQuoteReservedApplicationNames() {
+        for name in ["and", "then", "so", "next", "wait", "open", "hide"] {
+            let action = ActionConfiguration.openApplication(
+                OpenApplicationAction(
+                    application: .application(bundleIdentifier: "com.example.\(name)", label: name)
+                )
+            )
+            let phrase = CanonicalPhrase.text(for: action)
+            let parsed = parser.parse(phrase)
+            #expect(parsed.outcome == .complete, "\(name): \(phrase)")
+            let names = parsed.clauses
+                .filter { $0.kind == .openApplication }
+                .flatMap(\.resourceNames)
+            #expect(names == [name], "\(name): \(phrase)")
+        }
+    }
+
+    @Test func copyTextLiteralRoundTripsQuotesAndBackslashes() {
+        for value in ["he said \"hi\" and \\ bye", "path\\", "plain text"] {
+            var document = ComposerDocument()
+            document.addAction(.copyText(value))
+
+            let reparsed = ComposerDocument(text: document.text)
+            let restored = reparsed.actions.compactMap { action -> String? in
+                if case .copyText(let text) = action.draft { return text }
+                return nil
+            }
+            #expect(restored == [value], "\(value) -> \(document.text)")
+            #expect(reparsed.makeDefinition(name: "Copy") != nil, "\(value) -> \(document.text)")
+        }
+    }
+
+    @Test func expandedApplicationListRespectsActionLimit() {
+        let twelve = "open " + (1...12).map { "App\($0)" }.joined(separator: " and ")
+        let thirteen = "open " + (1...13).map { "App\($0)" }.joined(separator: " and ")
+
+        #expect(parser.parse(twelve).outcome == .complete)
+
+        let parsed = parser.parse(thirteen)
+        #expect(parsed.outcome == .needsInput)
+        #expect(parsed.diagnostics.contains { $0.message.contains("12") })
+    }
+
+    @Test func unclosedQuoteBeforeRationaleBlocks() {
+        let command = "open Notes \"so I can journal my day"
+        #expect(parser.parse(command).outcome != .complete)
+
+        let document = ComposerDocument(text: command)
+        #expect(document.rationaleText == nil)
+    }
 }

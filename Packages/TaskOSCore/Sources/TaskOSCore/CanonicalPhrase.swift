@@ -39,9 +39,7 @@ public enum CanonicalPhrase {
             return language.canonicalActionTemplate(.showNotification)?.render()
                 ?? "Show a notification"
         case .copyText(let copy):
-            return language.canonicalActionTemplate(.copyText)?
-                .render(["text": copy.text])
-                ?? "Copy \"\(copy.text)\""
+            return language.copyTextPhrase(copy.text)
         }
     }
 

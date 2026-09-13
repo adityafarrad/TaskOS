@@ -102,21 +102,22 @@ struct CommandLanguageCatalogTests {
     }
 
     @Test func canonicalScheduleFormsReparse() {
-        let samples: [ScheduleTrigger] = [
-            .daily(hour: 9, minute: 0),
-            .daily(hour: 21, minute: 30),
-            .weekdays([.monday, .friday], hour: 17, minute: 15),
-            .interval(every: 30 * 60, startingAt: Date(timeIntervalSince1970: 1_000_000)),
-            .interval(every: 60 * 60, startingAt: Date(timeIntervalSince1970: 1_000_000)),
+        let samples: [(ScheduleTrigger, ParsedSchedule)] = [
+            (.daily(hour: 9, minute: 0), .daily(hour: 9, minute: 0)),
+            (.daily(hour: 21, minute: 30), .daily(hour: 21, minute: 30)),
+            (.weekdays([.monday, .friday], hour: 17, minute: 15), .weekdays([.monday, .friday], hour: 17, minute: 15)),
+            (.interval(every: 30 * 60, startingAt: Date(timeIntervalSince1970: 1_000_000)), .interval(30 * 60)),
+            (.interval(every: 60 * 60, startingAt: Date(timeIntervalSince1970: 1_000_000)), .interval(60 * 60)),
+            (.interval(every: 90, startingAt: Date(timeIntervalSince1970: 1_000_000)), .interval(90)),
         ]
-        for schedule in samples {
+        for (schedule, expected) in samples {
             let phrase = CanonicalPhrase.text(for: schedule)
             let parsed = parser.parse(phrase)
-            #expect(
-                parsed.clauses.contains { $0.kind == .schedule },
-                "schedule canonical phrase did not reparse: \(phrase)"
-            )
             #expect(parsed.outcome == .complete, "schedule canonical phrase was incomplete: \(phrase)")
+            #expect(
+                parsed.clauses.compactMap(\.schedule).first == expected,
+                "schedule canonical phrase changed meaning: \(phrase)"
+            )
         }
     }
 

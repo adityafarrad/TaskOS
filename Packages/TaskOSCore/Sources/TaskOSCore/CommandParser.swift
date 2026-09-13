@@ -122,10 +122,11 @@ public struct CommandParser: Sendable {
             return Self.limitFailure(text, message: "Commands must be 16,384 UTF-16 units or fewer.")
         }
 
-        let tokens = CommandTokenizer.tokenize(text)
-        if tokens.count > CommandLimits.maximumTokens {
+        let rawTokens = CommandTokenizer.tokenize(text)
+        if rawTokens.count > CommandLimits.maximumTokens {
             return Self.limitFailure(text, message: "Commands must be 128 words or fewer.")
         }
+        let tokens = Self.splittingFinalPunctuation(rawTokens, text: text)
 
         var worker = ParserWorker(tokens: tokens, text: text, language: language)
         return worker.parse()
@@ -141,6 +142,66 @@ public struct CommandParser: Sendable {
             coverage: SourceCoverage(coveredSpans: [], unresolvedSpans: [span]),
             clarifications: [ParseClarification(span: span, question: message)]
         )
+    }
+
+    static func splittingFinalPunctuation(_ tokens: [CommandToken], text: String) -> [CommandToken] {
+        guard let last = tokens.last,
+              !isInsideUnclosedLiteral(text),
+              let final = last.original.last,
+              [".", "?", "!"].contains(final) else {
+            return tokens
+        }
+
+        let base = String(last.original.dropLast())
+        guard !base.isEmpty else { return tokens }
+
+        let splitKind: CommandToken.Kind
+        switch last.kind {
+        case .word:
+            splitKind = .word(base.lowercased())
+        case .number:
+            splitKind = .number(Double(base) ?? 0)
+        case .punctuation:
+            return tokens
+        }
+
+        let length = String(final).utf16.count
+        var result = tokens
+        result.removeLast()
+        result.append(
+            CommandToken(
+                kind: splitKind,
+                span: SourceSpan(start: last.span.start, end: last.span.end - length),
+                original: base
+            )
+        )
+        result.append(
+            CommandToken(
+                kind: .punctuation(String(final)),
+                span: SourceSpan(start: last.span.end - length, end: last.span.end),
+                original: String(final)
+            )
+        )
+        return result
+    }
+
+    static func isInsideUnclosedLiteral(_ text: String) -> Bool {
+        var open = false
+        var escaped = false
+        for character in text {
+            if escaped {
+                escaped = false
+                continue
+            }
+            if character == "\\" {
+                escaped = true
+                continue
+            }
+            if character == "\"" {
+                open.toggle()
+            }
+        }
+        return open
     }
 }
 
@@ -295,10 +356,16 @@ private struct ParserWorker {
             }
         }
 
-        let actionCount = clauses.filter { clause in
-            if let capability = clause.capability, case .action = capability { return true }
-            return false
-        }.count
+        let actionCount = clauses.reduce(0) { count, clause in
+            switch clause.kind {
+            case .openApplication, .hideApplication, .quitApplication:
+                return count + max(1, clause.resourceNames.count)
+            case .openFile, .revealInFinder, .arrangeWindow, .wait, .showNotification, .copyText:
+                return count + 1
+            default:
+                return count
+            }
+        }
         if actionCount > CommandLimits.maximumActions {
             diagnosticList.append(.error("A workflow can have at most 12 steps.", span: nil))
             if outcome == .complete {
@@ -320,7 +387,20 @@ private struct ParserWorker {
         let covered = (clauses.map(\.span) + approved).filter { $0.length > 0 }
         var unresolved: [SourceSpan] = []
 
-        for token in tokens where !isConnectorToken(token) {
+        for token in tokens {
+            if isConnectorToken(token) {
+                let isInside = covered.contains { span in
+                    span.start <= token.span.start && token.span.end <= span.end
+                }
+                let leadsToCoveredSpan = covered.contains { span in
+                    span.start >= token.span.end
+                }
+                if !isInside && !leadsToCoveredSpan {
+                    unresolved.append(token.span)
+                }
+                continue
+            }
+
             let isCovered = covered.contains { span in
                 span.start <= token.span.start && token.span.end <= span.end
             }
@@ -614,16 +694,27 @@ private struct ParserWorker {
                     flush()
                     return (names, end)
                 }
-                if isConnectorWord(word) {
-                    if isClauseStart(tokenAfterCurrent) {
+
+                if let connector = listConnector(at: position) {
+                    let nextIndex = position + connector.tokenCount
+                    if nextIndex >= tokens.count {
                         flush()
                         return (names, end)
                     }
                     flush()
-                    end = token.span.end
-                    position += 1
+                    end = tokens[nextIndex - 1].span.end
+                    position = nextIndex
+                    if isClauseStart(tokens[nextIndex]) {
+                        return (names, end)
+                    }
                     continue
                 }
+
+                if isClauseStart(token), !currentWords.isEmpty || !names.isEmpty {
+                    flush()
+                    return (names, end)
+                }
+
                 currentWords.append(token.original)
                 end = token.span.end
                 position += 1
@@ -644,16 +735,18 @@ private struct ParserWorker {
                         return (names, end)
                     }
                 }
-                if language.shared.connectorPunctuation.contains(punctuation) {
-                    if isClauseStart(tokenAfterCurrent) {
+                if let connector = listConnector(at: position) {
+                    let nextIndex = position + connector.tokenCount
+                    if nextIndex >= tokens.count {
                         flush()
-                        end = token.span.end
-                        position += 1
                         return (names, end)
                     }
                     flush()
-                    end = token.span.end
-                    position += 1
+                    end = tokens[nextIndex - 1].span.end
+                    position = nextIndex
+                    if isClauseStart(tokens[nextIndex]) {
+                        return (names, end)
+                    }
                     continue
                 }
                 flush()
@@ -668,6 +761,52 @@ private struct ParserWorker {
 
         flush()
         return (names, end)
+    }
+
+    private struct ListConnector {
+        let tokenCount: Int
+    }
+
+    private func listConnector(at index: Int) -> ListConnector? {
+        guard index >= 0, index < tokens.count else { return nil }
+
+        switch tokens[index].kind {
+        case .punctuation(let punctuation):
+            return language.shared.connectorPunctuation.contains(punctuation)
+                ? ListConnector(tokenCount: 1)
+                : nil
+
+        case .word(let word):
+            if language.shared.listSeparatorWords.contains(word) {
+                return ListConnector(tokenCount: 1)
+            }
+            for phrase in language.shared.clauseConnectorPhrases where phrase.first == word {
+                var matches = true
+                for (offset, expected) in phrase.enumerated() {
+                    guard index + offset < tokens.count,
+                          case .word(let candidate) = tokens[index + offset].kind,
+                          candidate == expected else {
+                        matches = false
+                        break
+                    }
+                }
+                guard matches,
+                      let next = token(at: index + phrase.count),
+                      isClauseStart(next) else {
+                    continue
+                }
+                return ListConnector(tokenCount: phrase.count)
+            }
+            return nil
+
+        case .number:
+            return nil
+        }
+    }
+
+    private func token(at index: Int) -> CommandToken? {
+        guard index >= 0, index < tokens.count else { return nil }
+        return tokens[index]
     }
 
     private mutating func parseArrange() -> ParsedClause {
@@ -1048,7 +1187,8 @@ private struct ParserWorker {
         var end = tokens[position].span.end
         position += 1
 
-        if position < tokens.count, case .word(let subject) = tokens[position].kind, subject == "you" {
+        if position < tokens.count, case .word(let subject) = tokens[position].kind,
+           language.schedule.optionalSubjectWords.contains(subject) {
             end = tokens[position].span.end
             position += 1
         }
@@ -1098,7 +1238,7 @@ private struct ParserWorker {
         }
 
         let scanStart = tokens[position].span.start
-        guard let scanned = Self.scanAbsoluteDateTime(text, from: scanStart) else {
+        guard let scanned = Self.scanAbsoluteDateTime(text, from: scanStart, atWord: language.schedule.atWord) else {
             let end = consumeClauseRemainder()
             return scheduleClause(.incomplete, start: startToken.span.start, end: end)
         }
@@ -1134,7 +1274,7 @@ private struct ParserWorker {
         let end: Int
     }
 
-    private static func scanAbsoluteDateTime(_ text: String, from offset: Int) -> ScannedDateTime? {
+    private static func scanAbsoluteDateTime(_ text: String, from offset: Int, atWord: String) -> ScannedDateTime? {
         guard let remainder = text.substring(in: SourceSpan(start: offset, end: text.utf16.count)) else {
             return nil
         }
@@ -1180,7 +1320,7 @@ private struct ParserWorker {
         guard let year = readDigits(4), consume("-"),
               let month = readDigits(2), consume("-"),
               let day = readDigits(2),
-              consumeWhitespace(), consumeWord("at"), consumeWhitespace(),
+              consumeWhitespace(), consumeWord(atWord), consumeWhitespace(),
               let hour = readDigits(2), consume(":"),
               let minute = readDigits(2) else {
             return nil

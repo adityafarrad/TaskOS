@@ -114,27 +114,42 @@ struct CompositionAndScheduleTests {
         #expect(parser.parse("once on 2026-09-20 at 09:00").outcome == .complete)
     }
 
-    @Test func canonicalSchedulePhrasesReparse() {
+    @Test func canonicalSchedulePhrasesReparseToTheSameValue() {
         let base = Date(timeIntervalSince1970: 1_700_000_000)
         let absolute = Calendar.current.date(
             from: DateComponents(year: 2026, month: 9, day: 20, hour: 9, minute: 0)
         )!
 
-        let samples: [ScheduleTrigger] = [
-            .daily(hour: 9, minute: 0),
-            .daily(hour: 21, minute: 30),
-            .weekdays([.monday, .friday], hour: 17, minute: 15),
-            .weekdays(Weekday.weekend, hour: 10, minute: 0),
-            .interval(every: 30 * 60, startingAt: base),
-            .oneTime(absolute),
+        let samples: [(ScheduleTrigger, ParsedSchedule)] = [
+            (.daily(hour: 9, minute: 0), .daily(hour: 9, minute: 0)),
+            (.daily(hour: 21, minute: 30), .daily(hour: 21, minute: 30)),
+            (.weekdays([.monday, .friday], hour: 17, minute: 15), .weekdays([.monday, .friday], hour: 17, minute: 15)),
+            (.weekdays(Weekday.weekend, hour: 10, minute: 0), .weekdays(Weekday.weekend, hour: 10, minute: 0)),
+            (.interval(every: 30 * 60, startingAt: base), .interval(30 * 60)),
+            (.interval(every: 90, startingAt: base), .interval(90)),
+            (.oneTime(absolute), .absolute(year: 2026, month: 9, day: 20, hour: 9, minute: 0)),
         ]
 
-        for schedule in samples {
+        for (schedule, expected) in samples {
             let phrase = CanonicalPhrase.text(for: schedule)
             let parsed = parser.parse(phrase)
             #expect(parsed.outcome == .complete, "\(phrase)")
-            #expect(parsed.clauses.contains { $0.kind == .schedule }, "\(phrase)")
+            #expect(parsed.clauses.compactMap(\.schedule).first == expected, "\(phrase)")
         }
+    }
+
+    @Test func relativeDurationsRoundTripExactly() {
+        for command in ["in 30 seconds", "in 1.5 minutes", "in 90 seconds"] {
+            let document = ComposerDocument(text: "\(command), then open Safari")
+            let reparsed = ComposerDocument(text: document.renderedText() + ", then open Safari")
+            #expect(reparsed.trigger == document.trigger, "\(command) -> \(document.renderedText())")
+        }
+    }
+
+    @Test func expandedListLimitSurfacesThroughComposer() {
+        let thirteen = "open " + (1...13).map { "App\($0)" }.joined(separator: " and ")
+        let document = ComposerDocument(text: thirteen)
+        #expect(document.blockingParseMessage?.contains("12") == true)
     }
 
     @Test func absoluteOneTimeSurvivesComposition() {

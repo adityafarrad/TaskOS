@@ -2891,9 +2891,8 @@ Second run before starting 2.7B, performed at commit `c6db374`:
   - Release build — BUILD SUCCEEDED.
 - Physical checks: none (Core grammar; UI paths exercised by the UI tests).
 - Remaining defects / gaps:
-  - A final period attached directly to the last word (for example `Open Notes.`)
-    is still tokenized as part of that word; separated `.` and `?`/`!` are
-    handled. Tracked for 2.7D hardening.
+  - Final punctuation is handled for every family by 2.7B-fix (including an
+    attached `.`/`?`); the earlier caveat is resolved.
   - Leading frames are not re-emitted after a card edit; the rationale is.
   - Rationale remains a fixed English set per the plan; no user-defined
     explanations.
@@ -2914,7 +2913,65 @@ Second run before starting 2.7C, performed at commit `0f50f73`:
 - UI tests: `xcodebuild ... test -only-testing:TaskOSUITests` — TEST SUCCEEDED.
 - Debug and Release builds — BUILD SUCCEEDED.
 - Release app launch smoke: opened and quit cleanly.
-- No defects found. 2.7B is verified; 2.7C1 is next.
+- That pass re-ran the existing tests only. A later independent audit (below)
+  found defects those tests did not cover.
+
+### Increment 2.7B-fix — Independent audit hardening (2026-09-13)
+
+- Status: done
+- Behavior delivered:
+  - Connectors are exact: `after that` and `followed by` are matched as
+    phrases, and `next` only connects when a clause follows. Dangling
+    connectors fail closed instead of being dropped, and list items such as
+    `Next`, `After`, or `By` survive (`open Safari and Next` is two apps).
+  - Repeated action heads create boundaries (`open Notes open Safari` is two
+    steps, not one bogus application name).
+  - Copy Text canonical rendering escapes `"` and `\`, so a literal containing
+    a quote or a trailing backslash survives rendering, reparsing, and
+    open-for-edit.
+  - Relative and interval durations render exactly (`In 90 seconds`,
+    `Every 90 seconds`); `seconds` are accepted for schedule durations, so an
+    unrelated text edit no longer truncates `in 1.5 minutes` to `In 1 minute`.
+  - One final `.`, `?`, or `!` is accepted for every action family
+    (`wait 5 seconds.`, `show a notification.`, `once at 7 pm.`,
+    `maximize Safari.`, and absolute `Once on … at HH:mm.`), and an attached
+    `?` no longer becomes part of an application name.
+  - Canonical application phrases quote reserved single words (`Open "Next"`),
+    so rendered names reparse to the same one application.
+  - The 12-action limit counts list-expanded actions, and the composer surfaces
+    the parser's `at most 12 steps` correction when Preview or Save cannot
+    build a definition.
+  - The rationale scan skips quoted literals and refuses to approve a rationale
+    inside an unclosed quote; the friendly `at`/`you` words come from the
+    catalog rather than parser literals.
+- Interfaces changed:
+  - `SharedVocabulary` gained `listSeparatorWords` and
+    `clauseConnectorPhrases`; `ScheduleVocabulary` gained
+    `optionalSubjectWords` and seconds in `durationUnits`.
+  - `CommandLanguageCatalog` gained `copyTextPhrase(_:)`, reserved-name quoting
+    in `applicationPhrase(_:)`, exact `intervalText(_:)`, and a quote-aware
+    `rationaleSpan(in:)`.
+  - `CommandParser`: trailing-punctuation splitting, phrase-aware connectors,
+    repeated-head boundaries, expanded action counting, and fail-closed
+    coverage for trailing connectors.
+  - `ComposerDocument.blockingParseMessage`; the view model shows it when
+    Preview or Save cannot produce a definition.
+- Tests performed:
+  - Core: `swift test --package-path Packages/TaskOSCore` — 356 tests, 41
+    suites, pass (was 347/41; +9 tests covering connector-word list items,
+    dangling connectors, repeated heads, reserved canonical names, Copy Text
+    quote/backslash round trip, expanded-list limit, unclosed quote before a
+    rationale, exact schedule reparse equality, and relative duration round
+    trip).
+  - App tests (`xcodebuild ... test -only-testing:TaskOSTests`) — TEST
+    SUCCEEDED.
+  - UI tests (`xcodebuild ... test -only-testing:TaskOSUITests`) — TEST
+    SUCCEEDED, 10/10.
+  - Debug and Release builds — BUILD SUCCEEDED.
+- Physical checks: none (Core grammar plus a view-model message; the UI paths
+  are exercised by the UI tests).
+- Remaining defects / gaps: none known for 2.7B. The next eligible work package
+  is 2.7C1 — Versioned application snapshots and list ambiguity.
 
 
 

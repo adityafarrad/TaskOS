@@ -92,6 +92,8 @@ public struct CommandLanguageCatalog: Sendable {
 
     public struct SharedVocabulary: Hashable, Sendable {
         public let connectorWords: Set<String>
+        public let listSeparatorWords: Set<String>
+        public let clauseConnectorPhrases: [[String]]
         public let connectorPunctuation: Set<String>
         public let negationWords: Set<String>
         public let actionJoiner: String
@@ -145,6 +147,7 @@ public struct CommandLanguageCatalog: Sendable {
         public let timeUnits: Set<String>
         public let meridiemAM: Set<String>
         public let meridiemPM: Set<String>
+        public let optionalSubjectWords: Set<String>
     }
 
     public struct TriggerVocabulary: Hashable, Sendable {
@@ -244,12 +247,30 @@ public struct CommandLanguageCatalog: Sendable {
             || name.contains("\\")
             || name.contains(",")
             || name.contains(where: { $0.isWhitespace })
+            || reservedApplicationWords.contains(name.lowercased())
         guard needsQuotes else { return name }
 
         let escaped = name
             .replacingOccurrences(of: "\\", with: "\\\\")
             .replacingOccurrences(of: "\"", with: "\\\"")
         return "\"\(escaped)\""
+    }
+
+    private var reservedApplicationWords: Set<String> {
+        var words = shared.connectorWords
+        words.formUnion(shared.negationWords)
+        words.formUnion(clauseRoutes.keys)
+        words.formUnion(excluded.keys)
+        words.insert(conversational.rationaleMarker)
+        words.formUnion(conversational.fillerWords)
+        return words
+    }
+
+    public func copyTextPhrase(_ text: String) -> String {
+        let escaped = text
+            .replacingOccurrences(of: "\\", with: "\\\\")
+            .replacingOccurrences(of: "\"", with: "\\\"")
+        return canonicalActionTemplate(.copyText)?.render(["text": escaped]) ?? "Copy \"\(escaped)\""
     }
 
     public func isRationaleMarker(_ word: String) -> Bool {
@@ -293,26 +314,41 @@ public struct CommandLanguageCatalog: Sendable {
 
     public func rationaleSpan(in text: String) -> SourceSpan? {
         let tokens = CommandTokenizer.tokenize(text)
-        guard let marker = tokens.first(where: { token in
-            if case .word(let word) = token.kind { return isRationaleMarker(word) }
-            return false
-        }) else {
-            return nil
+        var index = 0
+
+        while index < tokens.count {
+            let token = tokens[index]
+
+            if case .punctuation(let punctuation) = token.kind, punctuation == "\"" {
+                guard case .success(let literal) = CommandLiteralScanner.scan(text, at: token.span.start) else {
+                    return nil
+                }
+                while index < tokens.count, tokens[index].span.start < literal.span.end {
+                    index += 1
+                }
+                continue
+            }
+
+            if case .word(let word) = token.kind, isRationaleMarker(word) {
+                let raw = text.substring(in: SourceSpan(start: token.span.start, end: text.utf16.count)) ?? ""
+                var normalized = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+                if let last = normalized.last, conversational.finalPunctuation.contains(last) {
+                    normalized = String(normalized.dropLast())
+                }
+                normalized = normalized
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                    .lowercased()
+
+                guard conversational.rationaleEndings.contains(normalized) else {
+                    return nil
+                }
+                return SourceSpan(start: token.span.start, end: text.utf16.count)
+            }
+
+            index += 1
         }
 
-        let raw = text.substring(in: SourceSpan(start: marker.span.start, end: text.utf16.count)) ?? ""
-        var normalized = raw.trimmingCharacters(in: .whitespacesAndNewlines)
-        if let last = normalized.last, conversational.finalPunctuation.contains(last) {
-            normalized = String(normalized.dropLast())
-        }
-        normalized = normalized
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-            .lowercased()
-
-        guard conversational.rationaleEndings.contains(normalized) else {
-            return nil
-        }
-        return SourceSpan(start: marker.span.start, end: text.utf16.count)
+        return nil
     }
 
     public func rationaleText(in text: String) -> String? {
@@ -365,13 +401,31 @@ public struct CommandLanguageCatalog: Sendable {
     }
 
     public func intervalText(_ seconds: TimeInterval) -> String {
-        let minutes = seconds / 60
-        if minutes >= 60, minutes.truncatingRemainder(dividingBy: 60) == 0 {
-            let hours = Int(minutes / 60)
+        let normalized = (seconds * 1000).rounded() / 1000
+        if normalized >= 3600, normalized.truncatingRemainder(dividingBy: 3600) == 0 {
+            let hours = Int(normalized / 3600)
             return hours == 1 ? "1 hour" : "\(hours) hours"
         }
-        let whole = Int(minutes)
-        return whole == 1 ? "1 minute" : "\(whole) minutes"
+        if normalized >= 60, normalized.truncatingRemainder(dividingBy: 60) == 0 {
+            let minutes = Int(normalized / 60)
+            return minutes == 1 ? "1 minute" : "\(minutes) minutes"
+        }
+        let value = Self.numberText(normalized)
+        return normalized == 1 ? "\(value) second" : "\(value) seconds"
+    }
+
+    private static func numberText(_ value: Double) -> String {
+        if value == value.rounded() {
+            return String(Int(value))
+        }
+        var text = String(format: "%.3f", value)
+        while text.hasSuffix("0") {
+            text.removeLast()
+        }
+        if text.hasSuffix(".") {
+            text.removeLast()
+        }
+        return text
     }
 
     public func absoluteDateTimeText(_ date: Date, calendar: Calendar = .current) -> String {
@@ -413,6 +467,8 @@ extension CommandLanguageCatalog {
         ],
         shared: SharedVocabulary(
             connectorWords: ["and", "then", "also", "next", "after", "that", "followed", "by"],
+            listSeparatorWords: ["and", "then", "also"],
+            clauseConnectorPhrases: [["next"], ["after", "that"], ["followed", "by"]],
             connectorPunctuation: [",", ";"],
             negationWords: ["not", "never", "without", "don", "dont"],
             actionJoiner: ", then "
@@ -479,12 +535,14 @@ extension CommandLanguageCatalog {
                 "saturday": .saturday,
             ],
             durationUnits: [
+                "second": 1, "seconds": 1, "sec": 1, "secs": 1, "s": 1,
                 "minute": 60, "minutes": 60, "min": 60, "mins": 60,
                 "hour": 3600, "hours": 3600, "hr": 3600, "hrs": 3600,
             ],
             timeUnits: ["second", "seconds", "sec", "secs", "s"],
             meridiemAM: ["am", "a.m", "a.m."],
-            meridiemPM: ["pm", "p.m", "p.m."]
+            meridiemPM: ["pm", "p.m", "p.m."],
+            optionalSubjectWords: ["you"]
         ),
         trigger: TriggerVocabulary(
             headWords: ["when"],
