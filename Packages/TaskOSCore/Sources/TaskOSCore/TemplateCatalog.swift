@@ -148,7 +148,7 @@ public struct TemplateCatalog: Sendable {
                 .openWebsite(url: "https://", browser: nil),
             ],
             requiredParameters: [.file, .website],
-            limitations: "MacFlow does not detect or join meetings."
+            limitations: "TaskOS does not detect or join meetings."
         ),
         AutomationTemplate(
             id: "weekday",

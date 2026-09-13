@@ -2,10 +2,16 @@ import Foundation
 
 public struct SuggestionEngine: Sendable {
     private let registry: CapabilityRegistry
+    private let language: CommandLanguageCatalog
     public let limit: Int
 
-    public init(registry: CapabilityRegistry = .standard, limit: Int = 8) {
+    public init(
+        registry: CapabilityRegistry = .standard,
+        language: CommandLanguageCatalog = .standard,
+        limit: Int = 8
+    ) {
         self.registry = registry
+        self.language = language
         self.limit = limit
     }
 
@@ -24,7 +30,7 @@ public struct SuggestionEngine: Sendable {
                 let normalized = ResourceNameHeuristics.normalizedWebsiteURL(prefix)
                 let website = Suggestion(
                     id: "website.\(normalized)",
-                    phrase: "Open \(normalized)",
+                    phrase: language.websitePhrase(url: normalized),
                     title: normalized,
                     category: .parameter,
                     requiresParameter: false,
@@ -72,21 +78,21 @@ public struct SuggestionEngine: Sendable {
 
         let words = fragment.lowercased().split(separator: " ").map(String.init)
         guard let first = words.first else { return .start }
+        guard let route = language.clauseRoutes[first] else { return .other }
 
-        switch first {
-        case "open":
+        switch route {
+        case .open:
             return .openApplication(prefix: words.dropFirst().joined(separator: " "))
-        case "wait":
+        case .wait:
             if words.count == 1 { return .waitDuration }
-            if words.count == 2, words[1] == "for" { return .waitDuration }
+            if words.count == 2, language.wait.optionalWords.contains(words[1]) { return .waitDuration }
             return .other
-        case "show":
+        case .notification:
+            if language.notification.directWords.contains(first) { return .other }
             if words.count == 1 { return .notification }
-            if words.count == 2, words[1] == "a" || words[1] == "the" { return .notification }
+            if words.count == 2, language.notification.articles.contains(words[1]) { return .notification }
             return .other
-        case "notify":
-            return .other
-        case "when":
+        case .when:
             return .when
         default:
             return .other
@@ -105,123 +111,21 @@ public struct SuggestionEngine: Sendable {
     private func isConnector(_ token: CommandToken) -> Bool {
         switch token.kind {
         case .word(let word):
-            return word == "and" || word == "then" || word == "also"
+            return language.shared.connectorWords.contains(word)
         case .punctuation(let punctuation):
-            return punctuation == ","
+            return language.shared.connectorPunctuation.contains(punctuation)
         case .number:
             return false
         }
     }
 
     private func starters(openOnly: Bool = false) -> [Suggestion] {
-        var suggestions: [Suggestion] = []
-
-        suggestions.append(
-            Suggestion(
-                id: "action.openApplication",
-                phrase: "Open an application",
-                title: "Open an application",
-                category: .action,
-                requiresParameter: true,
-                match: .grammarPosition
-            )
-        )
-
-        suggestions.append(
-            Suggestion(
-                id: "action.openWebsite",
-                phrase: "Open https://",
-                title: "Open a website",
-                category: .action,
-                requiresParameter: true,
-                match: .grammarPosition
-            )
-        )
-
-        if !openOnly {
-            suggestions.append(
-                Suggestion(
-                    id: "action.hideApplication",
-                    phrase: "Hide Safari",
-                    title: "Hide an application",
-                    category: .action,
-                    requiresParameter: true,
-                    match: .grammarPosition
-                )
-            )
-            suggestions.append(
-                Suggestion(
-                    id: "action.quitApplication",
-                    phrase: "Quit Safari",
-                    title: "Quit an application",
-                    category: .action,
-                    requiresParameter: true,
-                    match: .grammarPosition
-                )
-            )
-            suggestions.append(
-                Suggestion(
-                    id: "action.openFile",
-                    phrase: "Open the selected file",
-                    title: "Open a file or folder",
-                    category: .action,
-                    requiresParameter: true,
-                    match: .grammarPosition
-                )
-            )
-            suggestions.append(
-                Suggestion(
-                    id: "action.revealInFinder",
-                    phrase: "Reveal the selected item",
-                    title: "Reveal in Finder",
-                    category: .action,
-                    requiresParameter: true,
-                    match: .grammarPosition
-                )
-            )
-            suggestions.append(
-                Suggestion(
-                    id: "action.arrangeWindow",
-                    phrase: "Put an application on the left half",
-                    title: "Arrange a window",
-                    category: .action,
-                    requiresParameter: true,
-                    match: .grammarPosition
-                )
-            )
-            suggestions.append(
-                Suggestion(
-                    id: "action.wait",
-                    phrase: "Wait 5 seconds",
-                    title: "Wait",
-                    category: .action,
-                    requiresParameter: true,
-                    match: .grammarPosition
-                )
-            )
-            suggestions.append(
-                Suggestion(
-                    id: "action.showNotification",
-                    phrase: "Show a notification",
-                    title: "Show a notification",
-                    category: .action,
-                    requiresParameter: false,
-                    match: .grammarPosition
-                )
-            )
-            suggestions.append(
-                Suggestion(
-                    id: "action.copyText",
-                    phrase: "Copy \"text\"",
-                    title: "Copy text",
-                    category: .action,
-                    requiresParameter: true,
-                    match: .grammarPosition
-                )
-            )
+        let openCapabilities: Set<ActionID> = [.openApplication, .openWebsite]
+        return ActionID.allCases.compactMap { id in
+            guard let starter = language.actionStarter(id) else { return nil }
+            if openOnly, !openCapabilities.contains(id) { return nil }
+            return suggestion(from: starter)
         }
-
-        return suggestions
     }
 
     private func applicationSuggestions(_ applications: [ApplicationResource], prefix: String) -> [Suggestion] {
@@ -250,7 +154,8 @@ public struct SuggestionEngine: Sendable {
             results.append(
                 Suggestion(
                     id: "app.\(application.bundleIdentifier)",
-                    phrase: "Open \(label)",
+                    phrase: language.canonicalActionTemplate(.openApplication)?
+                        .render(["application": label]) ?? "Open \(label)",
                     title: label,
                     category: .application,
                     requiresParameter: false,
@@ -263,98 +168,26 @@ public struct SuggestionEngine: Sendable {
     }
 
     private func waitSuggestions() -> [Suggestion] {
-        [
-            Suggestion(
-                id: "param.wait.1",
-                phrase: "Wait 1 second",
-                title: "Wait 1 second",
-                category: .parameter,
-                requiresParameter: false,
-                match: .grammarPosition
-            ),
-            Suggestion(
-                id: "param.wait.5",
-                phrase: "Wait 5 seconds",
-                title: "Wait 5 seconds",
-                category: .parameter,
-                requiresParameter: false,
-                match: .grammarPosition
-            ),
-            Suggestion(
-                id: "param.wait.30",
-                phrase: "Wait 30 seconds",
-                title: "Wait 30 seconds",
-                category: .parameter,
-                requiresParameter: false,
-                match: .grammarPosition
-            ),
-        ]
+        language.waitStarters.map { suggestion(from: $0) }
     }
 
     private func notificationSuggestions() -> [Suggestion] {
-        [
-            Suggestion(
-                id: "param.notification",
-                phrase: "Show a notification",
-                title: "Show a notification",
-                category: .parameter,
-                requiresParameter: false,
-                match: .grammarPosition
-            )
-        ]
+        [suggestion(from: language.notificationStarter)]
     }
 
     private func whenSuggestions() -> [Suggestion] {
-        [
-            Suggestion(
-                id: "trigger.appLifecycle",
-                phrase: "When Safari opens",
-                title: "When an app opens or quits",
-                category: .trigger,
-                requiresParameter: true,
-                match: .grammarPosition
-            ),
-            Suggestion(
-                id: "trigger.wake",
-                phrase: "When the Mac wakes",
-                title: "When the Mac wakes",
-                category: .trigger,
-                requiresParameter: false,
-                match: .grammarPosition
-            ),
-            Suggestion(
-                id: "trigger.display",
-                phrase: "When a display connects",
-                title: "When a display connects or disconnects",
-                category: .trigger,
-                requiresParameter: false,
-                match: .grammarPosition
-            ),
-            Suggestion(
-                id: "trigger.volume",
-                phrase: "When an external drive mounts",
-                title: "When an external drive mounts or unmounts",
-                category: .trigger,
-                requiresParameter: false,
-                match: .grammarPosition
-            ),
-            Suggestion(
-                id: "trigger.power",
-                phrase: "When the Mac switches to battery",
-                title: "When the power source changes",
-                category: .trigger,
-                requiresParameter: false,
-                match: .grammarPosition
-            ),
-            Suggestion(
-                id: "trigger.battery",
-                phrase: "When the battery drops below 20%",
-                title: "When the battery crosses a percentage",
-                category: .trigger,
-                requiresParameter: true,
-                match: .grammarPosition
-            ),
-        ]
+        language.whenStarters().map { suggestion(from: $0) }
+    }
+
+    private func suggestion(from starter: CommandLanguageCatalog.CompletionStarter) -> Suggestion {
+        Suggestion(
+            id: starter.id,
+            phrase: starter.phrase,
+            title: starter.title,
+            category: starter.category,
+            requiresParameter: starter.requiresParameter,
+            match: .grammarPosition
+        )
     }
 
     private func rankAndLimit(_ suggestions: [Suggestion]) -> [Suggestion] {

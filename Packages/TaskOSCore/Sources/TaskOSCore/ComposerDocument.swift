@@ -132,6 +132,7 @@ public struct ComposerDocument: Sendable {
 
     private let parser = CommandParser()
     private static let historyLimit = 100
+    private static let language = CommandLanguageCatalog.standard
 
     public private(set) var text: String
     public private(set) var trigger: ComposerTriggerDraft
@@ -384,7 +385,8 @@ public struct ComposerDocument: Sendable {
     }
 
     public func renderedText() -> String {
-        let actionText = elements.map(Self.render).joined(separator: ", then ")
+        let joiner = Self.language.shared.actionJoiner
+        let actionText = elements.map(Self.render).joined(separator: joiner)
         let triggerText = Self.render(trigger)
         if triggerText.isEmpty {
             return actionText
@@ -392,7 +394,7 @@ public struct ComposerDocument: Sendable {
         if actionText.isEmpty {
             return triggerText
         }
-        return triggerText + ", then " + actionText
+        return triggerText + joiner + actionText
     }
 
     public func resolvedActions() -> [ActionConfiguration]? {
@@ -803,32 +805,49 @@ public struct ComposerDocument: Sendable {
     private static func render(_ draft: ComposerActionDraft) -> String {
         switch draft {
         case .openApplication(let name, _):
-            return "Open \(name)"
+            return language.canonicalActionTemplate(.openApplication)?
+                .render(["application": name]) ?? "Open \(name)"
         case .hideApplication(let name, _):
-            return "Hide \(name)"
+            return language.canonicalActionTemplate(.hideApplication)?
+                .render(["application": name]) ?? "Hide \(name)"
         case .quitApplication(let name, _):
-            return "Quit \(name)"
+            return language.canonicalActionTemplate(.quitApplication)?
+                .render(["application": name]) ?? "Quit \(name)"
         case .openFile(let target):
-            return target?.kind == .folder ? "Open the selected folder" : "Open the selected file"
+            let variant = target?.kind == .folder ? "folder" : "file"
+            return language.canonicalActionTemplate(.openFile, variant: variant)?.render()
+                ?? (target?.kind == .folder ? "Open the selected folder" : "Open the selected file")
         case .revealInFinder:
-            return "Reveal the selected item"
+            return language.canonicalActionTemplate(.revealInFinder)?.render()
+                ?? "Reveal the selected item"
         case .openWebsite(let url, _):
-            return "Open \(url)"
+            return language.canonicalActionTemplate(.openWebsite)?
+                .render(["url": url]) ?? "Open \(url)"
         case .arrangeWindow(let name, _, let preset, _):
             switch preset {
             case .maximize:
-                return "Maximize \(name)"
+                return language.canonicalActionTemplate(.arrangeWindow, variant: "maximize")?
+                    .render(["application": name]) ?? "Maximize \(name)"
             case .center:
-                return "Center \(name)"
+                return language.canonicalActionTemplate(.arrangeWindow, variant: "center")?
+                    .render(["application": name]) ?? "Center \(name)"
             default:
-                return "Put \(name) \(preset.phraseSuffix)"
+                return language.canonicalActionTemplate(.arrangeWindow)?
+                    .render([
+                        "application": name,
+                        "preset": language.arrangePresetPhrase(preset),
+                    ]) ?? "Put \(name) \(language.arrangePresetPhrase(preset))"
             }
         case .wait(let duration):
-            return "Wait \(CanonicalPhrase.durationText(duration)) seconds"
+            return language.canonicalActionTemplate(.wait)?
+                .render(["duration": CanonicalPhrase.durationText(duration)])
+                ?? "Wait \(CanonicalPhrase.durationText(duration)) seconds"
         case .showNotification:
-            return "Show a notification"
+            return language.canonicalActionTemplate(.showNotification)?.render()
+                ?? "Show a notification"
         case .copyText(let value):
-            return "Copy \"\(value)\""
+            return language.canonicalActionTemplate(.copyText)?
+                .render(["text": value]) ?? "Copy \"\(value)\""
         }
     }
 
@@ -837,52 +856,67 @@ public struct ComposerDocument: Sendable {
         case .manual:
             return ""
         case .daily(let hour, let minute):
-            return "Every day at \(clockText(hour: hour, minute: minute))"
+            return language.scheduleTemplate("daily")?
+                .render(["clock": clockText(hour: hour, minute: minute)])
+                ?? "Every day at \(clockText(hour: hour, minute: minute))"
         case .weekdays(let days, let hour, let minute):
             let names = days.sorted { $0.rawValue < $1.rawValue }.map(\.displayName).joined(separator: ", ")
-            return "Every \(names) at \(clockText(hour: hour, minute: minute))"
+            return language.scheduleTemplate("weekdays")?
+                .render(["days": names, "clock": clockText(hour: hour, minute: minute)])
+                ?? "Every \(names) at \(clockText(hour: hour, minute: minute))"
         case .interval(let seconds):
-            return "Every \(intervalText(seconds))"
+            return language.scheduleTemplate("interval")?
+                .render(["interval": intervalText(seconds)])
+                ?? "Every \(intervalText(seconds))"
         case .relative(let seconds):
-            return "In \(intervalText(seconds))"
+            return language.scheduleTemplate("relative")?
+                .render(["interval": intervalText(seconds)])
+                ?? "In \(intervalText(seconds))"
         case .once(let hour, let minute):
-            return "Once at \(clockText(hour: hour, minute: minute))"
+            return language.scheduleTemplate("once")?
+                .render(["clock": clockText(hour: hour, minute: minute)])
+                ?? "Once at \(clockText(hour: hour, minute: minute))"
         case .oneTime(let date):
             let components = Calendar.current.dateComponents([.hour, .minute], from: date)
-            return "Once at \(clockText(hour: components.hour ?? 0, minute: components.minute ?? 0))"
+            let clock = clockText(hour: components.hour ?? 0, minute: components.minute ?? 0)
+            return language.scheduleTemplate("once")?.render(["clock": clock]) ?? "Once at \(clock)"
         case .applicationLifecycle(_, let label, let event):
-            return label.isEmpty ? "" : "When \(label) \(event.displayName)"
+            if label.isEmpty { return "" }
+            return language.canonicalTriggerTemplate(.applicationLifecycle)?
+                .render(["application": label, "event": event.displayName])
+                ?? "When \(label) \(event.displayName)"
         case .wake:
-            return "When the Mac wakes"
+            return language.canonicalTriggerTemplate(.wake)?.render() ?? "When the Mac wakes"
         case .displayConnection(let event, let selection):
             let noun = selection == .anyExternal ? "a display" : selection.displayName
-            return event == .connected ? "When \(noun) connects" : "When \(noun) disconnects"
+            let variant = event == .connected ? "connected" : "disconnected"
+            return language.canonicalTriggerTemplate(.displayConnection, variant: variant)?
+                .render(["display": noun])
+                ?? (event == .connected ? "When \(noun) connects" : "When \(noun) disconnects")
         case .externalVolume(let event, let selection):
             let noun = selection == .anyExternal ? "an external drive" : selection.displayName
-            return event == .mounted ? "When \(noun) mounts" : "When \(noun) unmounts"
+            let variant = event == .mounted ? "mounted" : "unmounted"
+            return language.canonicalTriggerTemplate(.externalVolume, variant: variant)?
+                .render(["volume": noun])
+                ?? (event == .mounted ? "When \(noun) mounts" : "When \(noun) unmounts")
         case .powerSource(let event):
-            return "When the Mac \(event.displayName)"
+            return language.canonicalTriggerTemplate(.powerSource)?
+                .render(["event": event.displayName]) ?? "When the Mac \(event.displayName)"
         case .batteryThreshold(let comparator, let percentage):
-            let direction = comparator == .below ? "drops below" : "rises above"
-            return "When the battery \(direction) \(percentage)%"
+            let direction = language.trigger.batteryDirectionWords[comparator]
+                ?? (comparator == .below ? "drops below" : "rises above")
+            return language.canonicalTriggerTemplate(.batteryThreshold)?
+                .render(["direction": direction, "percentage": "\(percentage)"])
+                ?? "When the battery \(direction) \(percentage)%"
         }
     }
 
     private static func clockText(hour: Int, minute: Int) -> String {
-        let period = hour < 12 ? "AM" : "PM"
-        var display = hour % 12
-        if display == 0 { display = 12 }
-        return String(format: "%d:%02d %@", display, minute, period)
+        language.clockText(hour: hour, minute: minute)
     }
 
     private static func intervalText(_ seconds: TimeInterval) -> String {
-        let minutes = seconds / 60
-        if minutes >= 60, minutes.truncatingRemainder(dividingBy: 60) == 0 {
-            let hours = Int(minutes / 60)
-            return hours == 1 ? "1 hour" : "\(hours) hours"
-        }
-        let whole = Int(minutes)
-        return whole == 1 ? "1 minute" : "\(whole) minutes"
+        language.intervalText(seconds)
     }
 
     private mutating func bumpRevision() {

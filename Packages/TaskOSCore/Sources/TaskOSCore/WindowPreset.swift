@@ -42,11 +42,7 @@ public enum WindowPreset: String, Codable, Sendable, CaseIterable, Hashable {
     }
 
     public var phraseSuffix: String {
-        switch self {
-        case .maximize: return "maximized"
-        case .center: return "centered"
-        default: return "on the \(displayName)"
-        }
+        CommandLanguageCatalog.standard.arrangePresetPhrase(self)
     }
 
     public func targetFrame(in usable: WindowFrame, currentSize: WindowFrame) -> WindowFrame {

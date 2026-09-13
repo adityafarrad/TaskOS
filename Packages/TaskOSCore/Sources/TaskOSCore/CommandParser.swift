@@ -98,10 +98,14 @@ enum CommandTokenizer {
 }
 
 public struct CommandParser: Sendable {
-    public init() {}
+    public let language: CommandLanguageCatalog
+
+    public init(language: CommandLanguageCatalog = .standard) {
+        self.language = language
+    }
 
     public func parse(_ text: String) -> ParsedCommand {
-        var worker = ParserWorker(tokens: CommandTokenizer.tokenize(text), text: text)
+        var worker = ParserWorker(tokens: CommandTokenizer.tokenize(text), text: text, language: language)
         return worker.parse()
     }
 }
@@ -109,121 +113,67 @@ public struct CommandParser: Sendable {
 private struct ParserWorker {
     let tokens: [CommandToken]
     let text: String
+    let language: CommandLanguageCatalog
     var position = 0
 
-    static let connectors: Set<String> = ["and", "then", "also", ","]
-    static let clauseKeywords: Set<String> = [
-        "open", "hide", "quit", "reveal", "wait", "show", "notify", "put",
-        "arrange", "maximize", "center", "copy", "every", "once", "in", "when",
-    ]
-    static let lifecycleVerbs: [String: LifecycleEvent] = [
-        "opens": .launched,
-        "launches": .launched,
-        "launched": .launched,
-        "quits": .quit,
-        "exits": .quit,
-        "closes": .quit,
-    ]
-    static let displaySubjects = [
-        "a display", "the display", "an external display", "the external display",
-        "external display", "a monitor", "an external monitor", "the external monitor",
-        "external monitor", "a screen", "an external screen", "the external screen",
-    ]
-    static let volumeSubjects = [
-        "a drive", "the drive", "an external drive", "the external drive", "external drive",
-        "a volume", "the volume", "an external volume", "the external volume", "external volume",
-        "a disk", "the disk", "an external disk", "the external disk",
-    ]
-    static let powerSubjects = ["the mac", "my mac", "this mac", "i"]
+    private let clauseStarts: Set<String>
 
-    static func displayEvent(for phrase: String) -> DisplayEvent? {
-        for subject in displaySubjects {
-            if phrase == "\(subject) connects" { return .connected }
-            if phrase == "\(subject) disconnects" { return .disconnected }
+    init(tokens: [CommandToken], text: String, language: CommandLanguageCatalog) {
+        self.tokens = tokens
+        self.text = text
+        self.language = language
+        self.clauseStarts = language.clauseStartWords()
+    }
+
+    func displayEvent(for phrase: String) -> DisplayEvent? {
+        for subject in language.trigger.displaySubjects {
+            for word in language.trigger.displayConnectWords where phrase == "\(subject) \(word)" {
+                return .connected
+            }
+            for word in language.trigger.displayDisconnectWords where phrase == "\(subject) \(word)" {
+                return .disconnected
+            }
         }
         return nil
     }
 
-    static func volumeEvent(for phrase: String) -> VolumeEvent? {
-        for subject in volumeSubjects {
-            if phrase == "\(subject) mounts" { return .mounted }
-            if phrase == "\(subject) unmounts" { return .unmounted }
+    func volumeEvent(for phrase: String) -> VolumeEvent? {
+        for subject in language.trigger.volumeSubjects {
+            for word in language.trigger.volumeMountWords where phrase == "\(subject) \(word)" {
+                return .mounted
+            }
+            for word in language.trigger.volumeUnmountWords where phrase == "\(subject) \(word)" {
+                return .unmounted
+            }
         }
         return nil
     }
 
-    static func powerEvent(for phrase: String) -> PowerEvent? {
-        for subject in powerSubjects {
-            if phrase == "\(subject) switches to battery"
-                || phrase == "\(subject) switch to battery"
-                || phrase == "\(subject) switches to battery power"
-                || phrase == "\(subject) switch to battery power"
-                || phrase == "\(subject) is on battery" {
+    func powerEvent(for phrase: String) -> PowerEvent? {
+        for subject in language.trigger.powerSubjects {
+            for suffix in language.trigger.powerToBatterySuffixes where phrase == "\(subject) \(suffix)" {
                 return .toBattery
             }
-            if phrase == "\(subject) switches to power"
-                || phrase == "\(subject) switch to power"
-                || phrase == "\(subject) switches to external power"
-                || phrase == "\(subject) switch to external power"
-                || phrase == "\(subject) connects to power"
-                || phrase == "\(subject) connect to power"
-                || phrase == "\(subject) connects to external power"
-                || phrase == "\(subject) connect to external power" {
+            for suffix in language.trigger.powerToExternalSuffixes where phrase == "\(subject) \(suffix)" {
                 return .toExternalPower
             }
         }
         return nil
     }
 
-    static func batteryThreshold(for phrase: String) -> (comparator: ThresholdComparison, percentage: Int)? {
-        let subjects = ["the battery", "my battery", "battery"]
-        let belowWords = ["drops below", "falls below", "goes below", "drops to", "falls to"]
-        let aboveWords = ["rises above", "goes above", "rises to", "reaches"]
-
-        for subject in subjects {
-            for word in belowWords where phrase.hasPrefix("\(subject) \(word) ") {
+    func batteryThreshold(for phrase: String) -> (comparator: ThresholdComparison, percentage: Int)? {
+        for subject in language.trigger.batterySubjects {
+            for word in language.trigger.batteryBelowWords where phrase.hasPrefix("\(subject) \(word) ") {
                 let value = phrase.dropFirst("\(subject) \(word) ".count)
                 if let percentage = Int(value) { return (.below, percentage) }
             }
-            for word in aboveWords where phrase.hasPrefix("\(subject) \(word) ") {
+            for word in language.trigger.batteryAboveWords where phrase.hasPrefix("\(subject) \(word) ") {
                 let value = phrase.dropFirst("\(subject) \(word) ".count)
                 if let percentage = Int(value) { return (.above, percentage) }
             }
         }
         return nil
     }
-    static let timeUnits: Set<String> = ["second", "seconds", "sec", "secs", "s"]
-    static let weekdayNames: [String: Weekday] = [
-        "sunday": .sunday,
-        "monday": .monday,
-        "tuesday": .tuesday,
-        "wednesday": .wednesday,
-        "thursday": .thursday,
-        "friday": .friday,
-        "saturday": .saturday,
-    ]
-    static let durationUnits: [String: TimeInterval] = [
-        "minute": 60, "minutes": 60, "min": 60, "mins": 60,
-        "hour": 3600, "hours": 3600, "hr": 3600, "hrs": 3600,
-    ]
-    static let excluded: [String: String] = [
-        "email": "Sending email is not supported in this release.",
-        "send": "Sending messages is not supported in this release.",
-        "message": "Messaging is not supported in this release.",
-        "delete": "Deleting or moving files is not supported in this release.",
-        "remove": "Deleting or moving files is not supported in this release.",
-        "move": "Deleting or moving files is not supported in this release.",
-        "rename": "Renaming files is not supported in this release.",
-        "run": "Running scripts or shell commands is not supported in this release.",
-        "execute": "Running scripts or shell commands is not supported in this release.",
-        "script": "Running scripts is not supported in this release.",
-        "applescript": "AppleScript is not supported in this release.",
-        "shortcut": "Running Apple Shortcuts is not supported in this release.",
-        "click": "Simulating clicks is not supported in this release.",
-        "type": "Sending keystrokes is not supported in this release.",
-        "upload": "Uploading is not supported in this release.",
-        "download": "Downloading is not supported in this release.",
-    ]
 
     mutating func parse() -> ParsedCommand {
         var clauses: [ParsedClause] = []
@@ -367,37 +317,39 @@ private struct ParserWorker {
             return ParsedClause(kind: .unrecognized, span: token.span, parameter: .none, detail: nil)
         }
 
-        switch word {
-        case "open":
-            return parseOpen()
-        case "hide":
-            return parseApplicationListClause(kind: .hideApplication)
-        case "quit":
-            return parseApplicationListClause(kind: .quitApplication)
-        case "reveal":
-            return parseReveal()
-        case "wait":
-            return parseWait()
-        case "show", "notify":
-            return parseNotification()
-        case "copy":
-            return parseCopy()
-        case "put", "arrange":
-            return parseArrange()
-        case "maximize":
-            return parseArrangeWithFixedPreset(.maximize)
-        case "center":
-            return parseArrangeWithFixedPreset(.center)
-        case "every", "once", "in":
-            return parseSchedule()
-        case "when":
-            return parseWhen()
-        default:
-            if let reason = Self.excluded[word] {
-                return parseUnsupported(reason: reason)
+        if let route = language.clauseRoutes[word] {
+            switch route {
+            case .open:
+                return parseOpen()
+            case .hideApplication:
+                return parseApplicationListClause(kind: .hideApplication)
+            case .quitApplication:
+                return parseApplicationListClause(kind: .quitApplication)
+            case .reveal:
+                return parseReveal()
+            case .wait:
+                return parseWait()
+            case .notification:
+                return parseNotification()
+            case .copy:
+                return parseCopy()
+            case .arrange:
+                return parseArrange()
+            case .maximize:
+                return parseArrangeWithFixedPreset(.maximize)
+            case .center:
+                return parseArrangeWithFixedPreset(.center)
+            case .schedule:
+                return parseSchedule()
+            case .when:
+                return parseWhen()
             }
-            return parseUnrecognized()
         }
+
+        if let reason = language.excluded[word] {
+            return parseUnsupported(reason: reason)
+        }
+        return parseUnrecognized()
     }
 
     private mutating func parseOpen() -> ParsedClause {
@@ -406,15 +358,7 @@ private struct ParserWorker {
         let (names, end) = collectApplicationNames(after: openToken)
 
         let joined = names.joined(separator: " ").lowercased()
-        let kind: FileTarget.Kind?
-        switch joined {
-        case "the selected file":
-            kind = .file
-        case "the selected folder":
-            kind = .folder
-        default:
-            kind = nil
-        }
+        let kind = language.file.selectionPhrases[joined]
 
         if let kind {
             return ParsedClause(
@@ -439,22 +383,21 @@ private struct ParserWorker {
         let (names, end) = collectApplicationNames(after: keyword)
         let joined = names.joined(separator: " ").lowercased()
 
-        switch joined {
-        case "the selected item", "the selected file", "the selected folder":
+        if language.file.revealPhrases.contains(joined) {
             return ParsedClause(
                 kind: .revealInFinder,
                 span: SourceSpan(start: keyword.span.start, end: end),
                 parameter: .fileSelection(kind: .file),
                 detail: nil
             )
-        default:
-            return ParsedClause(
-                kind: .revealInFinder,
-                span: SourceSpan(start: keyword.span.start, end: end),
-                parameter: .none,
-                detail: nil
-            )
         }
+
+        return ParsedClause(
+            kind: .revealInFinder,
+            span: SourceSpan(start: keyword.span.start, end: end),
+            parameter: .none,
+            detail: nil
+        )
     }
 
     private mutating func parseApplicationListClause(kind: ParsedClauseKind) -> ParsedClause {
@@ -489,7 +432,7 @@ private struct ParserWorker {
 
             switch token.kind {
             case .word(let word):
-                if Self.connectors.contains(word) {
+                if isConnectorWord(word) {
                     if isClauseStart(tokenAfterCurrent) {
                         flush()
                         return (names, end)
@@ -504,7 +447,7 @@ private struct ParserWorker {
                 position += 1
 
             case .punctuation(let punctuation):
-                if punctuation == "," {
+                if language.shared.connectorPunctuation.contains(punctuation) {
                     flush()
                     end = token.span.end
                     position += 1
@@ -535,8 +478,8 @@ private struct ParserWorker {
         while position < tokens.count {
             let token = tokens[position]
             guard case .word(let word) = token.kind else { break }
-            if Self.connectors.contains(word) { break }
-            if word == "on" || word == "to" {
+            if isConnectorWord(word) { break }
+            if language.arrange.joiners.contains(word) {
                 let (found, newEnd) = parsePresetPhrase()
                 if let found {
                     preset = found
@@ -567,7 +510,7 @@ private struct ParserWorker {
         while position < tokens.count {
             let token = tokens[position]
             guard case .word(let word) = token.kind else { break }
-            if Self.connectors.contains(word) || word == "on" || word == "to" { break }
+            if isConnectorWord(word) || language.arrange.joiners.contains(word) { break }
             appWords.append(token.original)
             end = token.span.end
             position += 1
@@ -595,7 +538,8 @@ private struct ParserWorker {
         var end = tokens[position].span.end
         position += 1
 
-        if position < tokens.count, case .word(let article) = tokens[position].kind, article == "the" {
+        if position < tokens.count, case .word(let article) = tokens[position].kind,
+           language.arrange.articles.contains(article) {
             end = tokens[position].span.end
             position += 1
         }
@@ -606,37 +550,47 @@ private struct ParserWorker {
         end = tokens[position].span.end
         position += 1
 
-        switch side {
-        case "left", "right":
-            if position < tokens.count, case .word(let noun) = tokens[position].kind, noun == "half" {
+        guard language.arrange.sides.contains(side) else {
+            return (nil, end)
+        }
+
+        let arrange = language.arrange
+
+        if side == arrange.leftWord || side == arrange.rightWord {
+            if position < tokens.count, case .word(let noun) = tokens[position].kind,
+               arrange.halfNouns.contains(noun) {
                 end = tokens[position].span.end
                 position += 1
             }
-            return (side == "left" ? .leftHalf : .rightHalf, end)
+            return (side == arrange.leftWord ? .leftHalf : .rightHalf, end)
+        }
 
-        case "top", "bottom":
+        if side == arrange.topWord || side == arrange.bottomWord {
             if position < tokens.count, case .word(let horizontal) = tokens[position].kind,
-               horizontal == "left" || horizontal == "right" {
+               arrange.horizontalSides.contains(horizontal) {
                 end = tokens[position].span.end
                 position += 1
                 let preset: WindowPreset
-                switch (side, horizontal) {
-                case ("top", "left"): preset = .topLeftQuarter
-                case ("top", "right"): preset = .topRightQuarter
-                case ("bottom", "left"): preset = .bottomLeftQuarter
-                default: preset = .bottomRightQuarter
+                if side == arrange.topWord, horizontal == arrange.leftWord {
+                    preset = .topLeftQuarter
+                } else if side == arrange.topWord, horizontal == arrange.rightWord {
+                    preset = .topRightQuarter
+                } else if side == arrange.bottomWord, horizontal == arrange.leftWord {
+                    preset = .bottomLeftQuarter
+                } else {
+                    preset = .bottomRightQuarter
                 }
                 return (preset, end)
             }
-            if position < tokens.count, case .word(let noun) = tokens[position].kind, noun == "half" {
+            if position < tokens.count, case .word(let noun) = tokens[position].kind,
+               arrange.halfNouns.contains(noun) {
                 end = tokens[position].span.end
                 position += 1
             }
-            return (side == "top" ? .topHalf : .bottomHalf, end)
-
-        default:
-            return (nil, end)
+            return (side == arrange.topWord ? .topHalf : .bottomHalf, end)
         }
+
+        return (nil, end)
     }
 
     private mutating func parseWait() -> ParsedClause {
@@ -644,7 +598,8 @@ private struct ParserWorker {
         position += 1
         var end = waitToken.span.end
 
-        if position < tokens.count, case .word(let word) = tokens[position].kind, word == "for" {
+        if position < tokens.count, case .word(let word) = tokens[position].kind,
+           language.wait.optionalWords.contains(word) {
             end = tokens[position].span.end
             position += 1
         }
@@ -661,7 +616,8 @@ private struct ParserWorker {
         end = tokens[position].span.end
         position += 1
 
-        if position < tokens.count, case .word(let unit) = tokens[position].kind, Self.timeUnits.contains(unit) {
+        if position < tokens.count, case .word(let unit) = tokens[position].kind,
+           language.wait.timeUnits.contains(unit) {
             end = tokens[position].span.end
             position += 1
         }
@@ -683,7 +639,7 @@ private struct ParserWorker {
         position += 1
         var end = startToken.span.end
 
-        if word == "notify" {
+        if language.notification.directWords.contains(word) {
             return ParsedClause(
                 kind: .showNotification,
                 span: SourceSpan(start: startToken.span.start, end: end),
@@ -692,12 +648,14 @@ private struct ParserWorker {
             )
         }
 
-        if position < tokens.count, case .word(let article) = tokens[position].kind, article == "a" {
+        if position < tokens.count, case .word(let article) = tokens[position].kind,
+           language.notification.articles.contains(article) {
             end = tokens[position].span.end
             position += 1
         }
 
-        if position < tokens.count, case .word(let noun) = tokens[position].kind, noun == "notification" {
+        if position < tokens.count, case .word(let noun) = tokens[position].kind,
+           language.notification.nouns.contains(noun) {
             end = tokens[position].span.end
             position += 1
             return ParsedClause(
@@ -732,7 +690,7 @@ private struct ParserWorker {
 
             switch token.kind {
             case .word(let word):
-                guard !Self.connectors.contains(word) else {
+                guard !isConnectorWord(word) else {
                     return whenClause(originals: originals, lowerWords: lowerWords, start: keyword.span.start, end: end)
                 }
                 originals.append(token.original)
@@ -761,20 +719,20 @@ private struct ParserWorker {
         let phrase = lowerWords.joined(separator: " ")
         let displayName = originals.joined(separator: " ").trimmingCharacters(in: .whitespacesAndNewlines)
 
-        if phrase == "the mac wakes" || phrase == "the mac woke" || phrase == "my mac wakes" {
+        if language.trigger.wakePhrases.contains(phrase) {
             return ParsedClause(kind: .wake, span: span, parameter: .wake, detail: nil)
         }
 
-        if let event = Self.displayEvent(for: phrase) {
+        if let event = displayEvent(for: phrase) {
             return ParsedClause(kind: .displayConnection, span: span, parameter: .display(event), detail: nil)
         }
-        if let event = Self.volumeEvent(for: phrase) {
+        if let event = volumeEvent(for: phrase) {
             return ParsedClause(kind: .externalVolume, span: span, parameter: .volume(event), detail: nil)
         }
-        if let event = Self.powerEvent(for: phrase) {
+        if let event = powerEvent(for: phrase) {
             return ParsedClause(kind: .powerSource, span: span, parameter: .power(event), detail: nil)
         }
-        if let threshold = Self.batteryThreshold(for: phrase) {
+        if let threshold = batteryThreshold(for: phrase) {
             return ParsedClause(
                 kind: .batteryThreshold,
                 span: span,
@@ -783,7 +741,9 @@ private struct ParserWorker {
             )
         }
 
-        if let last = lowerWords.last, let event = Self.lifecycleVerbs[last], originals.count >= 2 {
+        if let last = lowerWords.last,
+           let event = language.trigger.lifecycleVerbs[last],
+           originals.count >= 2 {
             let name = originals.dropLast().joined(separator: " ")
             return ParsedClause(
                 kind: .applicationLifecycle,
@@ -806,7 +766,8 @@ private struct ParserWorker {
         position += 1
         var end = startToken.span.end
 
-        if position < tokens.count, case .word(let word) = tokens[position].kind, word == "text" {
+        if position < tokens.count, case .word(let word) = tokens[position].kind,
+           language.copy.optionalWords.contains(word) {
             end = tokens[position].span.end
             position += 1
         }
@@ -849,23 +810,22 @@ private struct ParserWorker {
         position += 1
         let end = startToken.span.end
 
-        switch keyword {
-        case "in":
+        if keyword == language.schedule.inWord {
             if let (seconds, durationEnd) = parseDurationPhrase(allowBareUnit: false) {
                 return scheduleClause(.relative(seconds), start: startToken.span.start, end: durationEnd)
             }
             return scheduleClause(.incomplete, start: startToken.span.start, end: end)
+        }
 
-        case "once":
-            skipWord("at")
+        if keyword == language.schedule.onceWord {
+            skipWord(language.schedule.atWord)
             if let clock = parseClock() {
                 return scheduleClause(.once(hour: clock.hour, minute: clock.minute), start: startToken.span.start, end: clock.end)
             }
             return scheduleClause(.incomplete, start: startToken.span.start, end: end)
-
-        default:
-            return parseEvery(startToken: startToken)
         }
+
+        return parseEvery(startToken: startToken)
     }
 
     private mutating func parseEvery(startToken: CommandToken) -> ParsedClause {
@@ -882,20 +842,20 @@ private struct ParserWorker {
             return scheduleClause(.incomplete, start: startToken.span.start, end: end)
         }
 
-        switch word {
-        case "day", "days":
+        if language.schedule.dayWords.contains(word) {
             end = tokens[position].span.end
             position += 1
-            skipWord("at")
+            skipWord(language.schedule.atWord)
             if let clock = parseClock() {
                 return scheduleClause(.daily(hour: clock.hour, minute: clock.minute), start: startToken.span.start, end: clock.end)
             }
             return scheduleClause(.incomplete, start: startToken.span.start, end: end)
+        }
 
-        case "weekday", "weekdays":
+        if language.schedule.weekdayWords.contains(word) {
             end = tokens[position].span.end
             position += 1
-            skipWord("at")
+            skipWord(language.schedule.atWord)
             if let clock = parseClock() {
                 return scheduleClause(
                     .weekdays(Weekday.weekdays, hour: clock.hour, minute: clock.minute),
@@ -904,11 +864,12 @@ private struct ParserWorker {
                 )
             }
             return scheduleClause(.incomplete, start: startToken.span.start, end: end)
+        }
 
-        case "weekend", "weekends":
+        if language.schedule.weekendWords.contains(word) {
             end = tokens[position].span.end
             position += 1
-            skipWord("at")
+            skipWord(language.schedule.atWord)
             if let clock = parseClock() {
                 return scheduleClause(
                     .weekdays(Weekday.weekend, hour: clock.hour, minute: clock.minute),
@@ -917,45 +878,44 @@ private struct ParserWorker {
                 )
             }
             return scheduleClause(.incomplete, start: startToken.span.start, end: end)
+        }
 
-        default:
-            if let firstDay = Self.weekdayNames[word] {
-                var days: Set<Weekday> = [firstDay]
-                end = tokens[position].span.end
-                position += 1
+        if let firstDay = language.schedule.weekdayNames[word] {
+            var days: Set<Weekday> = [firstDay]
+            end = tokens[position].span.end
+            position += 1
 
-                while true {
-                    let saved = position
-                    if position < tokens.count, isConnectorToken(tokens[position]) {
-                        position += 1
-                    }
-                    guard position < tokens.count,
-                          case .word(let next) = tokens[position].kind,
-                          let day = Self.weekdayNames[next] else {
-                        position = saved
-                        break
-                    }
-                    days.insert(day)
-                    end = tokens[position].span.end
+            while true {
+                let saved = position
+                if position < tokens.count, isConnectorToken(tokens[position]) {
                     position += 1
                 }
-
-                skipWord("at")
-                if let clock = parseClock() {
-                    return scheduleClause(
-                        .weekdays(days, hour: clock.hour, minute: clock.minute),
-                        start: startToken.span.start,
-                        end: clock.end
-                    )
+                guard position < tokens.count,
+                      case .word(let next) = tokens[position].kind,
+                      let day = language.schedule.weekdayNames[next] else {
+                    position = saved
+                    break
                 }
-                return scheduleClause(.incomplete, start: startToken.span.start, end: end)
+                days.insert(day)
+                end = tokens[position].span.end
+                position += 1
             }
 
-            if let (seconds, durationEnd) = parseDurationPhrase(allowBareUnit: true) {
-                return scheduleClause(.interval(seconds), start: startToken.span.start, end: durationEnd)
+            skipWord(language.schedule.atWord)
+            if let clock = parseClock() {
+                return scheduleClause(
+                    .weekdays(days, hour: clock.hour, minute: clock.minute),
+                    start: startToken.span.start,
+                    end: clock.end
+                )
             }
             return scheduleClause(.incomplete, start: startToken.span.start, end: end)
         }
+
+        if let (seconds, durationEnd) = parseDurationPhrase(allowBareUnit: true) {
+            return scheduleClause(.interval(seconds), start: startToken.span.start, end: durationEnd)
+        }
+        return scheduleClause(.incomplete, start: startToken.span.start, end: end)
     }
 
     private mutating func parseClock() -> (hour: Int, minute: Int, end: Int)? {
@@ -983,13 +943,10 @@ private struct ParserWorker {
 
         var meridiem: Bool?
         if position < tokens.count, case .word(let word) = tokens[position].kind {
-            switch word {
-            case "am", "a.m", "a.m.":
+            if language.schedule.meridiemAM.contains(word) {
                 meridiem = false
-            case "pm", "p.m", "p.m.":
+            } else if language.schedule.meridiemPM.contains(word) {
                 meridiem = true
-            default:
-                break
             }
             if meridiem != nil {
                 end = tokens[position].span.end
@@ -1022,7 +979,7 @@ private struct ParserWorker {
             position += 1
         } else if allowBareUnit,
                   case .word(let unit) = tokens[position].kind,
-                  let multiplier = Self.durationUnits[unit] {
+                  let multiplier = language.schedule.durationUnits[unit] {
             end = tokens[position].span.end
             position += 1
             return (multiplier, end)
@@ -1032,7 +989,7 @@ private struct ParserWorker {
 
         guard position < tokens.count,
               case .word(let unit) = tokens[position].kind,
-              let multiplier = Self.durationUnits[unit] else {
+              let multiplier = language.schedule.durationUnits[unit] else {
             return nil
         }
         end = tokens[position].span.end
@@ -1100,15 +1057,19 @@ private struct ParserWorker {
         guard let token, case .word(let word) = token.kind else {
             return false
         }
-        return Self.clauseKeywords.contains(word) || Self.excluded[word] != nil
+        return clauseStarts.contains(word)
+    }
+
+    private func isConnectorWord(_ word: String) -> Bool {
+        language.shared.connectorWords.contains(word)
     }
 
     private func isConnectorToken(_ token: CommandToken) -> Bool {
         switch token.kind {
         case .word(let word):
-            return Self.connectors.contains(word)
+            return isConnectorWord(word)
         case .punctuation(let punctuation):
-            return punctuation == ","
+            return language.shared.connectorPunctuation.contains(punctuation)
         case .number:
             return false
         }

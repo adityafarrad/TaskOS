@@ -47,7 +47,7 @@ of this file). No 2.7 implementation has started.
 
 | ID | Sub-increment | Status | Evidence | Notes |
 |---|---|---|---|---|
-| 2.7A1 | Freeze the language contract | not started | — | Capability-language matrix, `CommandLanguageCatalog`, parity tests |
+| 2.7A1 | Freeze the language contract | done | Increment 2.7A1 | Capability-language matrix (`CommandLanguageCatalog`), consumer parity tests; parser/suggestions/canonical now catalog-driven |
 | 2.7A2 | Make source handling safe | not started | — | UTF-16 spans, quoted-literal scanner, coverage, limits |
 | 2.7A3 | Preserve authoring state and exact time | not started | — | Stable nodes, draft v2, exact one-time dates |
 | 2.7B1 | Exact action language | not started | — | Existing action families only; bare domains need acceptance |
@@ -2531,6 +2531,70 @@ record isolation/recovery) is deferred to Phase 3 with the migration fixtures.
   VoiceOver access, notification/accessibility permissions for Test actions,
   Notes and Safari for physical tests, and approval before any push.
 - Next eligible work package: 2.7A1 — Freeze the language contract.
+
+### Increment 2.7A1 — Command language catalog (plan 2.7A1)
+
+- Status: done
+- Behavior delivered: one approved language source for every existing
+  capability. `CommandLanguageCatalog` now owns approved aliases/head words,
+  canonical wording templates, completion starters, the excluded vocabulary,
+  and the schedule/trigger/file/window/notification/wait/copy vocabularies. The
+  parser, suggestion engine, canonical phrase builder, composer renderer, and
+  capability guide examples all read it. No command wording is accepted in one
+  consumer and missing in another.
+- Interfaces changed:
+  - Added `CommandLanguageCatalog` with per-capability `ActionLanguage` /
+    `TriggerLanguage` entries (head words, canonical templates and variants,
+    parseable examples, guide example, completion starter), `SharedVocabulary`,
+    `FileVocabulary`, `NotificationVocabulary`, `WaitVocabulary`,
+    `CopyVocabulary`, `ArrangeVocabulary`, `ScheduleVocabulary`,
+    `TriggerVocabulary`, `CommandClauseRoute`, `CanonicalTemplate`, and
+    `CompletionStarter`.
+  - `CommandParser` gained `language` (default `.standard`) and dispatches
+    clause starts through `catalog.clauseRoutes`; all alias/phrase tables were
+    removed from the parser.
+  - `SuggestionEngine` gained `language` (default `.standard`) and now builds
+    action, wait, notification, `when`, and website suggestions from the
+    catalog; context detection uses catalog routes and vocabulary.
+  - `CanonicalPhrase` action/trigger/schedule/command methods gained a
+    defaulted `language` parameter and render from catalog templates.
+  - `ComposerDocument` renders drafts from catalog templates; `renderedText`
+    uses the catalog action joiner.
+  - `WindowPreset.phraseSuffix` delegates to the catalog; capability guide
+    examples come from the catalog; clock and interval formatting moved into
+    the catalog so composer and canonical wording agree.
+  - Fixed remaining `MacFlow` user copy in `CapabilityGuide` and
+    `TemplateCatalog` (TaskOS naming).
+- Intentional behavior alignments (recorded):
+  - The parser now accepts `show the notification` (`the` article), matching
+    the wording the suggestion engine already offered; previously the parser
+    accepted only `a`.
+  - Canonical schedule phrases now use the composer's 12-hour clock
+    (`Every day at 9:00 AM`), so they reparse; the previous 24-hour
+    `09:00` form was ambiguous to the parser for hours 1–12. Interval wording
+    also gained correct singular forms (`1 hour`, `1 minute`).
+- Tests performed:
+  - `swift test --package-path Packages/TaskOSCore` — 284 tests, 36 suites,
+    pass (was 270/35; +14). New `CommandLanguageCatalogTests`: every executable
+    capability has exactly one language entry; every head word has a parser
+    route; every example and every canonical action/trigger/schedule phrase
+    reparses (the absolute `Once on` form is asserted as the documented B2
+    pending exception); suggestions match catalog wording; every starter is
+    parser-recognized; every clause route is parser-recognized; preset phrases
+    are catalog-owned; no application identity alias leaks into the catalog;
+    runtime/permission sources do not reference the catalog.
+  - App tests (`xcodebuild ... test -only-testing:TaskOSTests`) — TEST
+    SUCCEEDED.
+  - Debug build — BUILD SUCCEEDED.
+  - Release build — BUILD SUCCEEDED.
+- Physical checks: none (Core language refactor; no UI or platform behavior
+  change).
+- Remaining defects / gaps:
+  - The canonical absolute one-time form (`Once on <date>`) remains
+    review-only and does not reparse; 2.7B2 adds the absolute schedule form.
+  - Presentation display names (step titles, Add-step menu copy) remain
+    presentation-owned labels, not parser aliases.
+- Next eligible work package: 2.7A2 — Make source handling safe.
 
 
 
