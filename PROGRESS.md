@@ -2838,7 +2838,7 @@ Second run before starting 2.7B, performed at commit `c6db374`:
     survives further composition.
   - App tests (`xcodebuild ... test -only-testing:TaskOSTests`) — TEST
     SUCCEEDED.
-  - UI tests (`xcodebuild ... test -only-testing:TaskOSTests` UI target) — TEST
+  - UI tests (`xcodebuild ... test -only-testing:TaskOSUITests`) — TEST
     SUCCEEDED.
   - Debug build — BUILD SUCCEEDED.
   - Release build — BUILD SUCCEEDED.
