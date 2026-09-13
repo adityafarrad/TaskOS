@@ -1,12 +1,12 @@
 # TaskOS — Handoff
 
-**Status:** Phases 0–2 complete; pre-Phase-3 hardening and UI redesign done.
-Work package 2.7 (deterministic language hardening) is registered and next;
-Phase 3 not started.
+**Status:** Phases 0–2 complete; work package 2.7 (deterministic language
+hardening) passes its automated and performance gates. Only the owner 2.7D3
+physical journeys remain before the `wp-2.7-language` tag and Phase 3.
 **Contract:** `PLAN.md` · **WP 2.7 contract:** `WP-2.7.md` · **Ledger:**
 `PROGRESS.md` · **Agent rules:** `AGENTS.md`
 **Repo:** `https://github.com/adityafarrad/TaskOS` (branch `main`)
-**HEAD:** `9f6105f` plus the WP 2.7 registration commit (working tree clean)
+**HEAD:** `72b134a` (working tree clean)
 
 ---
 
@@ -67,16 +67,24 @@ Key project facts:
 
 ## 3. Current evidence
 
-- Core: **270 tests / 35 suites pass** (includes a purity test forbidding
-  SwiftUI/AppKit/SwiftData in Core); rerun 2026-09-13 at `9f6105f`.
-- App tests: TEST SUCCEEDED (37 test functions / 8 files), rerun 2026-09-13.
+- Core: **404 tests / 46 suites pass** (includes a purity test forbidding
+  SwiftUI/AppKit/SwiftData in Core); rerun 2026-09-13 at `72b134a`.
+- App tests: TEST SUCCEEDED; UI tests: **13/13 TEST SUCCEEDED** (launch, sidebar,
+  composer typing, suggestions, keyboard completion, discovery, step menu,
+  settings).
 - Debug + Release builds clean, rerun 2026-09-13.
+- WP 2.7D performance (Release): parser p95 0.022 ms / p99 0.029 ms (targets
+  10 / 25); app completion p95 4.36 ms (target 100); app search p95 3.66 ms;
+  cold app snapshot 105 apps in 2.78 ms. Full protocol and method in
+  `PROGRESS.md` under 2.7D3 and 2.7D-fix.
 - Physical checks: Phase 1 canonical journey; 2.1 schedule tests A–E; 2.4 all
   six event-trigger families; 2.6 attention/retention/permissions UI — all
-  user-confirmed. Older pending physical checks (I, J, M3, N1, P, Q,
-  N-c/N-d/N-e, U4, UX-1…UX-5, and the D2 matrix) were owner-deferred to Phase 3
-  on 2026-09-13; the named record is in `PROGRESS.md` under "Work Package 2.7
-  entry gate (pre-Phase 3)".
+  user-confirmed. The WP 2.7D3 owner physical pass (non-Latin IME marked text,
+  VoiceOver, real Test/Preview, permissions) is pending and is the only open
+  2.7 item. Older pending physical checks (I, J, M3, N1, P, Q, N-c/N-d/N-e, U4,
+  UX-1…UX-5, and the D2 matrix) were owner-deferred to Phase 3 on 2026-09-13;
+  the named record is in `PROGRESS.md` under "Work Package 2.7 entry gate
+  (pre-Phase 3)".
 
 ---
 
@@ -157,19 +165,26 @@ specific-volume card selection; full-screen/Spaces window operations.
 
 ---
 
-## 7. Next step: Work package 2.7
+## 7. Next step: close WP 2.7, then Phase 3
 
-Start with **2.7A1 — Freeze the language contract** (`WP-2.7.md`): the
-capability-language matrix and `CommandLanguageCatalog`; the plan/ledger/handoff
-registration itself is already delivered by the registration commit. Work
-through 2.7A → 2.7B → 2.7C → 2.7D in order; no phase starts before the previous
-phase's exit gate passes. The full package (tag `wp-2.7-language`) must close
-before broad Phase 3 qualification.
+Work package 2.7A–2.7D are implemented; the independent corpus, release
+performance targets, integration/privacy checks, Core 404/46, app tests, UI
+13/13, and Debug/Release builds all pass. The only open item is the **owner
+2.7D3 physical pass**:
 
-Then **Phase 3** (`PLAN.md`): 3.1 system validation (includes the deferred
-legacy physical checks), 3.2 physical compatibility matrix, 3.3
-usability/accessibility/performance, 3.4 beta, 3.5 distribution (Developer ID
-signing, notarization, Sparkle), 3.6 freeze.
+- One enabled non-Latin macOS input source: begin marked-text composition while
+  a suggestion is visible and press Return (TaskOS must not accept, save, or
+  test).
+- VoiceOver: suggestion count, selected suggestion, replacement meaning, and a
+  clarification message.
+- Real Notes/Safari Test: Preview has no effect; Test and Save each require an
+  explicit action; no microphone or network permission is requested.
+
+Record those results in `PROGRESS.md`, then create the annotated tag
+`wp-2.7-language` and begin **Phase 3** (`PLAN.md`): 3.1 system validation
+(includes the deferred legacy physical checks), 3.2 physical compatibility
+matrix, 3.3 usability/accessibility/performance, 3.4 beta, 3.5 distribution
+(Developer ID signing, notarization, Sparkle), 3.6 freeze.
 
 ---
 
