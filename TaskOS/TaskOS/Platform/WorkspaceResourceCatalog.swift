@@ -34,6 +34,16 @@ struct WorkspaceResourceCatalog: ResourceCatalog {
     }
 
     nonisolated func installedApplications() async -> [ApplicationResource] {
+        await installedApplicationRecords().map(\.resource)
+    }
+
+    private static let approvedAliases: [String: [String]] = [
+        "com.microsoft.VSCode": ["VS Code", "VSCode"],
+        "com.google.Chrome": ["Chrome"],
+        "com.apple.Safari": ["Safari"],
+    ]
+
+    nonisolated func installedApplicationRecords() async -> [ApplicationRecord] {
         let fileManager = FileManager.default
         let directories = [
             URL(fileURLWithPath: "/Applications"),
@@ -43,7 +53,7 @@ struct WorkspaceResourceCatalog: ResourceCatalog {
             fileManager.homeDirectoryForCurrentUser.appendingPathComponent("Applications"),
         ]
 
-        var collected: [ApplicationResource] = []
+        var collected: [ApplicationRecord] = []
 
         for directory in directories {
             guard let entries = try? fileManager.contentsOfDirectory(
@@ -57,11 +67,18 @@ struct WorkspaceResourceCatalog: ResourceCatalog {
                 guard let bundle = Bundle(url: entry), let identifier = bundle.bundleIdentifier else {
                     continue
                 }
+                let fileName = entry.deletingPathExtension().lastPathComponent
                 let displayName = (bundle.infoDictionary?["CFBundleDisplayName"] as? String)
                     ?? (bundle.infoDictionary?["CFBundleName"] as? String)
-                    ?? entry.deletingPathExtension().lastPathComponent
+                    ?? fileName
                 collected.append(
-                    ApplicationResource(bundleIdentifier: identifier, displayName: displayName)
+                    ApplicationRecord(
+                        bundleIdentifier: identifier,
+                        displayName: displayName,
+                        fileName: fileName,
+                        url: entry,
+                        aliases: Self.approvedAliases[identifier] ?? []
+                    )
                 )
             }
         }

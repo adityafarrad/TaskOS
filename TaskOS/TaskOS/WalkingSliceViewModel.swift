@@ -20,6 +20,8 @@ final class ComposerViewModel {
     private(set) var highlightedSuggestion = 0
     private(set) var suggestionsDismissed = false
     private(set) var applications: [ApplicationResource] = []
+    private(set) var applicationSnapshot: ApplicationSnapshot = .empty
+    private(set) var applicationClarification: String?
     private(set) var displays: [DisplayResource] = []
     private(set) var hardware = HardwareAvailability(
         hasBattery: true,
@@ -63,6 +65,9 @@ final class ComposerViewModel {
     private var lastSavedID: AutomationID?
     private var lastDefinition: AutomationDefinition?
     private var applicationsLoaded = false
+    private var lastSnapshotAt: Date?
+    private var isRefreshingSnapshot = false
+    private var isAutoRewriting = false
     private var autosaveTask: Task<Void, Never>?
     private var previewResetTask: Task<Void, Never>?
     private var runMonitor: Task<Void, Never>?
@@ -586,13 +591,30 @@ final class ComposerViewModel {
         refreshPermissions()
         Task { [weak self] in
             guard let self else { return }
-            let loaded = await composition.loadApplications()
-            self.applications = loaded
+            let snapshot = await composition.loadApplicationSnapshot()
+            self.applicationSnapshot = snapshot
+            self.applications = snapshot.applications.map(\.resource)
+            self.lastSnapshotAt = Date()
             self.displays = await composition.loadDisplays()
             self.hardware = composition.hardwareAvailability()
             self.refreshSuggestions()
             self.autoResolveApplications()
             self.restoreDraftIfNeeded()
+        }
+    }
+
+    func refreshApplicationSnapshot() {
+        guard !isRefreshingSnapshot else { return }
+        isRefreshingSnapshot = true
+        Task { [weak self] in
+            guard let self else { return }
+            let snapshot = await composition.loadApplicationSnapshot()
+            self.applicationSnapshot = snapshot
+            self.applications = snapshot.applications.map(\.resource)
+            self.lastSnapshotAt = Date()
+            self.isRefreshingSnapshot = false
+            self.autoResolveApplications()
+            self.refreshSuggestions()
         }
     }
 
@@ -802,7 +824,7 @@ final class ComposerViewModel {
     func prepare() {
         notice = nil
         guard let definition = document.makeDefinition(name: draftName, id: draftID, revision: currentRevision) else {
-            notice = document.blockingParseMessage ?? "Finish resolving every step before previewing."
+            notice = applicationClarification ?? document.blockingParseMessage ?? "Finish resolving every step before previewing."
             return
         }
 
@@ -906,7 +928,7 @@ final class ComposerViewModel {
         let revision = isUpdatingExisting ? currentRevision : WorkflowRevision(1)
 
         guard let definition = document.makeDefinition(name: draftName, id: targetID, revision: revision) else {
-            notice = document.blockingParseMessage ?? "Finish resolving every step before saving."
+            notice = applicationClarification ?? document.blockingParseMessage ?? "Finish resolving every step before saving."
             return
         }
 
@@ -1180,6 +1202,9 @@ final class ComposerViewModel {
         loadHistory()
         refreshRuntimeActivity()
         refreshPermissions()
+        if let last = lastSnapshotAt, Date().timeIntervalSince(last) > 60 {
+            refreshApplicationSnapshot()
+        }
         Task { [weak self] in
             guard let self else { return }
             self.displays = await self.composition.loadDisplays()
@@ -1454,19 +1479,63 @@ final class ComposerViewModel {
     }
 
     private func autoResolveApplications() {
-        if case .applicationLifecycle(let application, let label, let event) = document.trigger,
-           application == nil,
-           !label.isEmpty,
-           let match = applications.first(where: { $0.displayName.caseInsensitiveCompare(label) == .orderedSame }) {
-            document.setTrigger(
-                .applicationLifecycle(
-                    application: .application(bundleIdentifier: match.bundleIdentifier, label: match.displayName),
-                    label: match.displayName,
-                    event: event
-                )
-            )
+        let snapshot = applicationSnapshot
+        var clarification: String?
+
+        if snapshot.isOverCap {
+            applicationClarification = "More than \(CommandLimits.maximumApplications) applications are installed. Choose apps with the picker instead of typing."
+            return
         }
 
+        if case .applicationLifecycle(let application, let label, let event) = document.trigger,
+           application == nil,
+           !label.isEmpty {
+            switch ApplicationResolver.resolve(label, in: snapshot) {
+            case .resolved(let record):
+                document.setTrigger(
+                    .applicationLifecycle(
+                        application: .application(bundleIdentifier: record.bundleIdentifier, label: record.displayName),
+                        label: record.displayName,
+                        event: event
+                    )
+                )
+            case .ambiguous(let matches):
+                clarification = "More than one app matches \"\(label)\": \(matches.map(\.displayName).joined(separator: ", "))."
+            default:
+                break
+            }
+        }
+
+        var groupingBlocked = false
+        if !isAutoRewriting {
+            for run in openApplicationRuns() where run.count > 1 {
+                let names = run.compactMap { action -> String? in
+                    if case .openApplication(let name, _) = action.draft { return name }
+                    return nil
+                }
+
+                switch ApplicationListGrouper.group(segments: names, snapshot: snapshot) {
+                case .single(let grouping) where grouping.records.count != names.count:
+                    isAutoRewriting = true
+                    document.setText(grouping.rewrites[0])
+                    isAutoRewriting = false
+                    return
+                case .ambiguous(let groupings):
+                    groupingBlocked = true
+                    let rewrites = groupings.flatMap(\.rewrites).joined(separator: "  ")
+                    clarification = clarification ?? "That list of apps can be read more than one way. Try: \(rewrites)"
+                default:
+                    break
+                }
+            }
+        }
+
+        if groupingBlocked {
+            applicationClarification = clarification
+            return
+        }
+
+        var resolutionMissed = false
         for action in document.actions {
             let name: String?
             let resolved: ResourceReference?
@@ -1489,13 +1558,44 @@ final class ComposerViewModel {
             }
 
             guard let name, resolved == nil else { continue }
-            if let match = applications.first(where: { $0.displayName.caseInsensitiveCompare(name) == .orderedSame }) {
+
+            switch ApplicationResolver.resolve(name, in: snapshot) {
+            case .resolved(let record):
                 document.resolveApplication(
                     id: action.id,
-                    reference: .application(bundleIdentifier: match.bundleIdentifier, label: match.displayName)
+                    reference: .application(bundleIdentifier: record.bundleIdentifier, label: record.displayName)
                 )
+            case .ambiguous(let matches):
+                clarification = clarification ?? "More than one app matches \"\(name)\": \(matches.map(\.displayName).joined(separator: ", "))."
+            case .missing:
+                resolutionMissed = true
+            default:
+                break
             }
         }
+
+        applicationClarification = clarification
+
+        if resolutionMissed, !isRefreshingSnapshot, let last = lastSnapshotAt, Date().timeIntervalSince(last) > 60 {
+            refreshApplicationSnapshot()
+        }
+    }
+
+    private func openApplicationRuns() -> [[ComposerAction]] {
+        var runs: [[ComposerAction]] = []
+        var current: [ComposerAction] = []
+        for action in document.actions {
+            if case .openApplication = action.draft {
+                current.append(action)
+            } else if !current.isEmpty {
+                runs.append(current)
+                current = []
+            }
+        }
+        if !current.isEmpty {
+            runs.append(current)
+        }
+        return runs
     }
 
     private func resetPreview() {

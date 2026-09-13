@@ -53,7 +53,7 @@ of this file). No 2.7 implementation has started.
 | 2.7B1 | Exact action language | done | Increment 2.7B1 | Quoted app names, launch/start aliases, bare domains require acceptance, quoted-only Copy Text, negation blocks |
 | 2.7B2 | Composition and schedules | done | Increment 2.7B2 | All connectors outside literals, one trigger first/last only, `closes` removed, full schedule forms incl. absolute `Once on` |
 | 2.7B3 | Friendly frames and finite rationale | done | Increment 2.7B3 | Leading frames/fillers/final punctuation, journaling sentence, four rationale endings only |
-| 2.7C1 | Versioned app snapshots and list ambiguity | not started | — | Native resolver, bounded grouping, 5,000-app cap |
+| 2.7C1 | Versioned app snapshots and list ambiguity | done | Increment 2.7C1 | Revisioned snapshots, exact resolution with aliases, ambiguity (no first match), bounded list grouping, 5,000-app cap |
 | 2.7C2 | Native command editor and completion | not started | — | `NSTextView` wrapper, marked text, VoiceOver |
 | 2.7C3 | Result validity and bounded typo help | not started | — | Completion, resource-selection, and preparation keys |
 | 2.7D1 | Independent language corpus | not started | — | At least 2,000 positive, 100 negative, ambiguity fixtures |
@@ -2972,6 +2972,64 @@ Second run before starting 2.7C, performed at commit `0f50f73`:
   are exercised by the UI tests).
 - Remaining defects / gaps: none known for 2.7B. The next eligible work package
   is 2.7C1 — Versioned application snapshots and list ambiguity.
+
+### Increment 2.7C1 — Versioned app snapshots and list ambiguity (plan 2.7C1)
+
+- Status: done
+- Behavior delivered: applications are resolved from one immutable, versioned
+  snapshot using exact normalized matching over display name, file name (without
+  `.app`), and approved local aliases. There is no first-match fallback: two
+  trusted apps with the same accepted name produce ambiguity, and a
+  connector-separated list that can be read more than one way is reported with
+  rewrites instead of being split silently (for example
+  `Open Research and Notes and Safari`). Catalogs above 5,000 applications
+  refuse automatic search and resolution. The composer only fills an application
+  reference from a unique exact match; missing or ambiguous names stay unresolved
+  so Preview, Save, and Test remain blocked, and the clarification is shown.
+- Interfaces changed:
+  - Core: added `ApplicationRecord` (display name, file name, bundle identifier,
+    trusted URL, aliases), `ApplicationSnapshot` (monotonic revision, creation
+    time, records, `isOverCap`), `ApplicationResolution`,
+    `ApplicationResolver` (normalize/resolve), `ApplicationGrouping`,
+    `ApplicationGroupingResult`, and `ApplicationListGrouper` (bounded
+    backtracking, max two groupings, quoted rewrites).
+  - `ResourceCatalog` gained `applicationSnapshot()` with an empty default so
+    existing catalogs keep compiling.
+  - App: added `ApplicationRecordProviding` and `ApplicationCatalogService`
+    (coalesced refresh, monotonic revision, reset);
+    `WorkspaceResourceCatalog` now builds records with file name, URL, and an
+    approved alias table and keeps `installedApplications()` as a projection;
+    `AppComposition` owns the service and exposes `loadApplicationSnapshot()`.
+  - `ComposerViewModel`: holds `applicationSnapshot` and
+    `applicationClarification`, loads/refreshes the snapshot (composer open,
+    refresh method, active after 60 seconds), resolves exact/alias names, rewrites
+    an unambiguous merged list to its quoted canonical form, and reports
+    ambiguity in Preview/Save notices.
+- Tests performed:
+  - `swift test --package-path Packages/TaskOSCore` — 369 tests, 42 suites, pass
+    (was 356/41; +13 `ApplicationCatalogTests`). New coverage: normalize (case,
+    `.app` suffix); empty catalog; single display-name/file-name/alias matches;
+    duplicate display name is ambiguous (not first); the 5,000/5,001 cap; one
+    unambiguous grouping with the exact rewrite; quoted connector-bearing name;
+    whole-list collision; merged whole-list collision; partial-span collision;
+    more than two groupings; unresolved names; and no list-order selection.
+  - App tests (`xcodebuild ... test -only-testing:TaskOSTests`) — TEST
+    SUCCEEDED, including new `ApplicationCatalogServiceTests` (concurrent
+    refreshes coalesce into one provider call and one revision; refreshes
+    advance the revision and keep the latest; reset clears).
+  - UI tests (`xcodebuild ... test -only-testing:TaskOSUITests`) — TEST
+    SUCCEEDED.
+  - Debug and Release builds — BUILD SUCCEEDED.
+- Physical checks: none (Core + app resource resolution; UI paths exercised by
+  the UI tests).
+- Remaining defects / gaps:
+  - Ambiguity is surfaced as a notice plus unresolved cards; an interactive
+    rewrite picker arrives with the native completion panel (2.7C2).
+  - Suggestions still use `[ApplicationResource]` and do not yet surface aliases
+    as completion candidates (2.7C2).
+  - The miss-triggered refresh is throttled to 60 seconds to avoid refresh loops;
+    a dedicated refresh trigger is exposed as `refreshApplicationSnapshot()`.
+- Next eligible work package: 2.7C2 — Native command editor and completion.
 
 
 

@@ -41,6 +41,7 @@ final class AppComposition {
     let permissions: any PermissionStatusProvider
 
     private let catalog: WorkspaceResourceCatalog
+    private let applicationCatalog: ApplicationCatalogService
     private let sessionObserver: SystemSessionObserver
     private let lifecycleSource: ApplicationLifecycleSource
     private let wakeSource: WakeTriggerSource
@@ -51,6 +52,7 @@ final class AppComposition {
     init() {
         let clock = SystemClock()
         let catalog = WorkspaceResourceCatalog()
+        self.applicationCatalog = ApplicationCatalogService(provider: catalog)
 
         let container: ModelContainer
         if Self.isTesting {
@@ -151,6 +153,10 @@ final class AppComposition {
 
     func loadApplications() async -> [ApplicationResource] {
         await catalog.installedApplications()
+    }
+
+    func loadApplicationSnapshot() async -> ApplicationSnapshot {
+        await applicationCatalog.refresh()
     }
 
     func loadDisplays() async -> [DisplayResource] {

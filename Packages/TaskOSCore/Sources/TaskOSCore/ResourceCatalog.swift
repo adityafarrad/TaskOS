@@ -25,6 +25,7 @@ public struct DisplayResource: Hashable, Sendable {
 public protocol ResourceCatalog: Sendable {
     func application(bundleIdentifier: String) async -> ApplicationResource?
     func installedApplications() async -> [ApplicationResource]
+    func applicationSnapshot() async -> ApplicationSnapshot
     func display(identifier: String) async -> DisplayResource?
     func installedDisplays() async -> [DisplayResource]
     func fileExists(path: String) async -> Bool?
@@ -33,6 +34,10 @@ public protocol ResourceCatalog: Sendable {
 public extension ResourceCatalog {
     func installedApplications() async -> [ApplicationResource] {
         []
+    }
+
+    func applicationSnapshot() async -> ApplicationSnapshot {
+        .empty
     }
 
     func installedDisplays() async -> [DisplayResource] {
