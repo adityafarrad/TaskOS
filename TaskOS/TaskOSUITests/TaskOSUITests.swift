@@ -182,4 +182,90 @@ final class TaskOSUITests: XCTestCase {
         element(app, "step.menu.0").click()
         XCTAssertTrue(app.menuItems["Duplicate"].waitForExistence(timeout: 5))
     }
+
+    @MainActor
+    func testReturnAcceptsHighlightedSuggestion() throws {
+        let app = launchApp()
+        XCTAssertTrue(element(app, "editor.view").waitForExistence(timeout: 10))
+
+        let composer = composerField(app)
+        pasteComposerText(app, "open")
+
+        let suggestion = app.buttons
+            .matching(NSPredicate(format: "label BEGINSWITH %@", "Open an application"))
+            .firstMatch
+        XCTAssertTrue(suggestion.waitForExistence(timeout: 5))
+
+        composer.typeKey(.return, modifierFlags: [])
+        Thread.sleep(forTimeInterval: 0.6)
+
+        let value = composer.value as? String
+        XCTAssertNotEqual(value, "open", "Return should accept the highlighted suggestion")
+        XCTAssertFalse((value ?? "").isEmpty)
+        XCTAssertFalse(
+            app.staticTexts["Review workflow"].exists,
+            "Return must not open the review or start a run"
+        )
+    }
+
+    @MainActor
+    func testEscapeDismissesSuggestions() throws {
+        let app = launchApp()
+        XCTAssertTrue(element(app, "editor.view").waitForExistence(timeout: 10))
+
+        let composer = composerField(app)
+        pasteComposerText(app, "open")
+
+        let suggestion = app.buttons
+            .matching(NSPredicate(format: "label BEGINSWITH %@", "Open an application"))
+            .firstMatch
+        XCTAssertTrue(suggestion.waitForExistence(timeout: 5))
+
+        composer.typeKey(.escape, modifierFlags: [])
+        XCTAssertTrue(waitForDisappearance(suggestion))
+        XCTAssertFalse(app.staticTexts["Review workflow"].exists)
+    }
+
+    @MainActor
+    func testTabAcceptsOnlyAfterExplicitSelection() throws {
+        let app = launchApp()
+        XCTAssertTrue(element(app, "editor.view").waitForExistence(timeout: 10))
+
+        let composer = composerField(app)
+        pasteComposerText(app, "open")
+
+        let suggestion = app.buttons
+            .matching(NSPredicate(format: "label BEGINSWITH %@", "Open an application"))
+            .firstMatch
+        XCTAssertTrue(suggestion.waitForExistence(timeout: 5))
+
+        composer.typeKey(.downArrow, modifierFlags: [])
+        composer.typeKey(.tab, modifierFlags: [])
+        Thread.sleep(forTimeInterval: 0.6)
+
+        let value = composer.value as? String
+        XCTAssertNotEqual(value, "open", "Tab should accept after an explicit selection")
+        XCTAssertFalse((value ?? "").isEmpty)
+        XCTAssertFalse(app.staticTexts["Review workflow"].exists)
+    }
+
+    @MainActor
+    private func pasteComposerText(_ app: XCUIApplication, _ text: String) {
+        let composer = composerField(app)
+        composer.click()
+        Thread.sleep(forTimeInterval: 0.4)
+
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+        pasteboard.setString(text, forType: .string)
+        composer.typeKey("v", modifierFlags: .command)
+        Thread.sleep(forTimeInterval: 0.4)
+    }
+
+    @MainActor
+    private func waitForDisappearance(_ element: XCUIElement, timeout: TimeInterval = 3) -> Bool {
+        let predicate = NSPredicate(format: "exists == false")
+        let expectation = expectation(for: predicate, evaluatedWith: element)
+        return XCTWaiter().wait(for: [expectation], timeout: timeout) == .completed
+    }
 }

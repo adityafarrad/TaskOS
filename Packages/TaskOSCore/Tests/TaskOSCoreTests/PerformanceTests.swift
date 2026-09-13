@@ -6,41 +6,9 @@ import Foundation
 struct PerformanceTests {
     private static let perfEnabled = ProcessInfo.processInfo.environment["TASKOS_PERF"] == "1"
 
-    private static let corpus: [String] = [
-        "open Safari",
-        "open Notes and Safari",
-        "Open \"Research and Notes\", then open Safari",
-        "launch Google Chrome",
-        "hide Mail",
-        "quit Safari and Notes",
-        "wait 1 second",
-        "wait 30 seconds",
-        "show a notification",
-        "notify",
-        "copy \"meeting agenda\"",
-        "copy \"a, then b; c\"",
-        "reveal the selected item",
-        "open the selected file",
-        "open the selected folder",
-        "put Safari on the left half",
-        "put Notes on the top-left quarter",
-        "maximize Safari",
-        "center Notes",
-        "open https://example.com/path?q=1#frag",
-        "every day at 9 am, then open Safari",
-        "every weekday at 8:15 am, then open Notes",
-        "every monday and friday at 9 am, then open Safari",
-        "every 30 minutes, then open Safari",
-        "in 45 minutes, then show a notification",
-        "once on 2026-09-20 at 09:00, then open Notes",
-        "when Safari opens, then show a notification",
-        "when the Mac wakes, then open Safari",
-        "when a display connects, then open Notes",
-        "when an external drive mounts, then open the selected folder",
-        "when the Mac switches to battery, then open Safari",
-        "when the battery drops below 20%, then show a notification",
-        "Hey TaskOS, can you make sure at 9:00 PM every day you open Notes, so that I can journal my day as I keep forgetting?",
-    ]
+    private static let corpus: [String] = {
+        LanguageCorpus.positiveCommands(count: 2_000).map(\.text) + LanguageCorpus.negativeCommands()
+    }()
 
     private struct Percentiles {
         let p50: Double
@@ -90,7 +58,7 @@ struct PerformanceTests {
         }
 
         let report = Self.percentiles(samples)
-        print("PERF parser count=10000 p50=\(report.p50) p95=\(report.p95) p99=\(report.p99) max=\(report.maximum)")
+        print("PERF parser count=10000 corpus=\(Self.corpus.count) p50=\(report.p50) p95=\(report.p95) p99=\(report.p99) max=\(report.maximum)")
         #expect(report.p95 <= 10.0)
         #expect(report.p99 <= 25.0)
     }
@@ -117,7 +85,7 @@ struct PerformanceTests {
     }
 
     @Test(.enabled(if: perfEnabled))
-    func endToEndCompletionPerformance() {
+    func parseAndSuggestionEnginePerformance() {
         let engine = SuggestionEngine()
         let applications = Self.syntheticApplications(5_000)
 
@@ -139,28 +107,6 @@ struct PerformanceTests {
         }
 
         let report = Self.percentiles(samples)
-        print("PERF completion count=1000 apps=5000 p50=\(report.p50) p95=\(report.p95) p99=\(report.p99) max=\(report.maximum)")
-        #expect(report.p95 <= 100.0)
-    }
-
-    @Test(.enabled(if: perfEnabled))
-    func snapshotBuildPerformance() {
-        var samples: [Double] = []
-        for _ in 0..<50 {
-            samples.append(
-                Self.measure {
-                    let records = (0..<5_000).map { index in
-                        ApplicationRecord(
-                            bundleIdentifier: "com.example.app\(index)",
-                            displayName: "App\(index)",
-                            fileName: "App\(index)"
-                        )
-                    }
-                    _ = ApplicationSnapshot(revision: 1, createdAt: Date(), applications: records)
-                }
-            )
-        }
-        let report = Self.percentiles(samples)
-        print("PERF snapshot count=50 apps=5000 p50=\(report.p50) p95=\(report.p95) max=\(report.maximum)")
+        print("PERF parsePlusEngine count=1000 apps=5000 p50=\(report.p50) p95=\(report.p95) p99=\(report.p99) max=\(report.maximum)")
     }
 }

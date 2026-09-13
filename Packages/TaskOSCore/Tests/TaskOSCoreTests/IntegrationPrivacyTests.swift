@@ -165,6 +165,20 @@ struct IntegrationPrivacyTests {
         }
     }
 
+    @Test func frozenSavedWorkflowFixtureStillDecodes() throws {
+        let json = """
+        {"definition":{"actions":[{"openApplication":{"_0":{"application":{"identifier":"com.apple.Safari","kind":"application","label":"Safari"}}}},{"wait":{"_0":{"duration":2.5}}}],"id":{"rawValue":"00000000-0000-0000-0000-0000000000D2"},"name":"Frozen slice","revision":{"value":4},"schemaVersion":1,"trigger":{"manual":{"_0":{}}}},"isEnabled":false,"schemaVersion":1,"updatedAt":"2023-11-14T22:13:20Z"}
+        """
+
+        let decoded = try SavedWorkflowSerialization.decode(Data(json.utf8))
+        #expect(decoded.schemaVersion == 1)
+        #expect(decoded.name == "Frozen slice")
+        #expect(!decoded.isEnabled)
+        #expect(decoded.definition.trigger == .manual(ManualTrigger()))
+        #expect(decoded.definition.actions.map(\.id) == [.openApplication, .wait])
+        #expect(decoded.updatedAt == Date(timeIntervalSince1970: 1_700_000_000))
+    }
+
     @Test func coreSourcesDoNotPrint() throws {
         let packageRoot = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()

@@ -335,13 +335,28 @@ private struct ParserWorker {
 
         let triggerIndices = clauses.indices.filter { Self.isTriggerClause(clauses[$0]) }
         if triggerIndices.count > 1 {
-            diagnosticList.append(
-                .error("Use only one trigger.", span: clauses[triggerIndices[1]].span)
-            )
+            let span = clauses[triggerIndices[1]].span
+            diagnosticList.append(.error("Use only one trigger.", span: span))
+            clarifications.append(ParseClarification(span: span, question: "Use only one trigger."))
         } else if let index = triggerIndices.first, index != 0, index != clauses.count - 1 {
+            let span = clauses[index].span
             diagnosticList.append(
-                .error("Put the trigger at the start or the end of the command.", span: clauses[index].span)
+                .error("Put the trigger at the start or the end of the command.", span: span)
             )
+            clarifications.append(
+                ParseClarification(
+                    span: span,
+                    question: "Put the trigger at the start or the end of the command."
+                )
+            )
+        }
+
+        for clause in clauses where Self.needsInput(clause) {
+            guard !clarifications.contains(where: { $0.span == clause.span }) else { continue }
+            guard let message = diagnostics(for: clause).first(where: { $0.severity == .error })?.message else {
+                continue
+            }
+            clarifications.append(ParseClarification(span: clause.span, question: message))
         }
 
         let coverage = coverage(for: clauses, approved: approvedSpans)

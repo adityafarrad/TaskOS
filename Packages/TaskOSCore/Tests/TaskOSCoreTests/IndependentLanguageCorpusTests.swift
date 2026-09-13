@@ -6,177 +6,58 @@ import Foundation
 struct IndependentLanguageCorpusTests {
     private let parser = CommandParser()
 
-    private struct SeededGenerator: RandomNumberGenerator {
-        private var state: UInt64
-
-        init(seed: UInt64) {
-            state = seed
+    private func expect(_ clause: ParsedClause?, matches expected: CorpusClauseExpectation, index: Int) {
+        guard let clause else {
+            Issue.record("case \(index): expected a clause")
+            return
         }
-
-        mutating func next() -> UInt64 {
-            state = state &* 6364136223846793005 &+ 1442695040888963407
-            return state
+        #expect(clause.kind == expected.kind, "case \(index)")
+        #expect(clause.resourceNames == expected.names, "case \(index)")
+        switch expected.parameter {
+        case .none:
+            break
+        case .duration(let value):
+            #expect(clause.duration == value, "case \(index)")
+        case .copyText(let value):
+            #expect(clause.copyText == value, "case \(index)")
+        case .preset(let value):
+            #expect(clause.arrangePreset == value, "case \(index)")
+        case .fileSelection(let kind):
+            #expect(clause.fileSelectionKind == kind, "case \(index)")
         }
-    }
-
-    private struct GeneratedCase {
-        let command: String
-        let kinds: [ParsedClauseKind]
-        let names: [[String]]
-    }
-
-    private let plainAppNames = ["Safari", "Notes", "Calculator", "Mail"]
-    private let quotedAppNames = ["Google Chrome", "Visual Studio Code", "Research and Notes"]
-    private let waitChoices: [(String, String)] = [
-        ("1", "second"), ("2", "seconds"), ("5", "seconds"), ("30", "seconds"), ("0.5", "seconds"),
-    ]
-    private let copyLiterals = ["hello", "meeting agenda", "a, b; c then d"]
-    private let urls = ["https://example.com", "http://example.com/path?q=1#frag"]
-    private let arrangePresets = [
-        "on the left half", "on the right half", "on the top half", "on the bottom half",
-        "on the top-left quarter", "on the top-right quarter",
-        "on the bottom-left quarter", "on the bottom-right quarter",
-    ]
-    private let connectors = ["then", "and then", "and", "also", ",", ";", "after that", "next", "followed by"]
-
-    private func randomAction(_ generator: inout SeededGenerator) -> (text: String, kind: ParsedClauseKind, names: [String]) {
-        switch Int.random(in: 0..<12, using: &generator) {
-        case 0:
-            let name = plainAppNames.randomElement(using: &generator)!
-            return ("Open \(name)", .openApplication, [name])
-        case 1:
-            let name = quotedAppNames.randomElement(using: &generator)!
-            return ("Open \"\(name)\"", .openApplication, [name])
-        case 2:
-            let name = plainAppNames.randomElement(using: &generator)!
-            return ("Hide \(name)", .hideApplication, [name])
-        case 3:
-            let name = plainAppNames.randomElement(using: &generator)!
-            return ("Quit \(name)", .quitApplication, [name])
-        case 4:
-            let wait = waitChoices.randomElement(using: &generator)!
-            return ("Wait \(wait.0) \(wait.1)", .wait, [])
-        case 5:
-            return ("Show a notification", .showNotification, [])
-        case 6:
-            return ("Notify", .showNotification, [])
-        case 7:
-            let literal = copyLiterals.randomElement(using: &generator)!
-            return ("Copy \"\(literal)\"", .copyText, [])
-        case 8:
-            return ("Reveal the selected item", .revealInFinder, [])
-        case 9:
-            let command = Bool.random(using: &generator) ? "Open the selected file" : "Open the selected folder"
-            return (command, .openFile, [])
-        case 10:
-            let name = plainAppNames.randomElement(using: &generator)!
-            let preset = arrangePresets.randomElement(using: &generator)!
-            return ("Put \(name) \(preset)", .arrangeWindow, [])
-        default:
-            let url = urls.randomElement(using: &generator)!
-            return ("Open \(url)", .openApplication, [url])
-        }
-    }
-
-    private func generatedPositiveCases(count: Int) -> [GeneratedCase] {
-        var generator = SeededGenerator(seed: 0x2_7_D1_2026)
-        var cases: [GeneratedCase] = []
-        while cases.count < count {
-            let actionCount = Int.random(in: 1...3, using: &generator)
-            var parts: [String] = []
-            var kinds: [ParsedClauseKind] = []
-            var names: [[String]] = []
-            for index in 0..<actionCount {
-                if index > 0 {
-                    parts.append(connectors[Int.random(in: 0..<connectors.count, using: &generator)])
-                }
-                let action = randomAction(&generator)
-                parts.append(action.text)
-                kinds.append(action.kind)
-                names.append(action.names)
-            }
-            cases.append(GeneratedCase(command: parts.joined(separator: " "), kinds: kinds, names: names))
-        }
-        return cases
-    }
-
-    private func negativeFixtures() -> [String] {
-        [
-            "",
-            "frobnicate",
-            "open",
-            "hide",
-            "quit",
-            "wait",
-            "show",
-            "copy",
-            "copy agenda",
-            "reveal the selected",
-            "put Safari",
-            "when Safari closes",
-            "every day at 9",
-            "every day at 09:00",
-            "once on 2027-02-29 at 09:00",
-            "once on 2026-13-01 at 09:00",
-            "once on 2026-09-20 at 25:00",
-            "do not open Safari",
-            "not open Safari",
-            "open Safari and not Notes",
-            "never quit Notes",
-            "open Safari and email Bob",
-            "open Safari and delete Downloads",
-            "every day at 9 am, then every 30 minutes, then open Safari",
-            "open Safari, then every day at 9 am, then open Notes",
-            "when Safari launches and when Safari quits",
-            "open Notes so I can write extra text",
-            "open Notes so I can open Notes every day",
-            "wait 1 second except on weekends",
-        ]
-    }
-
-    private func generatedNegativeCases() -> [String] {
-        let prefixes = ["open Safari", "wait 1 second", "show a notification", "copy \"hello\"", "hide Notes"]
-        let tails = [
-            " and delete Downloads", " and email Bob", " and send Mail", " and message Bob",
-            " and remove Files", " and move Everything", " and rename Docs", " and run Scripts",
-            " and execute Code", " and script Stuff", " and shortcut X", " and click Here",
-            " and type Text", " and upload File", " and download Item",
-            " so I can do whatever I want", " and not open Notes",
-        ]
-        var cases: [String] = []
-        for prefix in prefixes {
-            for tail in tails {
-                cases.append(prefix + tail)
-            }
-        }
-        return cases
     }
 
     @Test func everyActionAliasCorpus() {
-        let cases: [(String, ParsedClauseKind)] = [
-            ("open Safari", .openApplication),
-            ("launch Safari", .openApplication),
-            ("start Safari", .openApplication),
-            ("hide Safari", .hideApplication),
-            ("quit Safari", .quitApplication),
-            ("reveal the selected item", .revealInFinder),
-            ("open the selected file", .openFile),
-            ("open the selected folder", .openFile),
-            ("put Safari on the left half", .arrangeWindow),
-            ("arrange Safari on the right half", .arrangeWindow),
-            ("maximize Safari", .arrangeWindow),
-            ("center Safari", .arrangeWindow),
-            ("wait 5 seconds", .wait),
-            ("show a notification", .showNotification),
-            ("notify", .showNotification),
-            ("copy \"meeting agenda\"", .copyText),
-            ("open https://example.com", .openApplication),
+        let cases: [(command: String, expectation: CorpusClauseExpectation)] = [
+            ("open Safari", .init(kind: .openApplication, names: ["Safari"], parameter: .none)),
+            ("launch Safari", .init(kind: .openApplication, names: ["Safari"], parameter: .none)),
+            ("start Safari", .init(kind: .openApplication, names: ["Safari"], parameter: .none)),
+            ("hide Safari", .init(kind: .hideApplication, names: ["Safari"], parameter: .none)),
+            ("quit Safari", .init(kind: .quitApplication, names: ["Safari"], parameter: .none)),
+            ("reveal the selected item", .init(kind: .revealInFinder, names: [], parameter: .fileSelection(.file))),
+            ("reveal the selected file", .init(kind: .revealInFinder, names: [], parameter: .fileSelection(.file))),
+            ("reveal the selected folder", .init(kind: .revealInFinder, names: [], parameter: .fileSelection(.file))),
+            ("open the selected file", .init(kind: .openFile, names: [], parameter: .fileSelection(.file))),
+            ("open the selected folder", .init(kind: .openFile, names: [], parameter: .fileSelection(.folder))),
+            ("put Safari on the left half", .init(kind: .arrangeWindow, names: [], parameter: .preset(.leftHalf))),
+            ("arrange Safari on the right half", .init(kind: .arrangeWindow, names: [], parameter: .preset(.rightHalf))),
+            ("maximize Safari", .init(kind: .arrangeWindow, names: [], parameter: .preset(.maximize))),
+            ("center Safari", .init(kind: .arrangeWindow, names: [], parameter: .preset(.center))),
+            ("wait 5 seconds", .init(kind: .wait, names: [], parameter: .duration(5))),
+            ("wait for 5 seconds", .init(kind: .wait, names: [], parameter: .duration(5))),
+            ("wait 1 sec", .init(kind: .wait, names: [], parameter: .duration(1))),
+            ("show a notification", .init(kind: .showNotification, names: [], parameter: .none)),
+            ("show the notification", .init(kind: .showNotification, names: [], parameter: .none)),
+            ("notify", .init(kind: .showNotification, names: [], parameter: .none)),
+            ("copy \"meeting agenda\"", .init(kind: .copyText, names: [], parameter: .copyText("meeting agenda"))),
+            ("copy text \"meeting agenda\"", .init(kind: .copyText, names: [], parameter: .copyText("meeting agenda"))),
+            ("open https://example.com", .init(kind: .openApplication, names: ["https://example.com"], parameter: .none)),
         ]
 
-        for (command, kind) in cases {
-            let parsed = parser.parse(command)
-            #expect(parsed.outcome == .complete, "\(command)")
-            #expect(parsed.clauses.contains { $0.kind == kind }, "\(command)")
+        for (index, item) in cases.enumerated() {
+            let parsed = parser.parse(item.command)
+            #expect(parsed.outcome == .complete, "case \(index)")
+            expect(parsed.clauses.first, matches: item.expectation, index: index)
         }
     }
 
@@ -187,6 +68,8 @@ struct IndependentLanguageCorpusTests {
             ("every day at 21:00", .daily(hour: 21, minute: 0)),
             ("every weekday at 8:15 am", .weekdays(Weekday.weekdays, hour: 8, minute: 15)),
             ("every monday and friday at 9 am", .weekdays([.monday, .friday], hour: 9, minute: 0)),
+            ("every tuesday at 9 am", .weekdays([.tuesday], hour: 9, minute: 0)),
+            ("every saturday and sunday at 10 am", .weekdays([.saturday, .sunday], hour: 10, minute: 0)),
             ("every weekend at 10 am", .weekdays(Weekday.weekend, hour: 10, minute: 0)),
             ("every 30 minutes", .interval(1800)),
             ("every 2 hours", .interval(7200)),
@@ -198,10 +81,10 @@ struct IndependentLanguageCorpusTests {
             ("once on 2028-02-29 at 09:00", .absolute(year: 2028, month: 2, day: 29, hour: 9, minute: 0)),
         ]
 
-        for (command, schedule) in cases {
-            let parsed = parser.parse(command)
-            #expect(parsed.outcome == .complete, "\(command)")
-            #expect(parsed.clauses.first { $0.kind == .schedule }?.schedule == schedule, "\(command)")
+        for (index, item) in cases.enumerated() {
+            let parsed = parser.parse(item.0)
+            #expect(parsed.outcome == .complete, "case \(index)")
+            #expect(parsed.clauses.first { $0.kind == .schedule }?.schedule == item.1, "case \(index)")
         }
     }
 
@@ -209,6 +92,7 @@ struct IndependentLanguageCorpusTests {
         let eventCases: [(String, ParsedClauseKind)] = [
             ("when Safari opens", .applicationLifecycle),
             ("when Safari launches", .applicationLifecycle),
+            ("when Safari launched", .applicationLifecycle),
             ("when Safari quits", .applicationLifecycle),
             ("when Safari exits", .applicationLifecycle),
             ("when the Mac wakes", .wake),
@@ -222,20 +106,20 @@ struct IndependentLanguageCorpusTests {
             ("when the battery rises above 80%", .batteryThreshold),
         ]
 
-        for (command, kind) in eventCases {
-            let parsed = parser.parse("\(command), then open Safari")
-            #expect(parsed.outcome == .complete, "\(command)")
-            #expect(parsed.clauses.contains { $0.kind == kind }, "\(command)")
+        for (index, item) in eventCases.enumerated() {
+            let parsed = parser.parse("\(item.0), then open Safari")
+            #expect(parsed.outcome == .complete, "case \(index)")
+            #expect(parsed.clauses.contains { $0.kind == item.1 }, "case \(index)")
         }
     }
 
     @Test func everyConnectorCorpus() {
-        for connector in connectors {
+        for (index, connector) in LanguageCorpus.connectors.enumerated() {
             let command = "open Safari \(connector) wait 1 second"
             let parsed = parser.parse(command)
-            #expect(parsed.outcome == .complete, "\(command)")
-            #expect(parsed.clauses.map(\.kind) == [.openApplication, .wait], "\(command)")
-            #expect(parsed.coverage.isComplete, "\(command)")
+            #expect(parsed.outcome == .complete, "case \(index)")
+            #expect(parsed.clauses.map(\.kind) == [.openApplication, .wait], "case \(index)")
+            #expect(parsed.coverage.isComplete, "case \(index)")
         }
     }
 
@@ -274,10 +158,10 @@ struct IndependentLanguageCorpusTests {
             "I’d like you to open Notes",
             "make sure open Notes",
         ]
-        for command in frames {
+        for (index, command) in frames.enumerated() {
             let parsed = parser.parse(command)
-            #expect(parsed.outcome == .complete, "\(command)")
-            #expect(parsed.clauses.filter { $0.kind == .openApplication }.flatMap(\.resourceNames) == ["Notes"], "\(command)")
+            #expect(parsed.outcome == .complete, "case \(index)")
+            #expect(parsed.clauses.filter { $0.kind == .openApplication }.flatMap(\.resourceNames) == ["Notes"], "case \(index)")
         }
 
         let rationales = [
@@ -286,11 +170,10 @@ struct IndependentLanguageCorpusTests {
             "so I can journal my day as I keep forgetting",
             "so that I can journal my day as I keep forgetting",
         ]
-        for ending in rationales {
-            let command = "open Notes, \(ending)"
-            let parsed = parser.parse(command)
-            #expect(parsed.outcome == .complete, "\(command)")
-            #expect(parsed.coverage.isComplete, "\(command)")
+        for (index, ending) in rationales.enumerated() {
+            let parsed = parser.parse("open Notes, \(ending)")
+            #expect(parsed.outcome == .complete, "case \(index)")
+            #expect(parsed.coverage.isComplete, "case \(index)")
         }
 
         let journaling = "Hey TaskOS, can you make sure at 9:00 PM every day you open Notes, so that I can journal my day as I keep forgetting?"
@@ -320,10 +203,22 @@ struct IndependentLanguageCorpusTests {
             ("Copy \"meeting agenda\"", .copyText),
             ("Open \"Google Chrome\"", .openApplication),
         ]
-        for (command, kind) in actionCases {
-            let parsed = parser.parse(command)
-            #expect(parsed.outcome == .complete, "\(command)")
-            #expect(parsed.clauses.first?.kind == kind, "\(command)")
+        for (index, item) in actionCases.enumerated() {
+            let parsed = parser.parse(item.0)
+            #expect(parsed.outcome == .complete, "case \(index)")
+            #expect(parsed.clauses.first?.kind == item.1, "case \(index)")
+        }
+
+        for (index, preset) in WindowPreset.allCases.enumerated() {
+            let phrase = CanonicalPhrase.text(
+                for: ArrangeWindowAction(
+                    application: .application(bundleIdentifier: "com.apple.Safari", label: "Safari"),
+                    preset: preset
+                )
+            )
+            let parsed = parser.parse(phrase)
+            #expect(parsed.outcome == .complete, "preset case \(index)")
+            #expect(parsed.clauses.first { $0.kind == .arrangeWindow }?.arrangePreset == preset, "preset case \(index)")
         }
 
         let scheduleCases: [(String, ParsedSchedule)] = [
@@ -332,70 +227,102 @@ struct IndependentLanguageCorpusTests {
             ("Every 30 minutes", .interval(1800)),
             ("Once on 2026-09-20 at 09:00", .absolute(year: 2026, month: 9, day: 20, hour: 9, minute: 0)),
         ]
-        for (command, schedule) in scheduleCases {
-            let parsed = parser.parse(command)
-            #expect(parsed.outcome == .complete, "\(command)")
-            #expect(parsed.clauses.first { $0.kind == .schedule }?.schedule == schedule, "\(command)")
+        for (index, item) in scheduleCases.enumerated() {
+            let parsed = parser.parse(item.0)
+            #expect(parsed.outcome == .complete, "schedule case \(index)")
+            #expect(parsed.clauses.first { $0.kind == .schedule }?.schedule == item.1, "schedule case \(index)")
         }
     }
 
     @Test func generatedPositiveCorpusAcceptsExactly() {
-        let cases = generatedPositiveCases(count: 2_000)
-        #expect(cases.count >= 2_000)
+        let commands = LanguageCorpus.positiveCommands(count: 2_000)
+        #expect(commands.count >= 2_000)
 
-        var failures: [String] = []
-        for item in cases {
-            let parsed = parser.parse(item.command)
-            guard parsed.outcome == .complete, parsed.coverage.isComplete,
-                  parsed.clauses.map(\.kind) == item.kinds else {
-                failures.append(item.command)
+        var failures: [Int] = []
+        for (index, item) in commands.enumerated() {
+            let parsed = parser.parse(item.text)
+            guard parsed.outcome == .complete,
+                  parsed.coverage.isComplete,
+                  parsed.clauses.count == item.clauses.count else {
+                failures.append(index)
                 continue
             }
-            for (index, clause) in parsed.clauses.enumerated() where index < item.names.count {
-                switch clause.kind {
-                case .openApplication, .hideApplication, .quitApplication:
-                    if clause.resourceNames != item.names[index] {
-                        failures.append(item.command)
-                    }
-                default:
+            for (clause, expected) in zip(parsed.clauses, item.clauses) {
+                guard Self.clause(clause, matches: expected) else {
+                    failures.append(index)
                     break
                 }
             }
         }
 
-        #expect(failures.isEmpty, "\(failures.prefix(5))")
+        #expect(failures.isEmpty, "failing case indices: \(failures.prefix(8))")
     }
 
     @Test func negativeCorpusFailsClosed() {
-        let negatives = negativeFixtures() + generatedNegativeCases()
+        let negatives = LanguageCorpus.negativeCommands()
         #expect(negatives.count >= 100)
 
-        var silentlyComplete: [String] = []
-        for command in negatives {
-            if parser.parse(command).outcome == .complete {
-                silentlyComplete.append(command)
-            }
+        var silentlyComplete: [Int] = []
+        for (index, command) in negatives.enumerated() where parser.parse(command).outcome == .complete {
+            silentlyComplete.append(index)
         }
 
-        #expect(silentlyComplete.isEmpty, "\(silentlyComplete.prefix(5))")
+        #expect(silentlyComplete.isEmpty, "failing case indices: \(silentlyComplete.prefix(8))")
     }
 
-    @Test func ambiguityCorpusReportsNeedsInput() {
-        let cases = [
-            "every day at 9",
-            "every day at 09:00",
-            "once on 2026-13-01 at 09:00",
-            "once on 2027-02-29 at 09:00",
-            "every day at 9 am, then every 30 minutes, then open Safari",
-            "open Safari, then every day at 9 am, then open Notes",
-            "when Safari launches and when Safari quits",
-        ]
-
-        for command in cases {
-            let parsed = parser.parse(command)
-            #expect(parsed.outcome == .needsInput, "\(command)")
-            #expect(parsed.diagnostics.contains { $0.severity == .error }, "\(command)")
+    @Test func ambiguityCorpusReportsExactClarifications() {
+        for (index, fixture) in LanguageCorpus.ambiguityFixtures.enumerated() {
+            let parsed = parser.parse(fixture.command)
+            #expect(parsed.outcome == .needsInput, "case \(index)")
+            #expect(
+                parsed.clarifications.map(\.question).contains(fixture.question),
+                "case \(index): \(parsed.clarifications.map(\.question))"
+            )
         }
+    }
+
+    @Test func limitBoundaryCorpus() {
+        let atCharacterLimit = "open " + String(repeating: "a", count: CommandLimits.maximumCharacters - 5)
+        #expect(atCharacterLimit.count == CommandLimits.maximumCharacters)
+        #expect(
+            !parser.parse(atCharacterLimit).diagnostics.contains { $0.message.contains("2,000") }
+        )
+
+        let overCharacter = parser.parse(atCharacterLimit + "a")
+        #expect(overCharacter.outcome == .needsInput)
+        #expect(overCharacter.diagnostics.contains { $0.message.contains("2,000") })
+
+        let twelve = Array(repeating: "open Safari", count: CommandLimits.maximumActions)
+            .joined(separator: " and ")
+        #expect(parser.parse(twelve).outcome == .complete)
+
+        let thirteen = Array(repeating: "open Safari", count: CommandLimits.maximumActions + 1)
+            .joined(separator: " and ")
+        let overAction = parser.parse(thirteen)
+        #expect(overAction.outcome == .needsInput)
+        #expect(overAction.diagnostics.contains { $0.message.contains("12") })
+
+        let atTokens = "open " + Array(repeating: "app", count: CommandLimits.maximumTokens - 1)
+            .joined(separator: " ")
+        #expect(CommandTokenizer.tokenize(atTokens).count == CommandLimits.maximumTokens)
+
+        let overTokens = "open " + Array(repeating: "app", count: CommandLimits.maximumTokens)
+            .joined(separator: " ")
+        let overTokenResult = parser.parse(overTokens)
+        #expect(overTokenResult.outcome == .needsInput)
+        #expect(overTokenResult.diagnostics.contains { $0.message.contains("128") })
+
+        let emojiUnit = "👨‍👩‍👧‍👦"
+        let emojiCount = (CommandLimits.maximumUTF16Units / emojiUnit.utf16.count) + 1
+        let overUTF16 = String(repeating: emojiUnit, count: emojiCount)
+        #expect(overUTF16.count <= CommandLimits.maximumCharacters)
+        #expect(overUTF16.utf16.count > CommandLimits.maximumUTF16Units)
+        let overUTF16Result = parser.parse(overUTF16)
+        #expect(overUTF16Result.outcome == .needsInput)
+        #expect(overUTF16Result.diagnostics.contains { $0.message.contains("16,384") })
+
+        let suggestions = SuggestionEngine().suggestions(for: "")
+        #expect(suggestions.count <= CommandLimits.maximumVisibleSuggestions)
     }
 
     @Test func appListAmbiguityCorpusHasExactRewrites() {
@@ -445,6 +372,32 @@ struct IndependentLanguageCorpusTests {
         #expect(tail.actions.count == 2)
         #expect(tail.hasUnresolvedApplications)
         #expect(tail.makeDefinition(name: "Tail") == nil)
+
+        let unfinishedSelection = ComposerDocument(text: "open the selected")
+        #expect(unfinishedSelection.hasUnresolvedApplications)
+        #expect(unfinishedSelection.makeDefinition(name: "Selection") == nil)
+
+        let shorthandHalf = parser.parse("put Safari on the left")
+        #expect(shorthandHalf.outcome == .complete)
+        #expect(shorthandHalf.clauses.first { $0.kind == .arrangeWindow }?.arrangePreset == .leftHalf)
+    }
+
+    private static func clause(_ clause: ParsedClause, matches expected: CorpusClauseExpectation) -> Bool {
+        guard clause.kind == expected.kind, clause.resourceNames == expected.names else {
+            return false
+        }
+        switch expected.parameter {
+        case .none:
+            return true
+        case .duration(let value):
+            return clause.duration == value
+        case .copyText(let value):
+            return clause.copyText == value
+        case .preset(let value):
+            return clause.arrangePreset == value
+        case .fileSelection(let kind):
+            return clause.fileSelectionKind == kind
+        }
     }
 
     private func applicationRecord(_ name: String) -> ApplicationRecord {

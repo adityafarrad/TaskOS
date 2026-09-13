@@ -3354,6 +3354,68 @@ Second run before starting 2.7C, performed at commit `0f50f73`:
   created only after the owner physical journeys are recorded and the final exit
   gate passes.
 
+### Increment 2.7D-fix — Independent audit hardening (2026-09-13)
+
+- Status: automated and performance evidence complete; the owner physical
+  journeys below remain the only closing gate.
+- Behavior delivered:
+  - The independent corpus now asserts exact typed parameters for generated
+    positives (wait durations, copy literals, arrange presets, file/folder
+    kind), every limit boundary (characters, UTF-16, tokens, actions, visible
+    suggestions), the exact clarification question for each ambiguity fixture,
+    every canonical arrange preset round trip, and expanded aliases
+    (`wait for`, `copy text`, `show the notification`, reveal file/folder,
+    launched); negative fixtures were broadened with structural failures.
+  - `CommandParser.parse()` now emits `ParseClarification`s for needs-input
+    clauses and for trigger position/count errors, so ambiguity fixtures assert
+    exact corrections from the implementation instead of diagnostics alone.
+  - Parser performance now runs 10,000 samples across the full 2,132-command
+    qualification corpus (2,000 generated positives plus negatives).
+  - The app completion boundary (editor change callback to published suggestion
+    model) is measured against 5,000 synthetic apps in an optimized Release
+    build via a testability override: p50 4.14 ms, p95 4.36 ms, p99 4.54 ms,
+    max 5.38 ms (target p95 ≤ 100 ms — met). Debug app-path p95 was 65.7 ms.
+  - Cold application snapshot time (real filesystem discovery) recorded:
+    105 applications in 2.78 ms Release (10.59 ms Debug).
+  - Integration/privacy coverage added: a saved workflow saves, loads, and runs
+    through `WorkflowRunner` with no parser; `ComposerViewModel` Discard, New,
+    and Save each clear the recovery draft; Preview publishes without creating a
+    run record; a pinned saved-workflow JSON fixture still decodes.
+  - UI coverage added for the native composer: Return accepts the highlighted
+    suggestion, Escape dismisses the panel, and Tab accepts only after an
+    explicit selection; none opens Review or starts a run.
+- Interfaces changed:
+  - `CommandParser`: additive `ParseClarification` emission for needs-input
+    clauses and trigger errors.
+  - Tests only: added `LanguageCorpusFixtures.swift`,
+    `CompletionPerformanceTests.swift` (app), `ComposerLifecycleTests.swift`,
+    `SavedWorkflowRunTests.swift`; strengthened the independent corpus,
+    performance, and integration/privacy suites.
+- Tests performed:
+  - Core: `swift test --package-path Packages/TaskOSCore` — 404 tests, 46
+    suites, pass.
+  - Release perf: parser p95 0.0218 ms / p99 0.0293 ms (targets ≤ 10/≤ 25 — met);
+    search p95 3.66 ms; parse-plus-engine p95 4.00 ms.
+  - App tests (`xcodebuild ... test -only-testing:TaskOSTests`) — TEST
+    SUCCEEDED, including the new lifecycle, parser-free run, and Release-threshold
+    completion performance suites.
+  - UI tests (`xcodebuild ... test -only-testing:TaskOSUITests`) — TEST
+    SUCCEEDED, 13/13.
+  - Release app build — BUILD SUCCEEDED; `git diff --check` clean; source scans
+    show no forbidden Core imports, logging APIs, AI, network, microphone, or
+    speech references.
+- Physical checks remaining (owner; cannot be performed by an agent):
+  - One non-Latin input method: begin marked-text composition while a suggestion
+    is visible and press Return; confirm TaskOS does not accept, save, or test.
+  - VoiceOver: hear the suggestion count, selected suggestion, replacement
+    meaning, and a clarification message.
+  - Real Notes/Safari Test: confirm Preview has no effect and Test/Save each
+    require an explicit action; confirm no microphone or network permission is
+    requested.
+  - The annotated tag `wp-2.7-language` is created only after these are
+    recorded and the final exit gate passes.
+- Remaining defects / gaps: none known in the automated scope.
+
 
 
 
