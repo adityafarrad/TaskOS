@@ -58,7 +58,7 @@ of this file). No 2.7 implementation has started.
 | 2.7C3 | Result validity and bounded typo help | done | Increment 2.7C3 | Completion/preparation/resource keys and rechecks; typo bounds (5/8/64, ≤3, 5,000) |
 | 2.7D1 | Independent language corpus | done | Increment 2.7D1 | Seeded 2,000-positive corpus, 114 negatives, ambiguity fixtures, literal oracle; quarter-preset round-trip fixed |
 | 2.7D2 | Integration, persistence, privacy | done | Increment 2.7D2 | Parser-free definition/preview, direct serialized-record inspection, draft v1/v2 restore, no private text in records/exports/logs |
-| 2.7D3 | Performance and physical proof | not started | — | Release build; targets met or changed by owner decision |
+| 2.7D3 | Performance and physical proof | in progress | Increment 2.7D3 (automated + performance) | Targets met on Release; owner physical journeys pending |
 
 ### Phase 3 — Qualify, beta-test, and distribute
 
@@ -3289,6 +3289,70 @@ Second run before starting 2.7C, performed at commit `0f50f73`:
   - Effect-free preview and explicit Test/Save are asserted structurally here and
     confirmed physically in 2.7D3.
 - Next eligible work package: 2.7D3 — Performance and physical proof.
+
+### Increment 2.7D3 — Performance (automated) and physical proof (plan 2.7D3)
+
+- Status: in progress — automated checks and performance measurements are
+  complete; the owner physical journeys are pending.
+- Performance protocol:
+  - Machine: Mac16,10 (Apple M4), 16 GB RAM, macOS 26.6.2 (build 25G83).
+  - Toolchain: Xcode 26.6 (17F113), Apple Swift 6.3.3.
+  - Configuration: optimized Release (`swift test -c release`).
+  - Corpus: 33 representative commands (actions, connectors, quoted/Unicode
+    literals, all schedule forms, event triggers, friendly journaling).
+  - Application snapshot: 5,000 synthetic applications.
+  - Warm-up: 100 parser runs; 100 search runs; 100 completion runs.
+  - Measured: 10,000 parser runs; 1,000 search runs; 1,000 completion runs.
+  - Boundaries measured separately: Core parse; application search; end-to-end
+    completion (text parse plus suggestion model); synthetic snapshot build.
+- Results (milliseconds):
+  - Parser: p50 0.010, p95 0.024, p99 0.033, max 0.088 (targets p95 ≤ 10,
+    p99 ≤ 25 — met).
+  - Application search (5,000 apps): p50 3.50, p95 4.68, p99 6.85, max 12.29.
+  - End-to-end completion (5,000 apps): p50 3.36, p95 4.66, p99 7.38, max 14.10
+    (target p95 ≤ 100 — met).
+  - Synthetic snapshot build (5,000 records): p50 0.60, p95 0.67, max 0.69.
+    Cold filesystem app discovery is app-level and is recorded by the owner in
+    the physical pass; no pass target is claimed for it.
+- Automated checks performed:
+  - `swift test --package-path Packages/TaskOSCore` — 403 tests, 46 suites, pass
+    (4 performance tests are disabled unless `TASKOS_PERF=1`).
+  - Release performance run — `TASKOS_PERF=1 swift test -c release --package-path
+    Packages/TaskOSCore --filter PerformanceTests` — 4 tests pass, numbers above.
+  - App tests (`xcodebuild ... test -only-testing:TaskOSTests`) — TEST
+    SUCCEEDED.
+  - UI tests (`xcodebuild ... test -only-testing:TaskOSUITests`) — TEST
+    SUCCEEDED (composer typing, suggestions, discovery, step menu, settings).
+  - Debug and Release builds — BUILD SUCCEEDED.
+  - `git diff --check` — clean.
+  - Source inspection: no forbidden Core imports (SwiftUI/AppKit/SwiftData/
+    Cocoa/UserNotifications); no AI, network, microphone, speech, or wake-word
+    references in Core or the app.
+- Interfaces changed: added
+  `Packages/TaskOSCore/Tests/TaskOSCoreTests/PerformanceTests.swift`. No
+  production changes.
+- Physical checks (owner, required to close 2.7D3):
+  - Type and edit the full journaling sentence; confirm the daily trigger and
+    Open Notes, and that rationale stays out of Save/export.
+  - Use mouse and keyboard completion (Up/Down, Return, Tab after selection,
+    Escape).
+  - Reorder two identical notifications with different messages; confirm each
+    message stays on its node.
+  - Restore a structured recoverable draft.
+  - Accept a bare-domain HTTPS proposal.
+  - Resolve an ambiguous app list by quoting one app.
+  - Verify a relative schedule does not move during editing.
+  - Verify a past-due one-time schedule blocks Save.
+  - Use one owner-selected non-Latin macOS input method; begin marked-text
+    composition while a suggestion is visible and press Return.
+  - Use VoiceOver to hear suggestion count, the selected suggestion, and
+    clarification text.
+  - Use Notes and Safari for a real Test; confirm Preview has no effect; confirm
+    Test and Save each require explicit action.
+  - Confirm no microphone or network permission is requested.
+- Remaining defects / gaps: none known. The annotated tag `wp-2.7-language` is
+  created only after the owner physical journeys are recorded and the final exit
+  gate passes.
 
 
 
