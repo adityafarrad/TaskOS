@@ -2471,6 +2471,21 @@ record isolation/recovery) is deferred to Phase 3 with the migration fixtures.
   and confirm the hint disappears.
 - Next: stop here per owner decision.
 
+### Fix UX-4-a — Launch UI test matches the empty-title behavior
+
+- Status: done
+- Defect: `TaskOSUITests.testLaunchShowsEditor` still asserted the workflow
+  title existed on an empty launch, so it failed after UX-4 hid the title until
+  there is content.
+- Fix: the test now asserts the title is absent for an empty new workflow and
+  that the editor/run controls exist.
+- Tests performed:
+  - UI tests (`xcodebuild ... test -only-testing:TaskOSUITests`) — TEST
+    SUCCEEDED, 10/10.
+  - Debug build — BUILD SUCCEEDED.
+- Next: stop here per owner decision.
+
+
 
 
 

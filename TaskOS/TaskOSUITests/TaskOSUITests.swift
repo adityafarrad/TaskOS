@@ -32,7 +32,10 @@ final class TaskOSUITests: XCTestCase {
     func testLaunchShowsEditor() throws {
         let app = launchApp()
         XCTAssertTrue(element(app, "editor.view").waitForExistence(timeout: 10))
-        XCTAssertTrue(element(app, "editor.title").exists)
+        XCTAssertFalse(
+            element(app, "editor.title").exists,
+            "An empty new workflow should not show the title chrome"
+        )
         XCTAssertTrue(element(app, "editor.run").exists)
     }
 
