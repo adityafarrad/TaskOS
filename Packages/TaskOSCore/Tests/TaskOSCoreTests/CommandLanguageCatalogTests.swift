@@ -120,14 +120,25 @@ struct CommandLanguageCatalogTests {
         }
     }
 
-    @Test func absoluteOneTimeFormIsRecordedAsPendingGrammar() {
+    @Test func absoluteOneTimeFormRoundTrips() {
         #expect(catalog.scheduleTemplate("oneTime")?.format == "Once on {date}")
 
-        let phrase = CanonicalPhrase.text(
-            for: ScheduleTrigger.oneTime(Date(timeIntervalSince1970: 1_800_000_000))
+        guard let date = Calendar.current.date(
+            from: DateComponents(year: 2026, month: 9, day: 20, hour: 9, minute: 0)
+        ) else {
+            Issue.record("Could not build the sample date")
+            return
+        }
+
+        let phrase = CanonicalPhrase.text(for: ScheduleTrigger.oneTime(date))
+        #expect(phrase == "Once on 2026-09-20 at 09:00")
+
+        let parsed = parser.parse(phrase)
+        #expect(parsed.outcome == .complete)
+        #expect(
+            parsed.clauses.compactMap(\.schedule).first
+                == .absolute(year: 2026, month: 9, day: 20, hour: 9, minute: 0)
         )
-        #expect(phrase.hasPrefix("Once on "))
-        #expect(parser.parse(phrase).outcome != .complete)
     }
 
     @Test func suggestionsUseCatalogWording() {

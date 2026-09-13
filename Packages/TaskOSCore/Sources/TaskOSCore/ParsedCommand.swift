@@ -27,6 +27,7 @@ public enum ParsedSchedule: Hashable, Sendable {
     case interval(TimeInterval)
     case relative(TimeInterval)
     case once(hour: Int, minute: Int)
+    case absolute(year: Int, month: Int, day: Int, hour: Int, minute: Int)
     case incomplete
 }
 

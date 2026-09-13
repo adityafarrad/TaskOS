@@ -94,8 +94,9 @@ public enum CanonicalPhrase {
     ) -> String {
         switch schedule {
         case .oneTime(let date):
-            return language.scheduleTemplate("oneTime")?.render(["date": shortDateTime(date)])
-                ?? "Once on \(shortDateTime(date))"
+            return language.scheduleTemplate("oneTime")?
+                .render(["date": language.absoluteDateTimeText(date)])
+                ?? "Once on \(language.absoluteDateTimeText(date))"
         case .daily(let hour, let minute):
             return language.scheduleTemplate("daily")?
                 .render(["clock": language.clockText(hour: hour, minute: minute)])
@@ -114,13 +115,6 @@ public enum CanonicalPhrase {
 
     public static func clockText(hour: Int, minute: Int) -> String {
         CommandLanguageCatalog.standard.clockText(hour: hour, minute: minute)
-    }
-
-    private static func shortDateTime(_ date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.dateStyle = .medium
-        formatter.timeStyle = .short
-        return formatter.string(from: date)
     }
 
     public static func command(

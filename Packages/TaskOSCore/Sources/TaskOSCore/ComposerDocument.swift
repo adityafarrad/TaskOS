@@ -718,7 +718,17 @@ public struct ComposerDocument: Sendable {
         var newElements: [ComposerElement] = []
         var newTrigger: ComposerTriggerDraft = .manual
 
+        let triggerIndices = parsed.clauses.indices.filter { Self.isTriggerClause(parsed.clauses[$0]) }
+        let triggerAllowed = triggerIndices.count == 0
+            || (triggerIndices.count == 1
+                && (triggerIndices[0] == 0 || triggerIndices[0] == parsed.clauses.count - 1))
+
         for clause in parsed.clauses {
+            if Self.isTriggerClause(clause), !triggerAllowed {
+                newElements.append(.unresolved(clauseText(clause)))
+                continue
+            }
+
             switch clause.kind {
             case .applicationLifecycle:
                 let name = (clause.lifecycleApplicationName ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
@@ -771,6 +781,19 @@ public struct ComposerDocument: Sendable {
                     newTrigger = .relative(seconds)
                 case .once(let hour, let minute):
                     newTrigger = .once(hour: hour, minute: minute)
+                case .absolute(let year, let month, let day, let hour, let minute):
+                    let components = DateComponents(
+                        year: year,
+                        month: month,
+                        day: day,
+                        hour: hour,
+                        minute: minute
+                    )
+                    if let date = Calendar.current.date(from: components) {
+                        newTrigger = .oneTime(date)
+                    } else {
+                        newElements.append(.unresolved(clauseText(clause)))
+                    }
                 case .incomplete, .none:
                     newElements.append(.unresolved(clauseText(clause)))
                 }
@@ -875,6 +898,16 @@ public struct ComposerDocument: Sendable {
         }
         elements = newElements
         trigger = newTrigger
+    }
+
+    private static func isTriggerClause(_ clause: ParsedClause) -> Bool {
+        switch clause.kind {
+        case .schedule, .applicationLifecycle, .wake, .displayConnection,
+             .externalVolume, .powerSource, .batteryThreshold:
+            return true
+        default:
+            return false
+        }
     }
 
     private func reusedAction(
@@ -1059,9 +1092,9 @@ public struct ComposerDocument: Sendable {
         var start = 0
         for token in tokens {
             switch token.kind {
-            case .word(let word) where word == "and" || word == "then" || word == "also":
+            case .word(let word) where Self.language.shared.connectorWords.contains(word):
                 start = token.span.end
-            case .punctuation(let punctuation) where punctuation == ",":
+            case .punctuation(let punctuation) where Self.language.shared.connectorPunctuation.contains(punctuation):
                 start = token.span.end
             default:
                 break
@@ -1154,9 +1187,9 @@ public struct ComposerDocument: Sendable {
                 .render(["clock": clockText(hour: hour, minute: minute)])
                 ?? "Once at \(clockText(hour: hour, minute: minute))"
         case .oneTime(let date):
-            let components = Calendar.current.dateComponents([.hour, .minute], from: date)
-            let clock = clockText(hour: components.hour ?? 0, minute: components.minute ?? 0)
-            return language.scheduleTemplate("once")?.render(["clock": clock]) ?? "Once at \(clock)"
+            return language.scheduleTemplate("oneTime")?
+                .render(["date": language.absoluteDateTimeText(date)])
+                ?? "Once on \(language.absoluteDateTimeText(date))"
         case .applicationLifecycle(_, let label, let event):
             if label.isEmpty { return "" }
             return language.canonicalTriggerTemplate(.applicationLifecycle)?

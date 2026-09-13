@@ -51,7 +51,7 @@ of this file). No 2.7 implementation has started.
 | 2.7A2 | Make source handling safe | done | Increment 2.7A2 | Checked UTF-16 spans, `CommandInput`/`CommandEdit`, literal scanner, coverage, limits, evidence/slots/clarifications |
 | 2.7A3 | Preserve authoring state and exact time | done | Increment 2.7A3 | Stable node preservation, conservative duplicate clearing, structured draft v2 + v1 fallback, resolve-once schedules |
 | 2.7B1 | Exact action language | done | Increment 2.7B1 | Quoted app names, launch/start aliases, bare domains require acceptance, quoted-only Copy Text, negation blocks |
-| 2.7B2 | Composition and schedules | not started | — | Connectors, one trigger maximum, schedule forms |
+| 2.7B2 | Composition and schedules | done | Increment 2.7B2 | All connectors outside literals, one trigger first/last only, `closes` removed, full schedule forms incl. absolute `Once on` |
 | 2.7B3 | Friendly frames and finite rationale | not started | — | Journaling sentence; four rationale forms only |
 | 2.7C1 | Versioned app snapshots and list ambiguity | not started | — | Native resolver, bounded grouping, 5,000-app cap |
 | 2.7C2 | Native command editor and completion | not started | — | `NSTextView` wrapper, marked text, VoiceOver |
@@ -2792,6 +2792,63 @@ Second run before starting 2.7B, performed at commit `c6db374`:
   - Negation is reported, not interpreted; correct negation semantics are out of
     scope for the release.
 - Next eligible work package: 2.7B2 — Composition and schedules.
+
+### Increment 2.7B2 — Composition and schedules (plan 2.7B2)
+
+- Status: done
+- Behavior delivered: action composition is exact and the schedule grammar is
+  complete. `then`, `and then`, `and`, `also`, comma, semicolon, `after that`,
+  `next`, and `followed by` separate actions outside quoted literals; a comma or
+  semicolon followed by a new action still creates a boundary. One trigger is
+  allowed, at the start or the end only; a trigger in the middle or two triggers
+  are reported instead of letting the last one win. `closes` is no longer an
+  application-quit alias. All schedule forms are supported, including the
+  absolute `Once on YYYY-MM-DD at HH:mm` form (two-digit 24-hour time), with
+  impossible dates and times rejected and leap days handled.
+- Interfaces changed:
+  - Catalog: connector words expanded and `;` added to connector punctuation;
+    `ScheduleVocabulary.onWord`; `absoluteDateTimeText(_:calendar:)`; the
+    `closes` lifecycle alias removed; schedule examples include the absolute
+    form.
+  - `ParsedSchedule` gained `.absolute(year:month:day:hour:minute:)`.
+  - `CommandParser`: `parseAbsoluteOnce` scans the raw date/time, validates it
+    (including leap years and hour/minute bounds), and consumes the literal;
+    `parse()` now reports "Use only one trigger." and "Put the trigger at the
+    start or the end of the command." for position/count violations; comma and
+    semicolon boundaries stop app lists when a new clause starts.
+  - `ComposerDocument`: trigger clauses that violate the position/count rule
+    become unresolved so no definition is built; `.absolute` maps to a one-time
+    trigger; one-time rendering uses `Once on YYYY-MM-DD at HH:mm`; trailing
+    fragment detection uses the catalog connectors.
+  - `CanonicalPhrase` renders one-time schedules in the absolute, reparseable
+    form.
+- Intentional behavior changes (from the compatibility table):
+  - `closes` is rejected; use `quits`.
+  - A comma or semicolon before a new action is a boundary, and `after that` /
+    `next` / `followed by` join actions.
+- Tests performed:
+  - `swift test --package-path Packages/TaskOSCore` — 337 tests, 40 suites, pass
+    (was 325/39; +12 `CompositionAndScheduleTests`). New coverage: every
+    connector between two actions in order with full coverage; connectors inside
+    Copy Text stay literal; 12 actions complete and 13 block; trigger first/last
+    allowed, middle reported; two triggers rejected; event trigger aliases;
+    `closes` rejected; every schedule form; leap day valid and impossible dates
+    rejected; `9 PM` / `9:00 PM` / `21:00` versus ambiguous `09:00`; absolute
+    `09:00`; canonical schedule phrases reparse; an absolute one-time trigger
+    survives further composition.
+  - App tests (`xcodebuild ... test -only-testing:TaskOSTests`) — TEST
+    SUCCEEDED.
+  - UI tests (`xcodebuild ... test -only-testing:TaskOSTests` UI target) — TEST
+    SUCCEEDED.
+  - Debug build — BUILD SUCCEEDED.
+  - Release build — BUILD SUCCEEDED.
+- Physical checks: none (Core grammar; UI paths exercised by the UI tests).
+- Remaining defects / gaps:
+  - A trigger supplied at the end is parsed but there is no dedicated UI hint;
+    the existing trigger card/selection continues to work.
+  - Absolute dates use the current system calendar for authoring-time
+    resolution, per the time contract.
+- Next eligible work package: 2.7B3 — Friendly frames and finite rationale.
 
 
 

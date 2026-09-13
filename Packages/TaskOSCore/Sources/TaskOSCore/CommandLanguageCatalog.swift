@@ -136,6 +136,7 @@ public struct CommandLanguageCatalog: Sendable {
         public let onceWord: String
         public let inWord: String
         public let atWord: String
+        public let onWord: String
         public let dayWords: Set<String>
         public let weekdayWords: Set<String>
         public let weekendWords: Set<String>
@@ -262,6 +263,18 @@ public struct CommandLanguageCatalog: Sendable {
         let whole = Int(minutes)
         return whole == 1 ? "1 minute" : "\(whole) minutes"
     }
+
+    public func absoluteDateTimeText(_ date: Date, calendar: Calendar = .current) -> String {
+        let components = calendar.dateComponents([.year, .month, .day, .hour, .minute], from: date)
+        return String(
+            format: "%04d-%02d-%02d at %02d:%02d",
+            components.year ?? 0,
+            components.month ?? 0,
+            components.day ?? 0,
+            components.hour ?? 0,
+            components.minute ?? 0
+        )
+    }
 }
 
 extension CommandLanguageCatalog {
@@ -289,8 +302,8 @@ extension CommandLanguageCatalog {
             "when": .when,
         ],
         shared: SharedVocabulary(
-            connectorWords: ["and", "then", "also"],
-            connectorPunctuation: [","],
+            connectorWords: ["and", "then", "also", "next", "after", "that", "followed", "by"],
+            connectorPunctuation: [",", ";"],
             negationWords: ["not", "never", "without", "don", "dont"],
             actionJoiner: ", then "
         ),
@@ -342,6 +355,7 @@ extension CommandLanguageCatalog {
             onceWord: "once",
             inWord: "in",
             atWord: "at",
+            onWord: "on",
             dayWords: ["day", "days"],
             weekdayWords: ["weekday", "weekdays"],
             weekendWords: ["weekend", "weekends"],
@@ -371,7 +385,6 @@ extension CommandLanguageCatalog {
                 "launched": .launched,
                 "quits": .quit,
                 "exits": .quit,
-                "closes": .quit,
             ],
             displaySubjects: [
                 "a display", "the display", "an external display", "the external display",
@@ -642,6 +655,7 @@ extension CommandLanguageCatalog {
                 "Every 30 minutes",
                 "In 45 minutes",
                 "Once at 19:00",
+                "Once on 2026-09-20 at 09:00",
             ],
             guideExample: "Every weekday at 9 am open Safari",
             starter: nil,

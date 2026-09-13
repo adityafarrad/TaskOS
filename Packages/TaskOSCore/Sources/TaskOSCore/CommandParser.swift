@@ -239,6 +239,17 @@ private struct ParserWorker {
             }
         }
 
+        let triggerIndices = clauses.indices.filter { Self.isTriggerClause(clauses[$0]) }
+        if triggerIndices.count > 1 {
+            diagnosticList.append(
+                .error("Use only one trigger.", span: clauses[triggerIndices[1]].span)
+            )
+        } else if let index = triggerIndices.first, index != 0, index != clauses.count - 1 {
+            diagnosticList.append(
+                .error("Put the trigger at the start or the end of the command.", span: clauses[index].span)
+            )
+        }
+
         let coverage = coverage(for: clauses)
         var outcome = Self.outcome(for: clauses, diagnostics: diagnosticList)
 
@@ -318,6 +329,16 @@ private struct ParserWorker {
             return .needsInput
         }
         return .complete
+    }
+
+    private static func isTriggerClause(_ clause: ParsedClause) -> Bool {
+        switch clause.kind {
+        case .schedule, .applicationLifecycle, .wake, .displayConnection,
+             .externalVolume, .powerSource, .batteryThreshold:
+            return true
+        default:
+            return false
+        }
     }
 
     private static func needsInput(_ clause: ParsedClause) -> Bool {
@@ -583,6 +604,12 @@ private struct ParserWorker {
                     }
                 }
                 if language.shared.connectorPunctuation.contains(punctuation) {
+                    if isClauseStart(tokenAfterCurrent) {
+                        flush()
+                        end = token.span.end
+                        position += 1
+                        return (names, end)
+                    }
                     flush()
                     end = token.span.end
                     position += 1
@@ -974,6 +1001,11 @@ private struct ParserWorker {
         }
 
         if keyword == language.schedule.onceWord {
+            if position < tokens.count, case .word(let onWord) = tokens[position].kind,
+               onWord == language.schedule.onWord {
+                position += 1
+                return parseAbsoluteOnce(startToken: startToken, onToken: tokens[max(0, position - 1)])
+            }
             skipWord(language.schedule.atWord)
             if let clock = parseClock() {
                 return scheduleClause(.once(hour: clock.hour, minute: clock.minute), start: startToken.span.start, end: clock.end)
@@ -982,6 +1014,124 @@ private struct ParserWorker {
         }
 
         return parseEvery(startToken: startToken)
+    }
+
+    private mutating func parseAbsoluteOnce(startToken: CommandToken, onToken: CommandToken) -> ParsedClause {
+        guard position < tokens.count else {
+            return scheduleClause(.incomplete, start: startToken.span.start, end: onToken.span.end)
+        }
+
+        let scanStart = tokens[position].span.start
+        guard let scanned = Self.scanAbsoluteDateTime(text, from: scanStart) else {
+            let end = consumeClauseRemainder()
+            return scheduleClause(.incomplete, start: startToken.span.start, end: end)
+        }
+
+        advancePastLiteral(SourceSpan(start: scanStart, end: scanned.end))
+        let schedule: ParsedSchedule
+        if Self.isValidAbsoluteDateTime(
+            year: scanned.year,
+            month: scanned.month,
+            day: scanned.day,
+            hour: scanned.hour,
+            minute: scanned.minute
+        ) {
+            schedule = .absolute(
+                year: scanned.year,
+                month: scanned.month,
+                day: scanned.day,
+                hour: scanned.hour,
+                minute: scanned.minute
+            )
+        } else {
+            schedule = .incomplete
+        }
+        return scheduleClause(schedule, start: startToken.span.start, end: scanned.end)
+    }
+
+    private struct ScannedDateTime {
+        let year: Int
+        let month: Int
+        let day: Int
+        let hour: Int
+        let minute: Int
+        let end: Int
+    }
+
+    private static func scanAbsoluteDateTime(_ text: String, from offset: Int) -> ScannedDateTime? {
+        guard let remainder = text.substring(in: SourceSpan(start: offset, end: text.utf16.count)) else {
+            return nil
+        }
+        let characters = Array(remainder)
+        var index = 0
+
+        func readDigits(_ count: Int) -> Int? {
+            guard index + count <= characters.count else { return nil }
+            var value = 0
+            for _ in 0..<count {
+                let character = characters[index]
+                guard character.isASCII, let digit = character.wholeNumberValue else { return nil }
+                value = value * 10 + digit
+                index += 1
+            }
+            return value
+        }
+
+        func consume(_ expected: Character) -> Bool {
+            guard index < characters.count, characters[index] == expected else { return false }
+            index += 1
+            return true
+        }
+
+        func consumeWhitespace() -> Bool {
+            let start = index
+            while index < characters.count, characters[index].isWhitespace {
+                index += 1
+            }
+            return index > start
+        }
+
+        func consumeWord(_ expected: String) -> Bool {
+            let word = Array(expected)
+            guard index + word.count <= characters.count else { return false }
+            for character in word {
+                guard characters[index] == character else { return false }
+                index += 1
+            }
+            return true
+        }
+
+        guard let year = readDigits(4), consume("-"),
+              let month = readDigits(2), consume("-"),
+              let day = readDigits(2),
+              consumeWhitespace(), consumeWord("at"), consumeWhitespace(),
+              let hour = readDigits(2), consume(":"),
+              let minute = readDigits(2) else {
+            return nil
+        }
+
+        if index < characters.count, characters[index].isNumber || characters[index] == ":" {
+            return nil
+        }
+
+        let consumed = String(characters[0..<index]).utf16.count
+        return ScannedDateTime(
+            year: year,
+            month: month,
+            day: day,
+            hour: hour,
+            minute: minute,
+            end: offset + consumed
+        )
+    }
+
+    private static func isValidAbsoluteDateTime(year: Int, month: Int, day: Int, hour: Int, minute: Int) -> Bool {
+        guard (0...23).contains(hour), (0...59).contains(minute) else { return false }
+        guard (1...12).contains(month), day >= 1 else { return false }
+
+        let leap = (year % 4 == 0 && year % 100 != 0) || year % 400 == 0
+        let monthLengths = [31, leap ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
+        return day <= monthLengths[month - 1]
     }
 
     private mutating func parseEvery(startToken: CommandToken) -> ParsedClause {
