@@ -2717,6 +2717,25 @@ record isolation/recovery) is deferred to Phase 3 with the migration fixtures.
   one-time dates no longer move without an explicit schedule edit; the saved
   workflow schema is unchanged; Core and app tests pass).
 
+### Phase 2.7A verification pass (2026-09-13)
+
+Second run before starting 2.7B, performed at commit `c6db374`:
+
+- Core: `swift test --package-path Packages/TaskOSCore` run twice — 315 tests,
+  38 suites, pass both times.
+- Focused A-phase suites: `CommandLanguageCatalogTests`, `SourceHandlingTests`,
+  `AuthoringStateTests` — 45 tests, 3 suites, pass.
+- App tests: `xcodebuild ... test -only-testing:TaskOSTests` — TEST SUCCEEDED.
+- UI tests: `xcodebuild ... test -only-testing:TaskOSUITests` — TEST SUCCEEDED,
+  10/10 (launch, sidebar, composer typing, suggestions, discovery, step menu,
+  settings).
+- Debug and Release builds — BUILD SUCCEEDED.
+- Release app launch smoke: opened the on-disk store (lightweight migration for
+  the optional draft payload) and quit cleanly.
+- Source checks: no `Date()` remains in `ComposerDocument` definition
+  materialization; saved-workflow schema versions remain 1; working tree clean.
+- No defects found. 2.7A is verified; 2.7B1 is next.
+
 
 
 
