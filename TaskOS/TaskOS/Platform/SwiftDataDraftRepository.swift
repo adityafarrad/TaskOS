@@ -8,12 +8,14 @@ final class DraftRecord {
     var name: String
     var text: String
     var updatedAt: Date
+    var payloadData: Data?
 
-    init(id: UUID, name: String, text: String, updatedAt: Date) {
+    init(id: UUID, name: String, text: String, updatedAt: Date, payloadData: Data?) {
         self.id = id
         self.name = name
         self.text = text
         self.updatedAt = updatedAt
+        self.payloadData = payloadData
     }
 }
 
@@ -31,7 +33,8 @@ actor SwiftDataDraftRepository: DraftRepository {
             id: AutomationID(record.id),
             name: record.name,
             text: record.text,
-            updatedAt: record.updatedAt
+            updatedAt: record.updatedAt,
+            payload: record.payloadData
         )
     }
 
@@ -42,7 +45,8 @@ actor SwiftDataDraftRepository: DraftRepository {
                 id: draft.id.rawValue,
                 name: draft.name,
                 text: draft.text,
-                updatedAt: draft.updatedAt
+                updatedAt: draft.updatedAt,
+                payloadData: draft.payload
             )
         )
         try modelContext.save()

@@ -1,6 +1,6 @@
 import Foundation
 
-public enum ComposerActionDraft: Hashable, Sendable {
+public enum ComposerActionDraft: Codable, Hashable, Sendable {
     case openApplication(name: String, resolved: ResourceReference?)
     case hideApplication(name: String, resolved: ResourceReference?)
     case quitApplication(name: String, resolved: ResourceReference?)
@@ -13,7 +13,7 @@ public enum ComposerActionDraft: Hashable, Sendable {
     case copyText(String)
 }
 
-public enum ComposerTriggerDraft: Hashable, Sendable {
+public enum ComposerTriggerDraft: Codable, Hashable, Sendable {
     case manual
     case daily(hour: Int, minute: Int)
     case weekdays(Set<Weekday>, hour: Int, minute: Int)
@@ -105,7 +105,7 @@ extension ComposerTriggerDraft {
     }
 }
 
-public struct ComposerAction: Hashable, Sendable, Identifiable {
+public struct ComposerAction: Codable, Hashable, Sendable, Identifiable {
     public let id: UUID
     public let draft: ComposerActionDraft
 
@@ -115,9 +115,68 @@ public struct ComposerAction: Hashable, Sendable, Identifiable {
     }
 }
 
-public enum ComposerElement: Hashable, Sendable {
+public enum ComposerElement: Codable, Hashable, Sendable {
     case action(ComposerAction)
     case unresolved(String)
+}
+
+public struct AuthoringNode: Codable, Hashable, Sendable {
+    public let id: UUID
+    public let draft: ComposerActionDraft
+
+    public init(id: UUID, draft: ComposerActionDraft) {
+        self.id = id
+        self.draft = draft
+    }
+}
+
+public struct AuthoringSnapshot: Codable, Hashable, Sendable {
+    public static let currentVersion = 2
+
+    public let version: Int
+    public let text: String
+    public let trigger: ComposerTriggerDraft
+    public let nodes: [AuthoringNode]
+    public let resolution: ScheduleResolution
+    public let revision: WorkflowRevision
+
+    public init(
+        version: Int = AuthoringSnapshot.currentVersion,
+        text: String,
+        trigger: ComposerTriggerDraft,
+        nodes: [AuthoringNode],
+        resolution: ScheduleResolution,
+        revision: WorkflowRevision
+    ) {
+        self.version = version
+        self.text = text
+        self.trigger = trigger
+        self.nodes = nodes
+        self.resolution = resolution
+        self.revision = revision
+    }
+}
+
+public struct ScheduleResolution: Codable, Hashable, Sendable {
+    public var oneTimeDate: Date?
+    public var intervalAnchor: Date?
+    public var timeZoneIdentifier: String?
+
+    public init(
+        oneTimeDate: Date? = nil,
+        intervalAnchor: Date? = nil,
+        timeZoneIdentifier: String? = nil
+    ) {
+        self.oneTimeDate = oneTimeDate
+        self.intervalAnchor = intervalAnchor
+        self.timeZoneIdentifier = timeZoneIdentifier
+    }
+
+    public static let empty = ScheduleResolution()
+
+    public var isEmpty: Bool {
+        oneTimeDate == nil && intervalAnchor == nil
+    }
 }
 
 public struct ComposerDocument: Sendable {
@@ -128,12 +187,19 @@ public struct ComposerDocument: Sendable {
         let parseOutcome: ParseOutcome
         let diagnostics: [ParseDiagnostic]
         let revision: WorkflowRevision
+        let resolution: ScheduleResolution
+    }
+
+    private final class ResolutionBox: @unchecked Sendable {
+        var value = ScheduleResolution.empty
     }
 
     private let parser = CommandParser()
     private static let historyLimit = 100
     private static let language = CommandLanguageCatalog.standard
+    private let resolution = ResolutionBox()
 
+    public let clock: CoreClock
     public private(set) var text: String
     public private(set) var trigger: ComposerTriggerDraft
     public private(set) var elements: [ComposerElement]
@@ -144,7 +210,12 @@ public struct ComposerDocument: Sendable {
     private var undoStack: [Snapshot] = []
     private var redoStack: [Snapshot] = []
 
-    public init(text: String = "") {
+    public var scheduleResolution: ScheduleResolution {
+        resolution.value
+    }
+
+    public init(text: String = "", clock: CoreClock = SystemClock()) {
+        self.clock = clock
         self.text = text
         self.trigger = .manual
         self.elements = []
@@ -154,23 +225,27 @@ public struct ComposerDocument: Sendable {
         applyText(text)
     }
 
-    public init(trigger: ComposerTriggerDraft, actions: [ComposerActionDraft]) {
+    public init(trigger: ComposerTriggerDraft, actions: [ComposerActionDraft], clock: CoreClock = SystemClock()) {
+        self.clock = clock
         self.text = ""
         self.trigger = trigger
         self.elements = actions.map { .action(ComposerAction(draft: $0)) }
         self.parseOutcome = .needsInput
         self.diagnostics = []
         self.revision = WorkflowRevision(1)
+        adoptScheduleResolution(from: trigger)
         self.text = renderedText()
     }
 
-    public init(definition: AutomationDefinition) {
+    public init(definition: AutomationDefinition, clock: CoreClock = SystemClock()) {
+        self.clock = clock
         self.text = ""
         self.trigger = ComposerTriggerDraft(definition.trigger)
         self.elements = definition.actions.map { .action(ComposerAction(draft: ComposerActionDraft($0))) }
         self.parseOutcome = .needsInput
         self.diagnostics = []
         self.revision = WorkflowRevision(1)
+        adoptScheduleResolution(from: definition.trigger)
         self.text = renderedText()
     }
 
@@ -438,12 +513,22 @@ public struct ComposerDocument: Sendable {
     public func makeDefinition(
         name: String,
         id: AutomationID = AutomationID(),
-        revision: WorkflowRevision = WorkflowRevision(1),
-        now: Date = Date()
+        revision: WorkflowRevision = WorkflowRevision(1)
     ) -> AutomationDefinition? {
+        makeDefinition(name: name, id: id, revision: revision, now: clock.now(), calendar: .current)
+    }
+
+    public func makeDefinition(
+        name: String,
+        id: AutomationID = AutomationID(),
+        revision: WorkflowRevision = WorkflowRevision(1),
+        now: Date,
+        calendar: Calendar = .current
+    ) -> AutomationDefinition? {
+        resolveSchedule(now: now, calendar: calendar)
         guard !hasUnresolvedText else { return nil }
         guard let actions = resolvedActions(), !actions.isEmpty else { return nil }
-        guard let triggerConfiguration = triggerConfiguration(relativeTo: now) else { return nil }
+        guard let triggerConfiguration = triggerConfiguration() else { return nil }
         let definition = AutomationDefinition(
             id: id,
             name: name,
@@ -454,7 +539,7 @@ public struct ComposerDocument: Sendable {
         return definition.validate(relativeTo: now).isValid ? definition : nil
     }
 
-    public func triggerConfiguration(relativeTo now: Date = Date()) -> TriggerConfiguration? {
+    public func triggerConfiguration() -> TriggerConfiguration? {
         switch trigger {
         case .manual:
             return .manual(ManualTrigger())
@@ -463,21 +548,13 @@ public struct ComposerDocument: Sendable {
         case .weekdays(let days, let hour, let minute):
             return .schedule(.weekdays(days, hour: hour, minute: minute))
         case .interval(let seconds):
-            return .schedule(.interval(every: seconds, startingAt: now))
-        case .relative(let seconds):
-            return .schedule(.oneTime(now.addingTimeInterval(seconds)))
-        case .once(let hour, let minute):
-            let calendar = Calendar.current
-            let components = DateComponents(hour: hour, minute: minute, second: 0)
-            guard let date = calendar.nextDate(
-                after: now.addingTimeInterval(-1),
-                matching: components,
-                matchingPolicy: .nextTime,
-                repeatedTimePolicy: .first,
-                direction: .forward
-            ) else {
-                return nil
-            }
+            guard let anchor = resolution.value.intervalAnchor else { return nil }
+            return .schedule(.interval(every: seconds, startingAt: anchor))
+        case .relative:
+            guard let date = resolution.value.oneTimeDate else { return nil }
+            return .schedule(.oneTime(date))
+        case .once:
+            guard let date = resolution.value.oneTimeDate else { return nil }
             return .schedule(.oneTime(date))
         case .oneTime(let date):
             return .schedule(.oneTime(date))
@@ -498,9 +575,94 @@ public struct ComposerDocument: Sendable {
         }
     }
 
+    public func triggerConfiguration(relativeTo now: Date, calendar: Calendar = .current) -> TriggerConfiguration? {
+        resolveSchedule(now: now, calendar: calendar)
+        return triggerConfiguration()
+    }
+
+    public func resolveSchedule(now: Date, calendar: Calendar) {
+        resolution.value.timeZoneIdentifier = calendar.timeZone.identifier
+        switch trigger {
+        case .relative(let seconds):
+            if resolution.value.oneTimeDate == nil {
+                resolution.value.oneTimeDate = now.addingTimeInterval(seconds)
+            }
+        case .once(let hour, let minute):
+            if resolution.value.oneTimeDate == nil {
+                resolution.value.oneTimeDate = calendar.nextDate(
+                    after: now.addingTimeInterval(-1),
+                    matching: DateComponents(hour: hour, minute: minute, second: 0),
+                    matchingPolicy: .nextTime,
+                    repeatedTimePolicy: .first,
+                    direction: .forward
+                )
+            }
+        case .oneTime(let date):
+            resolution.value.oneTimeDate = date
+        case .interval:
+            if resolution.value.intervalAnchor == nil {
+                resolution.value.intervalAnchor = now
+            }
+        case .manual, .daily, .weekdays,
+             .applicationLifecycle, .wake, .displayConnection,
+             .externalVolume, .powerSource, .batteryThreshold:
+            resolution.value.oneTimeDate = nil
+            resolution.value.intervalAnchor = nil
+        }
+    }
+
+    public func clearScheduleResolution() {
+        resolution.value = .empty
+    }
+
+    public func makeSnapshot() -> AuthoringSnapshot {
+        AuthoringSnapshot(
+            text: text,
+            trigger: trigger,
+            nodes: actions.map { AuthoringNode(id: $0.id, draft: $0.draft) },
+            resolution: resolution.value,
+            revision: revision
+        )
+    }
+
+    public init?(snapshot: AuthoringSnapshot, clock: CoreClock = SystemClock()) {
+        guard snapshot.version == AuthoringSnapshot.currentVersion else {
+            return nil
+        }
+        self.clock = clock
+        self.text = snapshot.text
+        self.trigger = snapshot.trigger
+        self.elements = snapshot.nodes.map { .action(ComposerAction(id: $0.id, draft: $0.draft)) }
+        self.parseOutcome = .needsInput
+        self.diagnostics = []
+        self.revision = snapshot.revision
+        self.resolution.value = snapshot.resolution
+    }
+
+    private func adoptScheduleResolution(from configuration: TriggerConfiguration) {
+        switch configuration {
+        case .schedule(.oneTime(let date)):
+            resolution.value.oneTimeDate = date
+        case .schedule(.interval(_, let startingAt)):
+            resolution.value.intervalAnchor = startingAt
+        default:
+            break
+        }
+    }
+
+    private func adoptScheduleResolution(from draft: ComposerTriggerDraft) {
+        switch draft {
+        case .oneTime(let date):
+            resolution.value.oneTimeDate = date
+        default:
+            break
+        }
+    }
+
     public mutating func setTrigger(_ draft: ComposerTriggerDraft) {
         guard draft != trigger else { return }
         recordHistory()
+        clearScheduleResolution()
         trigger = draft
         text = renderedText()
         bumpRevision()
@@ -535,6 +697,23 @@ public struct ComposerDocument: Sendable {
 
     private mutating func reconcileElements(from parsed: ParsedCommand) {
         let previousActions = actions
+
+        var previousCounts: [ActionShape: Int] = [:]
+        for action in previousActions where !Self.isTextIdentifiable(action.draft) {
+            previousCounts[Self.shape(of: action.draft), default: 0] += 1
+        }
+        var newCounts: [ActionShape: Int] = [:]
+        for clause in parsed.clauses {
+            for draft in Self.actionDrafts(from: clause) where !Self.isTextIdentifiable(draft) {
+                newCounts[Self.shape(of: draft), default: 0] += 1
+            }
+        }
+        var ambiguousShapes: Set<ActionShape> = []
+        for shape in Set(previousCounts.keys).union(newCounts.keys)
+        where previousCounts[shape, default: 0] != newCounts[shape, default: 0] {
+            ambiguousShapes.insert(shape)
+        }
+
         var consumed: Set<Int> = []
         var newElements: [ComposerElement] = []
         var newTrigger: ComposerTriggerDraft = .manual
@@ -622,10 +801,28 @@ public struct ComposerDocument: Sendable {
                 }
 
             case .openFile:
-                newElements.append(.action(reusedAction(for: .openFile(target: nil), from: previousActions, consumed: &consumed)))
+                newElements.append(
+                    .action(
+                        reusedAction(
+                            for: .openFile(target: nil),
+                            from: previousActions,
+                            consumed: &consumed,
+                            ambiguousShapes: ambiguousShapes
+                        )
+                    )
+                )
 
             case .revealInFinder:
-                newElements.append(.action(reusedAction(for: .revealInFinder(target: nil), from: previousActions, consumed: &consumed)))
+                newElements.append(
+                    .action(
+                        reusedAction(
+                            for: .revealInFinder(target: nil),
+                            from: previousActions,
+                            consumed: &consumed,
+                            ambiguousShapes: ambiguousShapes
+                        )
+                    )
+                )
 
             case .arrangeWindow:
                 let name = (clause.arrangeApplicationName ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
@@ -654,7 +851,8 @@ public struct ComposerDocument: Sendable {
                         reusedAction(
                             for: .showNotification(title: "TaskOS", message: ""),
                             from: previousActions,
-                            consumed: &consumed
+                            consumed: &consumed,
+                            ambiguousShapes: ambiguousShapes
                         )
                     )
                 )
@@ -672,6 +870,9 @@ public struct ComposerDocument: Sendable {
             }
         }
 
+        if newTrigger != trigger {
+            clearScheduleResolution()
+        }
         elements = newElements
         trigger = newTrigger
     }
@@ -679,8 +880,12 @@ public struct ComposerDocument: Sendable {
     private func reusedAction(
         for draft: ComposerActionDraft,
         from previous: [ComposerAction],
-        consumed: inout Set<Int>
+        consumed: inout Set<Int>,
+        ambiguousShapes: Set<ActionShape> = []
     ) -> ComposerAction {
+        if !Self.isTextIdentifiable(draft), ambiguousShapes.contains(Self.shape(of: draft)) {
+            return ComposerAction(draft: draft)
+        }
         if let index = previous.indices.first(where: {
             !consumed.contains($0) && Self.matchesExactly(previous[$0].draft, draft)
         }) {
@@ -694,6 +899,78 @@ public struct ComposerDocument: Sendable {
             return ComposerAction(id: previous[index].id, draft: merge(previous: previous[index].draft, new: draft))
         }
         return ComposerAction(draft: draft)
+    }
+
+    private enum ActionShape: Hashable {
+        case openApplication
+        case hideApplication
+        case quitApplication
+        case openFile
+        case revealInFinder
+        case openWebsite
+        case arrangeWindow
+        case wait
+        case showNotification
+        case copyText
+    }
+
+    private static func shape(of draft: ComposerActionDraft) -> ActionShape {
+        switch draft {
+        case .openApplication: return .openApplication
+        case .hideApplication: return .hideApplication
+        case .quitApplication: return .quitApplication
+        case .openFile: return .openFile
+        case .revealInFinder: return .revealInFinder
+        case .openWebsite: return .openWebsite
+        case .arrangeWindow: return .arrangeWindow
+        case .wait: return .wait
+        case .showNotification: return .showNotification
+        case .copyText: return .copyText
+        }
+    }
+
+    private static func isTextIdentifiable(_ draft: ComposerActionDraft) -> Bool {
+        switch draft {
+        case .openFile, .revealInFinder, .showNotification:
+            return false
+        default:
+            return true
+        }
+    }
+
+    private static func actionDrafts(from clause: ParsedClause) -> [ComposerActionDraft] {
+        switch clause.kind {
+        case .openApplication:
+            return clause.resourceNames.map { name in
+                if ResourceNameHeuristics.isWebsite(name) {
+                    return .openWebsite(url: ResourceNameHeuristics.normalizedWebsiteURL(name), browser: nil)
+                }
+                return .openApplication(name: name, resolved: nil)
+            }
+        case .hideApplication:
+            return clause.resourceNames.map { .hideApplication(name: $0, resolved: nil) }
+        case .quitApplication:
+            return clause.resourceNames.map { .quitApplication(name: $0, resolved: nil) }
+        case .openFile:
+            return [.openFile(target: nil)]
+        case .revealInFinder:
+            return [.revealInFinder(target: nil)]
+        case .arrangeWindow:
+            let name = (clause.arrangeApplicationName ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+            guard let preset = clause.arrangePreset, !name.isEmpty else { return [] }
+            return [.arrangeWindow(name: name, resolved: nil, preset: preset, display: .current)]
+        case .wait:
+            guard let duration = clause.duration, WaitAction.allowedRange.contains(duration) else { return [] }
+            return [.wait(duration)]
+        case .showNotification:
+            return [.showNotification(title: "TaskOS", message: "")]
+        case .copyText:
+            let literal = clause.copyText ?? ""
+            guard !literal.isEmpty else { return [] }
+            return [.copyText(literal)]
+        default:
+            return []
+        }
     }
 
     private static func sameCase(_ lhs: ComposerActionDraft, _ rhs: ComposerActionDraft) -> Bool {
@@ -930,7 +1207,8 @@ public struct ComposerDocument: Sendable {
             elements: elements,
             parseOutcome: parseOutcome,
             diagnostics: diagnostics,
-            revision: revision
+            revision: revision,
+            resolution: resolution.value
         )
     }
 
@@ -949,5 +1227,6 @@ public struct ComposerDocument: Sendable {
         parseOutcome = snapshot.parseOutcome
         diagnostics = snapshot.diagnostics
         revision = snapshot.revision
+        resolution.value = snapshot.resolution
     }
 }

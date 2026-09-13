@@ -1358,6 +1358,7 @@ final class ComposerViewModel {
     }
 
     private func afterEdit() {
+        document.resolveSchedule(now: composition.clock.now(), calendar: .current)
         autoResolveApplications()
         refreshSuggestions()
         resetPreview()
@@ -1369,7 +1370,8 @@ final class ComposerViewModel {
     }
 
     private func scheduleDraftAutosave() {
-        let draft = ComposerDraft(id: currentID, name: draftName, text: document.text)
+        let payload = ComposerDraft.encode(snapshot: document.makeSnapshot())
+        let draft = ComposerDraft(id: currentID, name: draftName, text: document.text, payload: payload)
         autosaveTask?.cancel()
         autosaveTask = Task { [weak self] in
             try? await Task.sleep(for: .milliseconds(400))
@@ -1396,12 +1398,26 @@ final class ComposerViewModel {
         recoverableDraft = nil
         draftID = draft.id
         draftName = draft.name
-        document = ComposerDocument(text: draft.text)
+
+        var recoveredStructured = false
+        if let snapshot = draft.authoringSnapshot,
+           let restored = ComposerDocument(snapshot: snapshot, clock: composition.clock) {
+            document = restored
+            recoveredStructured = true
+        } else {
+            document = ComposerDocument(text: draft.text, clock: composition.clock)
+        }
+
         autoResolveApplications()
         refreshSuggestions()
         resetPreview()
         updateWatchedDirectories()
-        notice = "Recovered your unsaved draft."
+
+        if recoveredStructured || draft.payload == nil {
+            notice = "Recovered your unsaved draft."
+        } else {
+            notice = "The saved draft data could not be read; restored the text only."
+        }
     }
 
     func discardRecoverableDraft() {

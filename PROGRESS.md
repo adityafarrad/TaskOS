@@ -49,7 +49,7 @@ of this file). No 2.7 implementation has started.
 |---|---|---|---|---|
 | 2.7A1 | Freeze the language contract | done | Increment 2.7A1 | Capability-language matrix (`CommandLanguageCatalog`), consumer parity tests; parser/suggestions/canonical now catalog-driven |
 | 2.7A2 | Make source handling safe | done | Increment 2.7A2 | Checked UTF-16 spans, `CommandInput`/`CommandEdit`, literal scanner, coverage, limits, evidence/slots/clarifications |
-| 2.7A3 | Preserve authoring state and exact time | not started | — | Stable nodes, draft v2, exact one-time dates |
+| 2.7A3 | Preserve authoring state and exact time | done | Increment 2.7A3 | Stable node preservation, conservative duplicate clearing, structured draft v2 + v1 fallback, resolve-once schedules |
 | 2.7B1 | Exact action language | not started | — | Existing action families only; bare domains need acceptance |
 | 2.7B2 | Composition and schedules | not started | — | Connectors, one trigger maximum, schedule forms |
 | 2.7B3 | Friendly frames and finite rationale | not started | — | Journaling sentence; four rationale forms only |
@@ -2648,6 +2648,74 @@ record isolation/recovery) is deferred to Phase 3 with the migration fixtures.
   - The composer still uses a SwiftUI `TextField`; the native `NSTextView`
     editor and UTF-16 selection reporting are 2.7C2.
 - Next eligible work package: 2.7A3 — Preserve authoring state and exact time.
+
+### Increment 2.7A3 — Preserve authoring state and exact time (plan 2.7A3)
+
+- Status: done
+- Behavior delivered: card-only values stay attached to their own clauses, and
+  one-time schedules resolve once and no longer move. Stable node IDs are
+  preserved through unrelated text edits; when a re-parse makes an
+  indistinguishable card-only group ambiguous (for example a paste adds a
+  second identical file action), the uncertain bindings are cleared instead of
+  being silently rotated. Recoverable drafts now carry an optional version-2
+  structured payload, and relative/once/interval schedules resolve through an
+  injected clock and an explicit calendar and are reused by Preview and Save.
+- Interfaces changed:
+  - Added `ScheduleResolution` and a private resolution box so a `ComposerDocument`
+    value can hold one resolved instant; `resolveSchedule(now:calendar:)`,
+    `clearScheduleResolution()`, `scheduleResolution`, and
+    `ComposerDocument(clock:)`.
+  - `triggerConfiguration()` (stored resolution) plus
+    `triggerConfiguration(relativeTo:calendar:)`;
+    `makeDefinition(name:id:revision:)` uses the stored resolution and the
+    injected clock, and `makeDefinition(name:id:revision:now:calendar:)` resolves
+    explicitly. Default `Date()` materialization is gone.
+  - Added `AuthoringNode` and `AuthoringSnapshot`; `ComposerActionDraft`,
+    `ComposerTriggerDraft`, `ComposerAction`, and `ComposerElement` are now
+    `Codable`; `makeSnapshot()` and `init?(snapshot:clock:)`.
+  - `ComposerDraft` gained optional `payload` and `recoveryError`, plus
+    `schemaVersion`, `authoringSnapshot`, and `encode(snapshot:)`.
+  - `DraftRecord` (SwiftData) gained optional `payloadData` for lightweight
+    migration; the repository round-trips it.
+  - `ComposerDocument` clears the stored resolution when the trigger meaning
+    changes and adopts the exact stored date/anchor when opening a saved
+    definition.
+  - Duplicate-clause guard: `ActionShape`, `isTextIdentifiable`, and
+    `actionDrafts(from:)` drive a conservative binding-clearing rule.
+- Tests performed:
+  - `swift test --package-path Packages/TaskOSCore` — 315 tests, 38 suites, pass
+    (was 302/37; +13 `AuthoringStateTests`). New coverage: duplicate
+    notifications keep messages through an unrelated edit; card reorder moves
+    messages with their nodes; delete/undo restores a message; inserting a third
+    identical clause keeps existing messages and gets a new ID; an ambiguous
+    duplicate remap clears all uncertain bindings; structured snapshot
+    round-trip preserves node IDs, card values, and the resolved instant; a
+    legacy payload-less draft restores text; a version-2 draft carries the
+    snapshot; a one-time schedule resolves once and Save reuses it; an unrelated
+    edit does not move the date while a schedule edit does; a card schedule edit
+    resolves fresh; a timezone change keeps the stored instant; opening a saved
+    definition preserves an exact date with seconds.
+  - App tests (`xcodebuild ... test -only-testing:TaskOSTests`) — TEST
+    SUCCEEDED, including a new SwiftData test that persists and reloads a
+    structured payload and restores its card-only value.
+  - Debug build — BUILD SUCCEEDED.
+  - Release build — BUILD SUCCEEDED.
+- Physical checks: none (Core behavior plus an app persistence change; no UI or
+  platform change).
+- Remaining defects / gaps:
+  - The exact-edit API is present (`CommandEdit`) but the composer still
+    re-parses whole text; binding it to the native `NSTextView` editor is
+    2.7C2, and cursor-only invalidation remains trivial until then.
+  - `recoveryError` is not surfaced in the UI yet (the view model shows a
+    non-sensitive notice on fallback).
+  - Completion, resource-selection, and preparation validity keys are 2.7C3.
+  - The saved workflow schema is unchanged; only the draft record gained an
+    optional field.
+- Next eligible work package: 2.7B1 — Exact action language. The Phase 2.7A
+  exit gate is met (duplicate clauses do not exchange hidden values; structured
+  and legacy draft recovery works; card-only changes invalidate old preparation;
+  one-time dates no longer move without an explicit schedule edit; the saved
+  workflow schema is unchanged; Core and app tests pass).
 
 
 

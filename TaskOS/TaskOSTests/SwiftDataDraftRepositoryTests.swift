@@ -39,4 +39,30 @@ struct SwiftDataDraftRepositoryTests {
         let loaded = try await repository.loadDraft()
         #expect(loaded?.name == "B")
     }
+
+    @Test func structuredPayloadRoundTrips() async throws {
+        let repository: any DraftRepository = try makeRepository()
+        var document = ComposerDocument(text: "show a notification")
+        guard let id = document.actions.first?.id else {
+            Issue.record("Expected a notification action")
+            return
+        }
+        document.updateAction(id: id, draft: .showNotification(title: "T", message: "kept"))
+
+        let payload = ComposerDraft.encode(snapshot: document.makeSnapshot())
+        let draft = ComposerDraft(name: "Structured", text: document.text, payload: payload)
+        try await repository.saveDraft(draft)
+
+        let loaded = try await repository.loadDraft()
+        #expect(loaded?.payload == payload)
+        #expect(loaded?.schemaVersion == 2)
+
+        let snapshot = loaded?.authoringSnapshot
+        #expect(snapshot?.nodes.count == 1)
+        if case .showNotification(_, let message)? = snapshot?.nodes.first?.draft {
+            #expect(message == "kept")
+        } else {
+            Issue.record("Expected a notification node")
+        }
+    }
 }
