@@ -93,6 +93,7 @@ public struct CommandLanguageCatalog: Sendable {
     public struct SharedVocabulary: Hashable, Sendable {
         public let connectorWords: Set<String>
         public let connectorPunctuation: Set<String>
+        public let negationWords: Set<String>
         public let actionJoiner: String
     }
 
@@ -200,7 +201,7 @@ public struct CommandLanguageCatalog: Sendable {
     }
 
     public func clauseStartWords() -> Set<String> {
-        Set(clauseRoutes.keys).union(excluded.keys)
+        Set(clauseRoutes.keys).union(excluded.keys).union(shared.negationWords)
     }
 
     public func canonicalActionTemplate(_ id: ActionID, variant: String? = nil) -> CanonicalTemplate? {
@@ -225,6 +226,20 @@ public struct CommandLanguageCatalog: Sendable {
 
     public func arrangePresetPhrase(_ preset: WindowPreset) -> String {
         arrange.presetPhrases[preset] ?? preset.displayName
+    }
+
+    public func applicationPhrase(_ name: String) -> String {
+        let needsQuotes = name.isEmpty
+            || name.contains("\"")
+            || name.contains("\\")
+            || name.contains(",")
+            || name.contains(where: { $0.isWhitespace })
+        guard needsQuotes else { return name }
+
+        let escaped = name
+            .replacingOccurrences(of: "\\", with: "\\\\")
+            .replacingOccurrences(of: "\"", with: "\\\"")
+        return "\"\(escaped)\""
     }
 
     public func websitePhrase(url: String) -> String {
@@ -255,6 +270,8 @@ extension CommandLanguageCatalog {
         triggers: standardTriggers,
         clauseRoutes: [
             "open": .open,
+            "launch": .open,
+            "start": .open,
             "hide": .hideApplication,
             "quit": .quitApplication,
             "reveal": .reveal,
@@ -274,6 +291,7 @@ extension CommandLanguageCatalog {
         shared: SharedVocabulary(
             connectorWords: ["and", "then", "also"],
             connectorPunctuation: [","],
+            negationWords: ["not", "never", "without", "don", "dont"],
             actionJoiner: ", then "
         ),
         file: FileVocabulary(
@@ -445,7 +463,7 @@ extension CommandLanguageCatalog {
     private static let standardActions: [ActionID: ActionLanguage] = [
         .openApplication: ActionLanguage(
             id: .openApplication,
-            headWords: ["open"],
+            headWords: ["open", "launch", "start"],
             canonical: CanonicalWording("Open {application}"),
             examples: ["Open Notes"],
             guideExample: "Open Safari",
@@ -521,7 +539,7 @@ extension CommandLanguageCatalog {
             headWords: ["open"],
             canonical: CanonicalWording("Open {url}"),
             examples: ["Open https://example.com"],
-            guideExample: "Open apple.com",
+            guideExample: "Open https://example.com",
             starter: CompletionStarter(
                 id: "action.openWebsite",
                 phrase: "Open https://",

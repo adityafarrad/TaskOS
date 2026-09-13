@@ -779,7 +779,7 @@ public struct ComposerDocument: Sendable {
                 for name in clause.resourceNames {
                     let draft: ComposerActionDraft
                     if ResourceNameHeuristics.isWebsite(name) {
-                        draft = .openWebsite(url: ResourceNameHeuristics.normalizedWebsiteURL(name), browser: nil)
+                        draft = .openWebsite(url: name, browser: nil)
                     } else {
                         draft = .openApplication(name: name, resolved: nil)
                     }
@@ -1083,13 +1083,13 @@ public struct ComposerDocument: Sendable {
         switch draft {
         case .openApplication(let name, _):
             return language.canonicalActionTemplate(.openApplication)?
-                .render(["application": name]) ?? "Open \(name)"
+                .render(["application": language.applicationPhrase(name)]) ?? "Open \(name)"
         case .hideApplication(let name, _):
             return language.canonicalActionTemplate(.hideApplication)?
-                .render(["application": name]) ?? "Hide \(name)"
+                .render(["application": language.applicationPhrase(name)]) ?? "Hide \(name)"
         case .quitApplication(let name, _):
             return language.canonicalActionTemplate(.quitApplication)?
-                .render(["application": name]) ?? "Quit \(name)"
+                .render(["application": language.applicationPhrase(name)]) ?? "Quit \(name)"
         case .openFile(let target):
             let variant = target?.kind == .folder ? "folder" : "file"
             return language.canonicalActionTemplate(.openFile, variant: variant)?.render()
@@ -1104,14 +1104,14 @@ public struct ComposerDocument: Sendable {
             switch preset {
             case .maximize:
                 return language.canonicalActionTemplate(.arrangeWindow, variant: "maximize")?
-                    .render(["application": name]) ?? "Maximize \(name)"
+                    .render(["application": language.applicationPhrase(name)]) ?? "Maximize \(name)"
             case .center:
                 return language.canonicalActionTemplate(.arrangeWindow, variant: "center")?
-                    .render(["application": name]) ?? "Center \(name)"
+                    .render(["application": language.applicationPhrase(name)]) ?? "Center \(name)"
             default:
                 return language.canonicalActionTemplate(.arrangeWindow)?
                     .render([
-                        "application": name,
+                        "application": language.applicationPhrase(name),
                         "preset": language.arrangePresetPhrase(preset),
                     ]) ?? "Put \(name) \(language.arrangePresetPhrase(preset))"
             }

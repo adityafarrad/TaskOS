@@ -30,7 +30,7 @@ struct OpenWebsiteTests {
         #expect(ResourceNameHeuristics.normalizedWebsiteURL("http://apple.com") == "http://apple.com")
     }
 
-    @Test func composerClassifiesTypedDomainAsWebsite() {
+    @Test func bareDomainRequiresExplicitAcceptance() {
         var document = ComposerDocument()
         document.setText("open apple.com")
 
@@ -39,7 +39,11 @@ struct OpenWebsiteTests {
             Issue.record("Expected a website draft")
             return
         }
-        #expect(url == "https://apple.com")
+        #expect(url == "apple.com")
+        #expect(document.hasUnresolvedWebsites)
+        #expect(document.makeDefinition(name: "Test") == nil)
+
+        document.setText("open https://apple.com")
         #expect(!document.hasUnresolvedWebsites)
         #expect(document.makeDefinition(name: "Test") != nil)
     }
@@ -83,7 +87,7 @@ struct OpenWebsiteTests {
 
     @Test func selectedBrowserFlowsIntoResolvedAction() {
         var document = ComposerDocument()
-        document.setText("open apple.com")
+        document.setText("open https://apple.com")
 
         document.setWebsiteBrowser(
             id: document.actions[0].id,

@@ -402,6 +402,9 @@ private struct ParserWorker {
         case .unsupported:
             return [.error(clause.detail ?? "This capability is not supported in this release.", span: clause.span)]
         case .unrecognized:
+            if let detail = clause.detail {
+                return [.error(detail, span: clause.span)]
+            }
             return [.warning("Could not match supported wording.", span: clause.span)]
         default:
             return []
@@ -448,10 +451,25 @@ private struct ParserWorker {
             }
         }
 
+        if language.shared.negationWords.contains(word) {
+            return parseNegated()
+        }
+
         if let reason = language.excluded[word] {
             return parseUnsupported(reason: reason)
         }
         return parseUnrecognized()
+    }
+
+    private mutating func parseNegated() -> ParsedClause {
+        let startToken = tokens[position]
+        let end = consumeClauseRemainder()
+        return ParsedClause(
+            kind: .unrecognized,
+            span: SourceSpan(start: startToken.span.start, end: end),
+            parameter: .none,
+            detail: "Negated actions are not supported."
+        )
     }
 
     private mutating func parseOpen() -> ParsedClause {
@@ -549,6 +567,21 @@ private struct ParserWorker {
                 position += 1
 
             case .punctuation(let punctuation):
+                if punctuation == "\"" {
+                    switch CommandLiteralScanner.scan(text, at: token.span.start) {
+                    case .success(let literal):
+                        flush()
+                        names.append(literal.value)
+                        end = max(end, literal.span.end)
+                        advancePastLiteral(literal.span)
+                        continue
+                    case .failure:
+                        flush()
+                        end = token.span.end
+                        position += 1
+                        return (names, end)
+                    }
+                }
                 if language.shared.connectorPunctuation.contains(punctuation) {
                     flush()
                     end = token.span.end
@@ -579,6 +612,15 @@ private struct ParserWorker {
 
         while position < tokens.count {
             let token = tokens[position]
+            if case .punctuation(let punctuation) = token.kind, punctuation == "\"" {
+                if case .success(let literal) = CommandLiteralScanner.scan(text, at: token.span.start) {
+                    appWords = [literal.value]
+                    end = max(end, literal.span.end)
+                    advancePastLiteral(literal.span)
+                    continue
+                }
+                break
+            }
             guard case .word(let word) = token.kind else { break }
             if isConnectorWord(word) { break }
             if language.arrange.joiners.contains(word) {
@@ -611,6 +653,15 @@ private struct ParserWorker {
 
         while position < tokens.count {
             let token = tokens[position]
+            if case .punctuation(let punctuation) = token.kind, punctuation == "\"" {
+                if case .success(let literal) = CommandLiteralScanner.scan(text, at: token.span.start) {
+                    appWords = [literal.value]
+                    end = max(end, literal.span.end)
+                    advancePastLiteral(literal.span)
+                    continue
+                }
+                break
+            }
             guard case .word(let word) = token.kind else { break }
             if isConnectorWord(word) || language.arrange.joiners.contains(word) { break }
             appWords.append(token.original)
@@ -879,21 +930,21 @@ private struct ParserWorker {
         }
 
         let literalStart = tokens[position].span.start
-        let literalEnd = consumeClauseRemainder()
 
         switch CommandLiteralScanner.scan(text, at: literalStart) {
         case .success(let literal):
-            return copyClause(
-                value: literal.value,
-                start: startToken.span.start,
-                end: max(literal.span.end, end)
-            )
-        case .failure(.unclosedQuote):
+            advancePastLiteral(literal.span)
+            return copyClause(value: literal.value, start: startToken.span.start, end: literal.span.end)
+        case .failure:
+            position = tokens.count
+            let literalEnd = tokens.last?.span.end ?? end
             return copyClause(value: "", start: startToken.span.start, end: literalEnd)
-        case .failure(.notQuoted):
-            let raw = (text.substring(in: SourceSpan(start: literalStart, end: literalEnd)) ?? "")
-                .trimmingCharacters(in: .whitespacesAndNewlines)
-            return copyClause(value: Self.stripQuotes(raw), start: startToken.span.start, end: literalEnd)
+        }
+    }
+
+    private mutating func advancePastLiteral(_ span: SourceSpan) {
+        while position < tokens.count, tokens[position].span.start < span.end {
+            position += 1
         }
     }
 
@@ -904,13 +955,6 @@ private struct ParserWorker {
             parameter: .copyText(value),
             detail: nil
         )
-    }
-
-    private static func stripQuotes(_ value: String) -> String {
-        if value.count >= 2, value.hasPrefix("\""), value.hasSuffix("\"") {
-            return String(value.dropFirst().dropLast())
-        }
-        return value
     }
 
     private mutating func parseSchedule() -> ParsedClause {

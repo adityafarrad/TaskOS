@@ -50,7 +50,7 @@ of this file). No 2.7 implementation has started.
 | 2.7A1 | Freeze the language contract | done | Increment 2.7A1 | Capability-language matrix (`CommandLanguageCatalog`), consumer parity tests; parser/suggestions/canonical now catalog-driven |
 | 2.7A2 | Make source handling safe | done | Increment 2.7A2 | Checked UTF-16 spans, `CommandInput`/`CommandEdit`, literal scanner, coverage, limits, evidence/slots/clarifications |
 | 2.7A3 | Preserve authoring state and exact time | done | Increment 2.7A3 | Stable node preservation, conservative duplicate clearing, structured draft v2 + v1 fallback, resolve-once schedules |
-| 2.7B1 | Exact action language | not started | — | Existing action families only; bare domains need acceptance |
+| 2.7B1 | Exact action language | done | Increment 2.7B1 | Quoted app names, launch/start aliases, bare domains require acceptance, quoted-only Copy Text, negation blocks |
 | 2.7B2 | Composition and schedules | not started | — | Connectors, one trigger maximum, schedule forms |
 | 2.7B3 | Friendly frames and finite rationale | not started | — | Journaling sentence; four rationale forms only |
 | 2.7C1 | Versioned app snapshots and list ambiguity | not started | — | Native resolver, bounded grouping, 5,000-app cap |
@@ -2734,7 +2734,64 @@ Second run before starting 2.7B, performed at commit `c6db374`:
   the optional draft payload) and quit cleanly.
 - Source checks: no `Date()` remains in `ComposerDocument` definition
   materialization; saved-workflow schema versions remain 1; working tree clean.
-- No defects found. 2.7A is verified; 2.7B1 is next.
+- No defects found. 2.7A is verified.
+
+### Increment 2.7B1 — Exact action language (plan 2.7B1)
+
+- Status: done
+- Behavior delivered: the action vocabulary is exact and closed. `open`, `launch`,
+  and `start` open an application; application names may be quoted and a quoted
+  name is indivisible (it may contain `and`, commas, and other connectors). A
+  bare domain such as `apple.com` is no longer silently executable: it produces
+  an unresolved website card and a `https://` replacement suggestion that must be
+  accepted and reparsed. Copy Text now requires a quoted literal; unquoted text
+  leaves the action incomplete. Command-changing negation is recognized and
+  blocks completion. Canonical phrases quote multi-word or reserved application
+  names so a rendered phrase reparses to the same single application.
+- Interfaces changed:
+  - `CommandLanguageCatalog.SharedVocabulary` gained `negationWords`;
+    `clauseStartWords()` includes them so app lists stop before a negation.
+  - `CommandLanguageCatalog.applicationPhrase(_:)` quotes and escapes an
+    application name when it contains whitespace, quotes, backslashes, or a
+    comma; `CanonicalPhrase`, `ComposerDocument` rendering, and application
+    suggestions use it.
+  - `openApplication` head words are now `open`, `launch`, and `start`;
+    `clauseRoutes` maps all three to the open route. The Open Website discovery
+    example is now an absolute URL.
+  - `CommandParser`: `collectApplicationNames`, `parseArrange`, and
+    `parseArrangeWithFixedPreset` scan quoted names; `parseCopy` uses the literal
+    scanner only (no unquoted fallback) and advances past the literal's tokens so
+    quoted `then`/`,`/`;` stay inside the text; `parseNegated` reports
+    "Negated actions are not supported." as an error.
+  - `ComposerDocument` keeps a bare domain as the raw `openWebsite` URL so
+    `hasUnresolvedWebsites` blocks completion until the user accepts the HTTPS
+    replacement.
+- Intentional behavior changes (from the compatibility table):
+  - `open apple.com` no longer materializes `https://apple.com` on its own;
+    the HTTPS form requires explicit suggestion acceptance.
+  - Unquoted `copy agenda` is now `Needs input`; a quoted literal is required.
+- Tests performed:
+  - `swift test --package-path Packages/TaskOSCore` — 325 tests, 39 suites, pass
+    (was 315/38; +10 `ActionLanguageTests`, and two Open Website tests were
+    intentionally updated). New coverage: open/launch/start aliases; quoted
+    names containing connectors; canonical `Open "Google Chrome"` reparses;
+    URLs with paths/queries/fragments; bare-domain rejection then acceptance via
+    the replacement suggestion; unquoted Copy Text needs input; quoted Copy Text
+    keeps connectors/commas/semicolons; negation blocks completion; unsupported
+    destructive tails fail closed; missing values report expected slots.
+  - App tests (`xcodebuild ... test -only-testing:TaskOSTests`) — TEST
+    SUCCEEDED.
+  - UI tests (`xcodebuild ... test -only-testing:TaskOSUITests`) — TEST
+    SUCCEEDED.
+  - Debug build — BUILD SUCCEEDED.
+  - Release build — BUILD SUCCEEDED.
+- Physical checks: none (Core grammar; UI paths exercised by the UI tests).
+- Remaining defects / gaps:
+  - Bare-domain acceptance is offered as a suggestion; there is no dedicated
+    inline "Use https://…" control beyond accepting the completion (2.7C2).
+  - Negation is reported, not interpreted; correct negation semantics are out of
+    scope for the release.
+- Next eligible work package: 2.7B2 — Composition and schedules.
 
 
 

@@ -8,15 +8,15 @@ public enum CanonicalPhrase {
         switch action {
         case .openApplication(let configuration):
             return language.canonicalActionTemplate(.openApplication)?
-                .render(["application": configuration.application.label])
+                .render(["application": language.applicationPhrase(configuration.application.label)])
                 ?? "Open \(configuration.application.label)"
         case .hideApplication(let configuration):
             return language.canonicalActionTemplate(.hideApplication)?
-                .render(["application": configuration.application.label])
+                .render(["application": language.applicationPhrase(configuration.application.label)])
                 ?? "Hide \(configuration.application.label)"
         case .quitApplication(let configuration):
             return language.canonicalActionTemplate(.quitApplication)?
-                .render(["application": configuration.application.label])
+                .render(["application": language.applicationPhrase(configuration.application.label)])
                 ?? "Quit \(configuration.application.label)"
         case .openFile(let configuration):
             let variant = configuration.target.kind == .folder ? "folder" : "file"
@@ -138,16 +138,16 @@ public enum CanonicalPhrase {
         switch configuration.preset {
         case .maximize:
             return language.canonicalActionTemplate(.arrangeWindow, variant: "maximize")?
-                .render(["application": configuration.application.label])
+                .render(["application": language.applicationPhrase(configuration.application.label)])
                 ?? "Maximize \(configuration.application.label)"
         case .center:
             return language.canonicalActionTemplate(.arrangeWindow, variant: "center")?
-                .render(["application": configuration.application.label])
+                .render(["application": language.applicationPhrase(configuration.application.label)])
                 ?? "Center \(configuration.application.label)"
         default:
             return language.canonicalActionTemplate(.arrangeWindow)?
                 .render([
-                    "application": configuration.application.label,
+                    "application": language.applicationPhrase(configuration.application.label),
                     "preset": language.arrangePresetPhrase(configuration.preset),
                 ])
                 ?? "Put \(configuration.application.label) \(language.arrangePresetPhrase(configuration.preset))"

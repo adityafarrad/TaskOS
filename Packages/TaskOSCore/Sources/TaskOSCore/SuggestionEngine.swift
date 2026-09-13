@@ -155,7 +155,7 @@ public struct SuggestionEngine: Sendable {
                 Suggestion(
                     id: "app.\(application.bundleIdentifier)",
                     phrase: language.canonicalActionTemplate(.openApplication)?
-                        .render(["application": label]) ?? "Open \(label)",
+                        .render(["application": language.applicationPhrase(label)]) ?? "Open \(label)",
                     title: label,
                     category: .application,
                     requiresParameter: false,
