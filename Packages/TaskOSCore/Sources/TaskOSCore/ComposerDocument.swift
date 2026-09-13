@@ -139,6 +139,7 @@ public struct AuthoringSnapshot: Codable, Hashable, Sendable {
     public let nodes: [AuthoringNode]
     public let resolution: ScheduleResolution
     public let revision: WorkflowRevision
+    public let rationaleText: String?
 
     public init(
         version: Int = AuthoringSnapshot.currentVersion,
@@ -146,7 +147,8 @@ public struct AuthoringSnapshot: Codable, Hashable, Sendable {
         trigger: ComposerTriggerDraft,
         nodes: [AuthoringNode],
         resolution: ScheduleResolution,
-        revision: WorkflowRevision
+        revision: WorkflowRevision,
+        rationaleText: String? = nil
     ) {
         self.version = version
         self.text = text
@@ -154,6 +156,7 @@ public struct AuthoringSnapshot: Codable, Hashable, Sendable {
         self.nodes = nodes
         self.resolution = resolution
         self.revision = revision
+        self.rationaleText = rationaleText
     }
 }
 
@@ -188,6 +191,7 @@ public struct ComposerDocument: Sendable {
         let diagnostics: [ParseDiagnostic]
         let revision: WorkflowRevision
         let resolution: ScheduleResolution
+        let rationaleText: String?
     }
 
     private final class ResolutionBox: @unchecked Sendable {
@@ -206,6 +210,7 @@ public struct ComposerDocument: Sendable {
     public private(set) var parseOutcome: ParseOutcome
     public private(set) var diagnostics: [ParseDiagnostic]
     public private(set) var revision: WorkflowRevision
+    public private(set) var rationaleText: String? = nil
 
     private var undoStack: [Snapshot] = []
     private var redoStack: [Snapshot] = []
@@ -463,13 +468,19 @@ public struct ComposerDocument: Sendable {
         let joiner = Self.language.shared.actionJoiner
         let actionText = elements.map(Self.render).joined(separator: joiner)
         let triggerText = Self.render(trigger)
+        let body: String
         if triggerText.isEmpty {
-            return actionText
+            body = actionText
+        } else if actionText.isEmpty {
+            body = triggerText
+        } else {
+            body = triggerText + joiner + actionText
         }
-        if actionText.isEmpty {
-            return triggerText
+
+        if let rationaleText, !rationaleText.isEmpty {
+            return body.isEmpty ? rationaleText : body + " " + rationaleText
         }
-        return triggerText + joiner + actionText
+        return body
     }
 
     public func resolvedActions() -> [ActionConfiguration]? {
@@ -621,7 +632,8 @@ public struct ComposerDocument: Sendable {
             trigger: trigger,
             nodes: actions.map { AuthoringNode(id: $0.id, draft: $0.draft) },
             resolution: resolution.value,
-            revision: revision
+            revision: revision,
+            rationaleText: rationaleText
         )
     }
 
@@ -637,6 +649,7 @@ public struct ComposerDocument: Sendable {
         self.diagnostics = []
         self.revision = snapshot.revision
         self.resolution.value = snapshot.resolution
+        self.rationaleText = snapshot.rationaleText
     }
 
     private func adoptScheduleResolution(from configuration: TriggerConfiguration) {
@@ -689,6 +702,7 @@ public struct ComposerDocument: Sendable {
 
     private mutating func applyText(_ newText: String) {
         text = newText
+        rationaleText = Self.language.rationaleText(in: newText)
         let parsed = parser.parse(newText)
         parseOutcome = parsed.outcome
         diagnostics = parsed.diagnostics
@@ -1241,7 +1255,8 @@ public struct ComposerDocument: Sendable {
             parseOutcome: parseOutcome,
             diagnostics: diagnostics,
             revision: revision,
-            resolution: resolution.value
+            resolution: resolution.value,
+            rationaleText: rationaleText
         )
     }
 
@@ -1261,5 +1276,6 @@ public struct ComposerDocument: Sendable {
         diagnostics = snapshot.diagnostics
         revision = snapshot.revision
         resolution.value = snapshot.resolution
+        rationaleText = snapshot.rationaleText
     }
 }

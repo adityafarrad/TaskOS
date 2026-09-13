@@ -52,7 +52,7 @@ of this file). No 2.7 implementation has started.
 | 2.7A3 | Preserve authoring state and exact time | done | Increment 2.7A3 | Stable node preservation, conservative duplicate clearing, structured draft v2 + v1 fallback, resolve-once schedules |
 | 2.7B1 | Exact action language | done | Increment 2.7B1 | Quoted app names, launch/start aliases, bare domains require acceptance, quoted-only Copy Text, negation blocks |
 | 2.7B2 | Composition and schedules | done | Increment 2.7B2 | All connectors outside literals, one trigger first/last only, `closes` removed, full schedule forms incl. absolute `Once on` |
-| 2.7B3 | Friendly frames and finite rationale | not started | — | Journaling sentence; four rationale forms only |
+| 2.7B3 | Friendly frames and finite rationale | done | Increment 2.7B3 | Leading frames/fillers/final punctuation, journaling sentence, four rationale endings only |
 | 2.7C1 | Versioned app snapshots and list ambiguity | not started | — | Native resolver, bounded grouping, 5,000-app cap |
 | 2.7C2 | Native command editor and completion | not started | — | `NSTextView` wrapper, marked text, VoiceOver |
 | 2.7C3 | Result validity and bounded typo help | not started | — | Completion, resource-selection, and preparation keys |
@@ -2849,6 +2849,58 @@ Second run before starting 2.7B, performed at commit `c6db374`:
   - Absolute dates use the current system calendar for authoring-time
     resolution, per the time contract.
 - Next eligible work package: 2.7B3 — Friendly frames and finite rationale.
+
+### Increment 2.7B3 — Friendly frames and finite rationale (plan 2.7B3)
+
+- Status: done
+- Behavior delivered: friendly leading wording is accepted as nonexecuting
+  framing, and only four exact rationale endings are accepted. The approved
+  journaling sentence now works end to end:
+  "Hey TaskOS, can you make sure at 9:00 PM every day you open Notes, so that I
+  can journal my day as I keep forgetting?" produces a daily 9:00 PM trigger and
+  an Open Notes action, and its canonical equivalent produces the same typed
+  meaning. Accepted rationale is shown in the session and kept in the
+  recoverable draft, but is never written into the saved workflow.
+- Interfaces changed:
+  - Catalog: `ConversationalVocabulary` (leading frames, filler words, rationale
+    marker, the four rationale endings, final punctuation) plus
+    `leadingFrameEnd(in:)`, `rationaleSpan(in:)`, `rationaleText(in:)`,
+    `isRationaleMarker(_:)`, and `isFinalPunctuation(_:)`.
+  - `CommandParser`: approves leading frames/fillers and one final punctuation as
+    covered nonexecuting spans; cuts parsing before an accepted rationale; stops
+    app lists at the rationale marker; and parses the friendly
+    `at TIME every day [you] <action>` schedule order into the canonical daily
+    form.
+  - `ComposerDocument`: preserves the accepted rationale text across rendering,
+    undo, and the version-2 snapshot; `makeDefinition` and export ignore it.
+  - `AuthoringSnapshot` gained an optional `rationaleText`.
+- Tests performed:
+  - `swift test --package-path Packages/TaskOSCore` — 347 tests, 41 suites, pass
+    (was 337/40; +10 `FriendlyLanguageTests`). New coverage: the full journaling
+    sentence; every listed frame; filler words; one final `?`/`!`/separated `.`;
+    `make sure` creating no trigger; every one of the four rationale endings
+    (with the text preserved); friendly and canonical forms producing the same
+    typed trigger and action; accepted rationale absent from the encoded saved
+    workflow; seven arbitrary/unmatched rationale suffixes blocking completion;
+    and a rationale marker inside quoted Copy Text staying literal.
+  - App tests (`xcodebuild ... test -only-testing:TaskOSTests`) — TEST
+    SUCCEEDED.
+  - UI tests (`xcodebuild ... test -only-testing:TaskOSUITests`) — TEST
+    SUCCEEDED.
+  - Debug build — BUILD SUCCEEDED.
+  - Release build — BUILD SUCCEEDED.
+- Physical checks: none (Core grammar; UI paths exercised by the UI tests).
+- Remaining defects / gaps:
+  - A final period attached directly to the last word (for example `Open Notes.`)
+    is still tokenized as part of that word; separated `.` and `?`/`!` are
+    handled. Tracked for 2.7D hardening.
+  - Leading frames are not re-emitted after a card edit; the rationale is.
+  - Rationale remains a fixed English set per the plan; no user-defined
+    explanations.
+- Next eligible work package: 2.7C1 — Versioned application snapshots and list
+  ambiguity. Phase 2.7B is complete: the journaling example works, its canonical
+  form is equal, only the four rationale endings are nonexecuting, and every
+  other unmatched suffix blocks completion.
 
 
 

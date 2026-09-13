@@ -166,6 +166,14 @@ public struct CommandLanguageCatalog: Sendable {
         public let batteryDirectionWords: [ThresholdComparison: String]
     }
 
+    public struct ConversationalVocabulary: Hashable, Sendable {
+        public let leadingFrames: [String]
+        public let fillerWords: [String]
+        public let rationaleMarker: String
+        public let rationaleEndings: [String]
+        public let finalPunctuation: Set<Character>
+    }
+
     public let actions: [ActionID: ActionLanguage]
     public let triggers: [TriggerID: TriggerLanguage]
     public let clauseRoutes: [String: CommandClauseRoute]
@@ -177,6 +185,7 @@ public struct CommandLanguageCatalog: Sendable {
     public let arrange: ArrangeVocabulary
     public let schedule: ScheduleVocabulary
     public let trigger: TriggerVocabulary
+    public let conversational: ConversationalVocabulary
     public let excluded: [String: String]
     public let waitStarters: [CompletionStarter]
     public let notificationStarter: CompletionStarter
@@ -241,6 +250,107 @@ public struct CommandLanguageCatalog: Sendable {
             .replacingOccurrences(of: "\\", with: "\\\\")
             .replacingOccurrences(of: "\"", with: "\\\"")
         return "\"\(escaped)\""
+    }
+
+    public func isRationaleMarker(_ word: String) -> Bool {
+        word == conversational.rationaleMarker
+    }
+
+    public func isFinalPunctuation(_ character: Character) -> Bool {
+        conversational.finalPunctuation.contains(character)
+    }
+
+    public func leadingFrameEnd(in text: String) -> Int? {
+        let phrases = (conversational.leadingFrames + conversational.fillerWords)
+            .sorted { $0.count > $1.count }
+        var offset = 0
+        var matched = false
+
+        while true {
+            let before = offset
+            offset = Self.skipWhitespace(text, from: offset)
+
+            var matchedRound = false
+            for phrase in phrases {
+                guard let end = Self.matchPhrase(text, at: offset, phrase: phrase) else { continue }
+                offset = Self.skipWhitespace(text, from: end)
+                if Self.character(text, at: offset) == "," {
+                    offset = Self.skipWhitespace(text, from: offset + 1)
+                }
+                matched = true
+                matchedRound = true
+                break
+            }
+
+            if !matchedRound {
+                offset = before
+                break
+            }
+        }
+
+        return matched ? offset : nil
+    }
+
+    public func rationaleSpan(in text: String) -> SourceSpan? {
+        let tokens = CommandTokenizer.tokenize(text)
+        guard let marker = tokens.first(where: { token in
+            if case .word(let word) = token.kind { return isRationaleMarker(word) }
+            return false
+        }) else {
+            return nil
+        }
+
+        let raw = text.substring(in: SourceSpan(start: marker.span.start, end: text.utf16.count)) ?? ""
+        var normalized = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let last = normalized.last, conversational.finalPunctuation.contains(last) {
+            normalized = String(normalized.dropLast())
+        }
+        normalized = normalized
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
+
+        guard conversational.rationaleEndings.contains(normalized) else {
+            return nil
+        }
+        return SourceSpan(start: marker.span.start, end: text.utf16.count)
+    }
+
+    public func rationaleText(in text: String) -> String? {
+        guard let span = rationaleSpan(in: text) else { return nil }
+        return text.substring(in: span)?.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private static func skipWhitespace(_ text: String, from offset: Int) -> Int {
+        var result = offset
+        while let character = character(text, at: result), character.isWhitespace {
+            result += String(character).utf16.count
+        }
+        return result
+    }
+
+    private static func matchPhrase(_ text: String, at offset: Int, phrase: String) -> Int? {
+        guard let range = SourceSpan(start: offset, end: text.utf16.count).range(in: text) else {
+            return nil
+        }
+        var index = range.lowerBound
+        for phraseCharacter in phrase {
+            guard index < text.endIndex else { return nil }
+            let character = text[index]
+            guard String(character).lowercased() == String(phraseCharacter) else { return nil }
+            index = text.index(after: index)
+        }
+        if index < text.endIndex {
+            let next = text[index]
+            guard next.isWhitespace || next == "," else { return nil }
+        }
+        return text.utf16.distance(from: text.startIndex, to: index)
+    }
+
+    private static func character(_ text: String, at offset: Int) -> Character? {
+        guard let range = SourceSpan(start: offset, end: offset + 1).range(in: text) else {
+            return nil
+        }
+        return text[range].first
     }
 
     public func websitePhrase(url: String) -> String {
@@ -422,6 +532,29 @@ extension CommandLanguageCatalog {
             batteryBelowWords: ["drops below", "falls below", "goes below", "drops to", "falls to"],
             batteryAboveWords: ["rises above", "goes above", "rises to", "reaches"],
             batteryDirectionWords: [.below: "drops below", .above: "rises above"]
+        ),
+        conversational: ConversationalVocabulary(
+            leadingFrames: [
+                "hey taskos",
+                "taskos",
+                "please",
+                "can you",
+                "could you",
+                "would you",
+                "i would like you to",
+                "i'd like you to",
+                "i’d like you to",
+                "make sure",
+            ],
+            fillerWords: ["um", "uh"],
+            rationaleMarker: "so",
+            rationaleEndings: [
+                "so i can journal my day",
+                "so that i can journal my day",
+                "so i can journal my day as i keep forgetting",
+                "so that i can journal my day as i keep forgetting",
+            ],
+            finalPunctuation: [".", "?", "!"]
         ),
         excluded: [
             "email": "Sending email is not supported in this release.",

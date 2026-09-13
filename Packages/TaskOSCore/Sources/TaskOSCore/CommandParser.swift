@@ -212,9 +212,31 @@ private struct ParserWorker {
     mutating func parse() -> ParsedCommand {
         var clauses: [ParsedClause] = []
         var diagnosticList: [ParseDiagnostic] = []
+        var approvedSpans: [SourceSpan] = []
+
+        var effectiveEnd = text.utf16.count
+
+        if let frameEnd = language.leadingFrameEnd(in: text), frameEnd > 0 {
+            approvedSpans.append(SourceSpan(start: 0, end: frameEnd))
+            while position < tokens.count, tokens[position].span.start < frameEnd {
+                position += 1
+            }
+        }
+
+        if let rationale = language.rationaleSpan(in: text) {
+            approvedSpans.append(rationale)
+            effectiveEnd = rationale.start
+        } else if let last = tokens.last,
+                  case .punctuation(let punctuation) = last.kind,
+                  punctuation.count == 1,
+                  let character = punctuation.first,
+                  language.isFinalPunctuation(character) {
+            approvedSpans.append(last.span)
+            effectiveEnd = min(effectiveEnd, last.span.start)
+        }
 
         skipConnectors()
-        while position < tokens.count {
+        while position < tokens.count, tokens[position].span.start < effectiveEnd {
             let start = position
             let clause = parseClause()
             clauses.append(clause)
@@ -223,6 +245,17 @@ private struct ParserWorker {
             if position == start {
                 position += 1
             }
+        }
+
+        if let lastClause = clauses.last,
+           lastClause.kind == .unrecognized,
+           lastClause.span.length == 1,
+           let raw = text.substring(in: lastClause.span),
+           raw.count == 1,
+           let character = raw.first,
+           language.isFinalPunctuation(character) {
+            approvedSpans.append(lastClause.span)
+            clauses.removeLast()
         }
 
         var clarifications: [ParseClarification] = []
@@ -250,7 +283,7 @@ private struct ParserWorker {
             )
         }
 
-        let coverage = coverage(for: clauses)
+        let coverage = coverage(for: clauses, approved: approvedSpans)
         var outcome = Self.outcome(for: clauses, diagnostics: diagnosticList)
 
         if !coverage.isComplete {
@@ -283,8 +316,8 @@ private struct ParserWorker {
         )
     }
 
-    func coverage(for clauses: [ParsedClause]) -> SourceCoverage {
-        let covered = clauses.map(\.span).filter { $0.length > 0 }
+    func coverage(for clauses: [ParsedClause], approved: [SourceSpan] = []) -> SourceCoverage {
+        let covered = (clauses.map(\.span) + approved).filter { $0.length > 0 }
         var unresolved: [SourceSpan] = []
 
         for token in tokens where !isConnectorToken(token) {
@@ -296,7 +329,7 @@ private struct ParserWorker {
             }
         }
 
-        return SourceCoverage(coveredSpans: covered, unresolvedSpans: Self.merge(unresolved))
+        return SourceCoverage(coveredSpans: Self.merge(covered), unresolvedSpans: Self.merge(unresolved))
     }
 
     private static func merge(_ spans: [SourceSpan]) -> [SourceSpan] {
@@ -443,6 +476,10 @@ private struct ParserWorker {
             return ParsedClause(kind: .unrecognized, span: token.span, parameter: .none, detail: nil)
         }
 
+        if word == language.schedule.atWord, let friendly = parseFriendlySchedule() {
+            return friendly
+        }
+
         if let route = language.clauseRoutes[word] {
             switch route {
             case .open:
@@ -573,6 +610,10 @@ private struct ParserWorker {
 
             switch token.kind {
             case .word(let word):
+                if language.isRationaleMarker(word) {
+                    flush()
+                    return (names, end)
+                }
                 if isConnectorWord(word) {
                     if isClauseStart(tokenAfterCurrent) {
                         flush()
@@ -649,7 +690,7 @@ private struct ParserWorker {
                 break
             }
             guard case .word(let word) = token.kind else { break }
-            if isConnectorWord(word) { break }
+            if isConnectorWord(word) || language.isRationaleMarker(word) { break }
             if language.arrange.joiners.contains(word) {
                 let (found, newEnd) = parsePresetPhrase()
                 if let found {
@@ -690,7 +731,7 @@ private struct ParserWorker {
                 break
             }
             guard case .word(let word) = token.kind else { break }
-            if isConnectorWord(word) || language.arrange.joiners.contains(word) { break }
+            if isConnectorWord(word) || language.isRationaleMarker(word) || language.arrange.joiners.contains(word) { break }
             appWords.append(token.original)
             end = token.span.end
             position += 1
@@ -981,6 +1022,41 @@ private struct ParserWorker {
             span: SourceSpan(start: start, end: end),
             parameter: .copyText(value),
             detail: nil
+        )
+    }
+
+    private mutating func parseFriendlySchedule() -> ParsedClause? {
+        let saved = position
+        let atToken = tokens[position]
+        position += 1
+
+        guard let clock = parseClock() else {
+            position = saved
+            return nil
+        }
+        guard position < tokens.count, case .word(let every) = tokens[position].kind,
+              every == language.schedule.everyWord else {
+            position = saved
+            return nil
+        }
+        position += 1
+        guard position < tokens.count, case .word(let dayWord) = tokens[position].kind,
+              language.schedule.dayWords.contains(dayWord) else {
+            position = saved
+            return nil
+        }
+        var end = tokens[position].span.end
+        position += 1
+
+        if position < tokens.count, case .word(let subject) = tokens[position].kind, subject == "you" {
+            end = tokens[position].span.end
+            position += 1
+        }
+
+        return scheduleClause(
+            .daily(hour: clock.hour, minute: clock.minute),
+            start: atToken.span.start,
+            end: end
         )
     }
 
