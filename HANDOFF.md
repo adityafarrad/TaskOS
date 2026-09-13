@@ -1,10 +1,12 @@
-# TaskOS / MacFlow v1 — Handoff
+# TaskOS — Handoff
 
-**Status:** Phases 0–2 complete and physically verified; pre-Phase-3 hardening
-done. Phase 3 not started.
-**Contract:** `PLAN.md` · **Ledger:** `PROGRESS.md` · **Agent rules:** `AGENTS.md`
+**Status:** Phases 0–2 complete; pre-Phase-3 hardening and UI redesign done.
+Work package 2.7 (deterministic language hardening) is registered and next;
+Phase 3 not started.
+**Contract:** `PLAN.md` · **WP 2.7 contract:** `WP-2.7.md` · **Ledger:**
+`PROGRESS.md` · **Agent rules:** `AGENTS.md`
 **Repo:** `https://github.com/adityafarrad/TaskOS` (branch `main`)
-**HEAD:** `3b6dfbe` (synced with `origin/main`, working tree clean)
+**HEAD:** `9f6105f` plus the WP 2.7 registration commit (working tree clean)
 
 ---
 
@@ -24,7 +26,8 @@ Layers (strict):
   repositories.
 - **Platform** `TaskOS/TaskOS/Platform` — AppKit/IOKit/UserNotifications
   adapters (executors, event sources, permissions, login item).
-- **Presentation** `TaskOS/TaskOS/ContentView.swift` — SwiftUI screens.
+- **Presentation** `TaskOS/TaskOS/Presentation/` — SwiftUI screens (shell in
+  `ContentView.swift`).
 
 ---
 
@@ -64,13 +67,16 @@ Key project facts:
 
 ## 3. Current evidence
 
-- Core: **265 tests / 34 suites pass** (includes a purity test forbidding
-  SwiftUI/AppKit/SwiftData in Core).
-- App tests: SwiftData workflow/history/draft/admission repositories pass.
-- Debug + Release builds clean.
+- Core: **270 tests / 35 suites pass** (includes a purity test forbidding
+  SwiftUI/AppKit/SwiftData in Core); rerun 2026-09-13 at `9f6105f`.
+- App tests: TEST SUCCEEDED (37 test functions / 8 files), rerun 2026-09-13.
+- Debug + Release builds clean, rerun 2026-09-13.
 - Physical checks: Phase 1 canonical journey; 2.1 schedule tests A–E; 2.4 all
   six event-trigger families; 2.6 attention/retention/permissions UI — all
-  user-confirmed.
+  user-confirmed. Older pending physical checks (I, J, M3, N1, P, Q,
+  N-c/N-d/N-e, U4, UX-1…UX-5, and the D2 matrix) were owner-deferred to Phase 3
+  on 2026-09-13; the named record is in `PROGRESS.md` under "Work Package 2.7
+  entry gate (pre-Phase 3)".
 
 ---
 
@@ -114,7 +120,9 @@ URL suggestion.
 
 - Composition root: `TaskOS/TaskOS/AppComposition.swift`
 - Composer/view-model: `TaskOS/TaskOS/WalkingSliceViewModel.swift`
-- UI: `TaskOS/TaskOS/ContentView.swift`; menu bar
+- UI: `TaskOS/TaskOS/Presentation/` (`CommandComposerView.swift`,
+  `WorkflowEditorView.swift`, `StepCardView.swift`, `InspectorView.swift`, …);
+  shell in `TaskOS/TaskOS/ContentView.swift`; menu bar
   `MenuBarViewModel.swift` / `MenuBarContent.swift`
 - Runtime: `Packages/TaskOSCore/Sources/TaskOSCore/RunCoordinator.swift`
 - Events: `EventTriggerRegistry.swift`, `EventTriggers.swift`,
@@ -130,6 +138,8 @@ URL suggestion.
 ## 6. Deferred gaps (recorded, intentional)
 
 **Before/around Phase 3:**
+- **Legacy pending physical checks** — owner-deferred to Phase 3 on 2026-09-13;
+  the named list and reason are in the `PROGRESS.md` 2.7 entry-gate record.
 - **Gap 4 — malformed-record isolation/recovery.** `loadAll` throws for the whole
   list if one record fails to decode; no per-record recovery UX. Deferred to
   Phase 3 migration fixtures.
@@ -147,16 +157,19 @@ specific-volume card selection; full-screen/Spaces window operations.
 
 ---
 
-## 7. Next step: Phase 3
+## 7. Next step: Work package 2.7
 
-Start with **3.1 system validation** (`PLAN.md` §3.1):
-full deterministic suites, parser/suggestion corpus, text/card/template parity,
-persistence/migration fixtures (fold in Gap 4), runtime interruption/event-storm
-tests, Release UI journeys, architecture review.
+Start with **2.7A1 — Freeze the language contract** (`WP-2.7.md`): the
+capability-language matrix and `CommandLanguageCatalog`; the plan/ledger/handoff
+registration itself is already delivered by the registration commit. Work
+through 2.7A → 2.7B → 2.7C → 2.7D in order; no phase starts before the previous
+phase's exit gate passes. The full package (tag `wp-2.7-language`) must close
+before broad Phase 3 qualification.
 
-Then 3.2 physical compatibility matrix, 3.3 usability/accessibility/performance,
-3.4 beta, 3.5 distribution (Developer ID signing, notarization, Sparkle), 3.6
-freeze.
+Then **Phase 3** (`PLAN.md`): 3.1 system validation (includes the deferred
+legacy physical checks), 3.2 physical compatibility matrix, 3.3
+usability/accessibility/performance, 3.4 beta, 3.5 distribution (Developer ID
+signing, notarization, Sparkle), 3.6 freeze.
 
 ---
 
@@ -164,6 +177,8 @@ freeze.
 
 - **Commit** after each bounded sub-increment locally; **push + tag** only when a
   numbered sub-phase completes, and **ask before every push** (`AGENTS.md`).
+  Work package 2.7 is the tag exception: one `wp-2.7-language` tag after the full
+  package passes.
 - SwiftData in-memory container creation can flake on the first app-test run;
   suites are `.serialized` and a rerun usually passes.
 - Always relaunch the app after a rebuild — earlier confusion came from running a

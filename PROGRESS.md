@@ -1,4 +1,4 @@
-# TaskOS / MacFlow v1 — Progress Ledger
+# TaskOS v1 — Progress Ledger
 
 Source contract: `PLAN.md`.
 Status legend: `not started` | `in progress` | `blocked` | `done`.
@@ -36,14 +36,35 @@ compressed into implementation plus per-increment physical smoke checks.
 | 2.2 | Finish app, window, and utility actions | done | Increments I1–I3 | Copy Text, Hide, normal Quit, specific-display selection, window presets, and notification editing/presentation done; lifecycle loop suppression tracked in 2.4 |
 | 2.3 | Add selected files and portable workflows | done | Increments J1–J3 | File selection, Open/Reveal, durable references, repair, and portable export/import with rebinding done |
 | 2.4 | Add event-triggered workflows | done | Increments K1–K6 | All six event families implemented end to end with discovery/availability; user-confirmed physical checks complete |
-| 2.5 | Finish the template and discovery experience | in progress | Increments M1–M3 | Twelve templates, template picker, and capability discovery implemented; physical UI check pending |
+| 2.5 | Finish the template and discovery experience | done | Increments M1–M3 | Twelve templates, template picker, and capability discovery implemented; physical UI check deferred to Phase 3 by the WP 2.7 entry-gate decision |
 | 2.6 | Complete everyday management and recovery | done | Increments N1–N4 | Visibility, attention/repair, action-level history, retention, permission settings links, and onboarding polish complete |
+
+### Work Package 2.7 — Deterministic language hardening (pre-Phase 3)
+
+Contract: `WP-2.7.md`. Entry gate closed 2026-09-13 (baselines pass; older
+physical checks owner-deferred to Phase 3 — see the entry-gate record at the end
+of this file). No 2.7 implementation has started.
+
+| ID | Sub-increment | Status | Evidence | Notes |
+|---|---|---|---|---|
+| 2.7A1 | Freeze the language contract | not started | — | Capability-language matrix, `CommandLanguageCatalog`, parity tests |
+| 2.7A2 | Make source handling safe | not started | — | UTF-16 spans, quoted-literal scanner, coverage, limits |
+| 2.7A3 | Preserve authoring state and exact time | not started | — | Stable nodes, draft v2, exact one-time dates |
+| 2.7B1 | Exact action language | not started | — | Existing action families only; bare domains need acceptance |
+| 2.7B2 | Composition and schedules | not started | — | Connectors, one trigger maximum, schedule forms |
+| 2.7B3 | Friendly frames and finite rationale | not started | — | Journaling sentence; four rationale forms only |
+| 2.7C1 | Versioned app snapshots and list ambiguity | not started | — | Native resolver, bounded grouping, 5,000-app cap |
+| 2.7C2 | Native command editor and completion | not started | — | `NSTextView` wrapper, marked text, VoiceOver |
+| 2.7C3 | Result validity and bounded typo help | not started | — | Completion, resource-selection, and preparation keys |
+| 2.7D1 | Independent language corpus | not started | — | At least 2,000 positive, 100 negative, ambiguity fixtures |
+| 2.7D2 | Integration, persistence, privacy | not started | — | Serialized fixtures inspected directly |
+| 2.7D3 | Performance and physical proof | not started | — | Release build; targets met or changed by owner decision |
 
 ### Phase 3 — Qualify, beta-test, and distribute
 
 | ID | Work package | Status | Evidence | Notes |
 |---|---|---|---|---|
-| 3.1 | Complete system validation | not started | — | |
+| 3.1 | Complete system validation | not started | — | Includes the older physical checks deferred from before WP 2.7 (named in the entry-gate record at the end of this file) |
 | 3.2 | Run the physical compatibility matrix | not started | — | |
 | 3.3 | Validate usability, accessibility, and performance | not started | — | |
 | 3.4 | Conduct the beta | not started | — | |
@@ -1213,7 +1234,7 @@ Next eligible work package: 2.1 — scheduling and runtime admission.
   - Release build — BUILD SUCCEEDED.
 - Physical checks: pending (arrange a window onto a second display by name, and
   disconnect it to confirm the preview flags it instead of falling back).
-- Remaining in plan 2.2: lifecycle feedback-loop suppression (MacFlow-initiated
+- Remaining in plan 2.2: lifecycle feedback-loop suppression (TaskOS-initiated
   app launch/quit must suppress correlated lifecycle triggers) is intentionally
   deferred to 2.4, where app lifecycle triggers are implemented.
 - Next eligible work package: 2.3 — selected files and portable workflows.
@@ -1354,7 +1375,7 @@ Next eligible work package: 2.1 — scheduling and runtime admission.
   the trigger to manual (the composer has no event-trigger card yet); the app
   does not observe or register event triggers yet.
 - Next eligible work package: 2.4 increment K2 — application lifecycle end to
-  end (NSWorkspace source, registration, cards/parser, MacFlow-initiated change
+  end (NSWorkspace source, registration, cards/parser, TaskOS-initiated change
   suppression).
 
 ### Increment K2 — Application lifecycle trigger, end to end (plan 2.4, partial; plan T4)
@@ -1366,7 +1387,7 @@ Next eligible work package: 2.1 — scheduling and runtime admission.
   event** family with an application picker and opens/quits selector) builds the
   trigger and writes the canonical phrase. An enabled app-event workflow is
   registered at launch and on save, and fires through the admission coordinator
-  when `NSWorkspace` reports the launch/quit. MacFlow's own Open/Quit actions
+  when `NSWorkspace` reports the launch/quit. TaskOS's own Open/Quit actions
   record the affected bundle identifier in a `LifecycleSuppressor`, so the
   correlated lifecycle event is suppressed during the operation and a bounded
   settling window instead of re-triggering a workflow.
@@ -2484,6 +2505,32 @@ record isolation/recovery) is deferred to Phase 3 with the migration fixtures.
     SUCCEEDED, 10/10.
   - Debug build — BUILD SUCCEEDED.
 - Next: stop here per owner decision.
+
+## Work Package 2.7 entry gate (pre-Phase 3)
+
+- Status: CLOSED 2026-09-13. Contract: `WP-2.7.md`.
+- Worktree: commit `9f6105f`, working tree clean at registration.
+- Baseline (rerun 2026-09-13):
+  - `swift test --package-path Packages/TaskOSCore` — 270 tests, 35 suites,
+    pass (Core purity test included).
+  - App tests (`xcodebuild ... test -only-testing:TaskOSTests`) — TEST
+    SUCCEEDED (37 test functions across 8 files).
+  - Debug build — BUILD SUCCEEDED.
+  - Release build — BUILD SUCCEEDED.
+  - UI tests were not rerun at the entry gate (10 methods across 2 files on
+    record); they run at 2.7D3 and Phase 3.
+- Owner-approved deferral (2026-09-13): the older pending physical checks are
+  deferred to Phase 3 qualification, because WP 2.7 replaces the composer,
+  suggestion, source-handling, and revision layers they exercised; 2.7 carries
+  its own physical gates (`WP-2.7.md` §8.3) and Phase 3.1–3.3 re-covers legacy
+  journeys. Named deferred checks: H2-a, H2-c, I1, I2, I3, J1, J2, J3, M3, N1,
+  N2, N3, N4, N-c, N-d, N-e, P1, P2, P3, Q1, Q2, U4, UX-1, UX-2, UX-3, UX-4,
+  UX-5, and the D2 manual regression matrix. No qualification gate that belongs
+  to work package 2.7 is deferred.
+- Owner inputs pending for 2.7D3 (`WP-2.7.md` §9.2): one non-Latin input source,
+  VoiceOver access, notification/accessibility permissions for Test actions,
+  Notes and Safari for physical tests, and approval before any push.
+- Next eligible work package: 2.7A1 — Freeze the language contract.
 
 
 

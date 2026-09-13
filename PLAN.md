@@ -1,12 +1,12 @@
 
-# MacFlow v1 — Product and Development Handoff
+# TaskOS v1 — Product and Development Handoff
 
 **Product:** A native macOS automation app with autocomplete-guided creation.  
 **Platform:** macOS 14 and later, supporting Apple silicon and compatible Intel Macs.  
 **Delivery:** Four phases, numbered **0–3**.  
 **Status:** Proposed development contract. Every phase starts as **not started**.
 
-This is a standalone plan for a team building MacFlow from the beginning. Existing implementation, previous phase completion, and historical architectural choices are not prerequisites or acceptance evidence.
+This is a standalone plan for a team building TaskOS from the beginning. Existing implementation, previous phase completion, and historical architectural choices are not prerequisites or acceptance evidence.
 
 ## 1. Product definition
 
@@ -14,7 +14,7 @@ This is a standalone plan for a team building MacFlow from the beginning. Existi
 
 > **Start typing what you want your Mac to do. Choose a suggestion, review the steps, and save an automation that runs locally.**
 
-MacFlow helps ordinary Mac users automate repeated tasks without learning a programming language or constructing a complex node graph.
+TaskOS helps ordinary Mac users automate repeated tasks without learning a programming language or constructing a complex node graph.
 
 The central experience combines:
 
@@ -30,7 +30,7 @@ There is **no AI in the application**: no model integration, model downloads, pr
 
 The primary audience is people who repeatedly arrange the same apps, open the same resources, or perform the same setup steps.
 
-| User | Recurring problem | MacFlow’s useful outcome |
+| User | Recurring problem | TaskOS’s useful outcome |
 |---|---|---|
 | Office and remote workers | Reopening work tools each morning | A scheduled workspace setup |
 | Students and researchers | Rebuilding a reading and notes layout | One shortcut opens resources and arranges windows |
@@ -43,9 +43,9 @@ The first release is not intended to replace advanced scripting tools.
 
 ### 1.3 Research-informed positioning
 
-Event triggers, reusable workflows, keyword entry, and execution history are established patterns. Crank emphasizes system events and action history; Alfred combines keyword or hotkey entry with reusable workflows. These support the proposed direction, but do not establish which features MacFlow users will value most. Phase 0 includes direct usability validation. [Crank](https://lowtechguys.com/crank/), [Alfred Workflows](https://www.alfredapp.com/workflows/)
+Event triggers, reusable workflows, keyword entry, and execution history are established patterns. Crank emphasizes system events and action history; Alfred combines keyword or hotkey entry with reusable workflows. These support the proposed direction, but do not establish which features TaskOS users will value most. Phase 0 includes direct usability validation. [Crank](https://lowtechguys.com/crank/), [Alfred Workflows](https://www.alfredapp.com/workflows/)
 
-MacFlow’s proposed differentiator is:
+TaskOS’s proposed differentiator is:
 
 > **Users discover supported automations while typing, and can always see and edit the exact workflow being created.**
 
@@ -162,7 +162,7 @@ Limit the visible list to eight suggestions. Provide a separate “Browse all ac
 - Up and Down move through suggestions.
 - Enter accepts the highlighted suggestion.
 - Escape dismisses suggestions without deleting the command.
-- Tab retains normal focus navigation.
+- Tab retains normal focus navigation, except while the completion panel is visible with a suggestion explicitly selected, where Tab accepts that suggestion (work package 2.7; see `WP-2.7.md` §7.2).
 - Accepting a suggestion never runs an automation.
 - Losing focus never commits an unselected suggestion.
 - Native text selection, undo, paste, and input-method composition continue to work.
@@ -219,7 +219,7 @@ For example:
 Open Safari and email my manager that I am available.
 ```
 
-MacFlow may recognize “Open Safari,” but must not create or save an executable workflow that omits the email instruction.
+TaskOS may recognize “Open Safari,” but must not create or save an executable workflow that omits the email instruction.
 
 The recognized portion can remain visible as a draft. The unresolved portion must remain visible, and execution stays blocked until the user explicitly changes or removes it.
 
@@ -299,7 +299,7 @@ Custom coordinates, arbitrary percentages, full-screen switching, and moving win
 Action-specific safeguards:
 
 - Normal quit may be refused or delayed by an unsaved-document prompt. Report this; never dismiss the prompt automatically.
-- MacFlow cannot quit itself, Finder, or system infrastructure through a workflow.
+- TaskOS cannot quit itself, Finder, or system infrastructure through a workflow.
 - Open-file actions reject executable applications, installers, scripts, and automation files.
 - Notification success means macOS accepted the request, not that the user saw it.
 - Copy-text actions clearly state that they replace clipboard contents.
@@ -351,14 +351,14 @@ The workflow preview is a review state within Create/Edit, rather than another i
 
 The menu bar provides:
 
-- Open MacFlow.
+- Open TaskOS.
 - Run a saved workflow.
 - View the current run.
 - Pause or resume automatic triggers.
 - Cancel the current run and clear queued runs.
-- Quit MacFlow.
+- Quit TaskOS.
 
-Closing the main window leaves the menu-bar runtime active. Quitting MacFlow stops its runtime.
+Closing the main window leaves the menu-bar runtime active. Quitting TaskOS stops its runtime.
 
 Launch at login is optional and uses `SMAppService.mainApp`. It does not require a custom privileged daemon. [Apple SMAppService](https://developer.apple.com/documentation/servicemanagement/smappservice)
 
@@ -415,7 +415,7 @@ Workflows cannot invoke other workflows.
 
 Reject obvious self-triggering configurations, such as a quit-triggered workflow that opens and quits its triggering app.
 
-Track app lifecycle changes initiated by MacFlow. Suppress correlated lifecycle triggers for those app identities during the operation and its bounded settling period. Treat this as conservative suppression, not perfect attribution of every OS event.
+Track app lifecycle changes initiated by TaskOS. Suppress correlated lifecycle triggers for those app identities during the operation and its bounded settling period. Treat this as conservative suppression, not perfect attribution of every OS event.
 
 Use the queue limit and cooldown as additional defenses against repeated event chains.
 
@@ -444,12 +444,12 @@ Do not equate cancellation of a Swift task with cancellation of an underlying sy
 - Show the next three occurrences in the editor.
 - A nonexistent daylight-saving local time is skipped.
 - A repeated local time executes once, using the first occurrence.
-- Missed occurrences while MacFlow is closed or the Mac is asleep are skipped.
+- Missed occurrences while TaskOS is closed or the Mac is asleep are skipped.
 - Interval schedules skip missed intervals rather than replaying a backlog.
 - Relative one-time input is converted to a visible absolute date/time for review.
 - A one-time schedule that becomes past-due before saving requires correction.
 
-MacFlow does not wake the computer or promise execution while it is shut down.
+TaskOS does not wake the computer or promise execution while it is shut down.
 
 #### Device state
 
@@ -993,6 +993,47 @@ Every advertised capability works through creation, editing, persistence, and it
 
 ---
 
+### Work Package 2.7 — Deterministic language hardening (pre-Phase 3)
+
+**Status:** not started. **Contract:** `WP-2.7.md`.
+
+Before broad Phase 3 qualification begins, harden the deterministic creation
+path so TaskOS understands more safe commands without adding a compiler,
+workflow engine, store, runtime, or capability family. The authoritative path
+stays:
+
+> Command text → parser → composer document → trusted resource resolution →
+> typed automation definition → preparation → preview and approval → existing
+> runner.
+
+Scope rules: no AI, semantic matching, speech, or wake words; no network
+dependency; no shell, AppleScript, JavaScript, or plugins; no conditions,
+branches, parallel actions, or multiple-trigger workflows; saved workflows, run
+history, and exports carry no command text, rationale, parser evidence, or
+transcripts; recoverable drafts stay local and are removed after Save, New, or
+Discard; all parsing fails closed and Preview, Save, and Test stay disabled
+until syntax, trusted resources, and all required card values are complete.
+
+Work package 2.7 intentionally corrects unsafe compatibility behavior
+(bare-domain URLs, multiple triggers, unquoted Copy Text, duplicate app display
+names, the `closes` alias, ignored unknown tails, arbitrary rationale, and
+schedule drift). The full compatibility exception table and the exact source,
+draft, time, and asynchronous-validity contracts live in `WP-2.7.md`.
+
+This package replaces the "Tab retains normal focus navigation" rule in §2.2
+only while the completion panel is visible with a suggestion explicitly
+selected: Tab then accepts that suggestion (`WP-2.7.md` §7.2).
+
+**Exit gate:** every 2.7A–2.7D gate passes; the independent language corpus
+passes; saved-workflow compatibility, draft migration, privacy inspection,
+Debug and Release builds, automated and UI tests, and required physical checks
+pass; measured parser and completion performance meets the targets in
+`WP-2.7.md` §8.3 or an owner-approved decision changes them; `PROGRESS.md`
+records the full evidence. Tag `wp-2.7-language` after the package closes.
+Phase 3 begins only after 2.7.
+
+---
+
 ### Phase 3 — Qualify, beta-test, and distribute
 
 **Objective:** Ship the frozen product with demonstrated reliability, understandable failures, and a verified installation/update path.
@@ -1260,7 +1301,7 @@ These are planning estimates, not measurements. Reforecast after Phase 0 qualifi
 
 ### The release is complete when
 
-A new user can install MacFlow, begin typing an everyday automation, select useful suggestions, understand the resulting cards, resolve missing details, review the exact steps, test them deliberately, save and enable the workflow, and trust its later runs to behave the same way.
+A new user can install TaskOS, begin typing an everyday automation, select useful suggestions, understand the resulting cards, resolve missing details, review the exact steps, test them deliberately, save and enable the workflow, and trust its later runs to behave the same way.
 
-When the request is unsupported, a permission is missing, or an external application behaves differently, MacFlow must stop predictably and explain the next useful action.
+When the request is unsupported, a permission is missing, or an external application behaves differently, TaskOS must stop predictably and explain the next useful action.
 

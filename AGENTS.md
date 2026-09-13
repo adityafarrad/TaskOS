@@ -1,10 +1,12 @@
 # TaskOS — Agent Instructions
 
-Product contract: `PLAN.md`. Progress ledger: `PROGRESS.md`.
+Product contract: `PLAN.md`. WP 2.7 contract: `WP-2.7.md`. Progress ledger:
+`PROGRESS.md`.
 
-MacFlow v1 is built incrementally as bounded work packages (plan section 3 and
+TaskOS v1 is built incrementally as bounded work packages (plan section 3 and
 4.4). The release phases are checkpoints; the numbered work packages are the
-unit of work.
+unit of work. The current work package is **2.7 (deterministic language
+hardening)**; the next eligible sub-increment is **2.7A1**.
 
 ## Per-work-package loop
 
@@ -48,6 +50,10 @@ annotated tag so history is understandable later:
 
 - Format: `wp-<plan-id>-<short-slug>` (e.g. `wp-0.4-foundation`,
   `wp-2.3-complete`).
+- Work package 2.7 is the exception: its sub-phases 2.7A–2.7D are gated
+  internally and are not tagged individually; create the annotated tag
+  `wp-2.7-language` once, after the full package's final exit gate passes
+  (`WP-2.7.md` §12).
 - Tag is created when the sub-phase's work is committed, tested, and verified.
   Sub-increment commits before that remain as untagged local history.
 - Push tags explicitly at the phase boundary: `git push origin --tags`
