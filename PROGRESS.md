@@ -56,7 +56,7 @@ of this file). No 2.7 implementation has started.
 | 2.7C1 | Versioned app snapshots and list ambiguity | done | Increment 2.7C1 | Revisioned snapshots, exact resolution with aliases, ambiguity (no first match), bounded list grouping, 5,000-app cap |
 | 2.7C2 | Native command editor and completion | done | Increment 2.7C2 | `NSTextView` wrapper, UTF-16 edits/selection, marked-text rules, keyboard completion, VoiceOver |
 | 2.7C3 | Result validity and bounded typo help | done | Increment 2.7C3 | Completion/preparation/resource keys and rechecks; typo bounds (5/8/64, ≤3, 5,000) |
-| 2.7D1 | Independent language corpus | not started | — | At least 2,000 positive, 100 negative, ambiguity fixtures |
+| 2.7D1 | Independent language corpus | done | Increment 2.7D1 | Seeded 2,000-positive corpus, 114 negatives, ambiguity fixtures, literal oracle; quarter-preset round-trip fixed |
 | 2.7D2 | Integration, persistence, privacy | not started | — | Serialized fixtures inspected directly |
 | 2.7D3 | Performance and physical proof | not started | — | Release build; targets met or changed by owner decision |
 
@@ -3199,6 +3199,50 @@ Second run before starting 2.7C, performed at commit `0f50f73`:
   - Suggestions still do not surface application file-name or alias matches
     (tracked gap).
 - Next eligible work package: 2.7D1 — Independent language corpus.
+
+### Increment 2.7D1 — Independent language corpus (plan 2.7D1)
+
+- Status: done
+- Behavior delivered: a reviewed, oracle-independent language corpus. Hand
+  authored fixtures cover every action alias, every trigger family, every
+  schedule form, every connector, quoted literals, Unicode, friendly frames, the
+  four rationale forms, canonical action and schedule phrases, missing slots, and
+  the compatibility exceptions. A fixed-seed generator (seed `0x2_7_D1_2026`)
+  produces 2,000 positive commands whose expected clause kinds and resource names
+  are computed from literal, reviewed tables rather than from production parser
+  or catalog code. More than 100 held-out negatives must fail closed, and
+  dedicated ambiguity fixtures assert `Needs input` and exact app-list
+  clarifications.
+- Defect fixed (surfaced by the corpus): canonical quarter-window phrases did not
+  reparse. The preset grammar now accepts both `top-left`/`top-right`/`bottom-…`
+  compounds and the spaced form, with an optional `quarter` noun, so every
+  canonical arrange phrase round-trips.
+- Interfaces changed:
+  - `CommandLanguageCatalog.ArrangeVocabulary` gained `quarterNouns`;
+    `CommandParser.parsePresetPhrase` handles hyphenated quarter presets and
+    consumes an optional quarter noun; added `hyphenatedQuarterPreset`.
+  - Added `Packages/TaskOSCore/Tests/TaskOSCoreTests/IndependentLanguageCorpusTests.swift`.
+- Tests performed:
+  - `swift test --package-path Packages/TaskOSCore` — 393 tests, 44 suites, pass
+    (was 380/43; +13 corpus tests). Acceptance proven: every generated positive
+    parses to the exact expected clause kinds and resource names with complete
+    source coverage; every negative fails closed; every ambiguity reports
+    `Needs input`; app-list ambiguity yields the exact rewrite pair; missing
+    values report the expected slots; friendly and canonical forms produce equal
+    typed triggers and actions; the oracle uses literal expectations only.
+  - App tests (`xcodebuild ... test -only-testing:TaskOSTests`) — TEST
+    SUCCEEDED.
+  - UI tests (`xcodebuild ... test -only-testing:TaskOSUITests`) — TEST
+    SUCCEEDED.
+  - Debug and Release builds — BUILD SUCCEEDED.
+- Physical checks: none (deterministic corpus).
+- Remaining defects / gaps:
+  - Unknown words after an open/hide/quit head are retained as application names
+    by design; those cases are represented as composer-level unresolved apps
+    rather than parser negatives.
+  - The corpus is parser/composer level; UI and input-method behavior is covered
+    by the UI tests and 2.7D3 physical checks.
+- Next eligible work package: 2.7D2 — Integration, persistence, and privacy.
 
 
 

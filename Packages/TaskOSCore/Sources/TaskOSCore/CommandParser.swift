@@ -910,11 +910,20 @@ private struct ParserWorker {
         end = tokens[position].span.end
         position += 1
 
-        guard language.arrange.sides.contains(side) else {
-            return (nil, end)
+        let arrange = language.arrange
+
+        if let preset = Self.hyphenatedQuarterPreset(side, arrange: arrange) {
+            if position < tokens.count, case .word(let noun) = tokens[position].kind,
+               arrange.quarterNouns.contains(noun) {
+                end = tokens[position].span.end
+                position += 1
+            }
+            return (preset, end)
         }
 
-        let arrange = language.arrange
+        guard arrange.sides.contains(side) else {
+            return (nil, end)
+        }
 
         if side == arrange.leftWord || side == arrange.rightWord {
             if position < tokens.count, case .word(let noun) = tokens[position].kind,
@@ -940,6 +949,11 @@ private struct ParserWorker {
                 } else {
                     preset = .bottomRightQuarter
                 }
+                if position < tokens.count, case .word(let noun) = tokens[position].kind,
+                   arrange.quarterNouns.contains(noun) {
+                    end = tokens[position].span.end
+                    position += 1
+                }
                 return (preset, end)
             }
             if position < tokens.count, case .word(let noun) = tokens[position].kind,
@@ -951,6 +965,31 @@ private struct ParserWorker {
         }
 
         return (nil, end)
+    }
+
+    private static func hyphenatedQuarterPreset(
+        _ side: String,
+        arrange: CommandLanguageCatalog.ArrangeVocabulary
+    ) -> WindowPreset? {
+        let parts = side.split(separator: "-").map(String.init)
+        guard parts.count == 2,
+              let vertical = parts.first,
+              let horizontal = parts.last,
+              vertical == arrange.topWord || vertical == arrange.bottomWord,
+              arrange.horizontalSides.contains(horizontal) else {
+            return nil
+        }
+
+        if vertical == arrange.topWord, horizontal == arrange.leftWord {
+            return .topLeftQuarter
+        }
+        if vertical == arrange.topWord, horizontal == arrange.rightWord {
+            return .topRightQuarter
+        }
+        if vertical == arrange.bottomWord, horizontal == arrange.leftWord {
+            return .bottomLeftQuarter
+        }
+        return .bottomRightQuarter
     }
 
     private mutating func parseWait() -> ParsedClause {

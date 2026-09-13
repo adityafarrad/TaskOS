@@ -127,6 +127,7 @@ public struct CommandLanguageCatalog: Sendable {
         public let sides: Set<String>
         public let horizontalSides: Set<String>
         public let halfNouns: Set<String>
+        public let quarterNouns: Set<String>
         public let leftWord: String
         public let rightWord: String
         public let topWord: String
@@ -500,6 +501,7 @@ extension CommandLanguageCatalog {
             sides: ["left", "right", "top", "bottom"],
             horizontalSides: ["left", "right"],
             halfNouns: ["half"],
+            quarterNouns: ["quarter", "quarters"],
             leftWord: "left",
             rightWord: "right",
             topWord: "top",
