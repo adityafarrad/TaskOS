@@ -48,7 +48,7 @@ of this file). No 2.7 implementation has started.
 | ID | Sub-increment | Status | Evidence | Notes |
 |---|---|---|---|---|
 | 2.7A1 | Freeze the language contract | done | Increment 2.7A1 | Capability-language matrix (`CommandLanguageCatalog`), consumer parity tests; parser/suggestions/canonical now catalog-driven |
-| 2.7A2 | Make source handling safe | not started | — | UTF-16 spans, quoted-literal scanner, coverage, limits |
+| 2.7A2 | Make source handling safe | done | Increment 2.7A2 | Checked UTF-16 spans, `CommandInput`/`CommandEdit`, literal scanner, coverage, limits, evidence/slots/clarifications |
 | 2.7A3 | Preserve authoring state and exact time | not started | — | Stable nodes, draft v2, exact one-time dates |
 | 2.7B1 | Exact action language | not started | — | Existing action families only; bare domains need acceptance |
 | 2.7B2 | Composition and schedules | not started | — | Connectors, one trigger maximum, schedule forms |
@@ -2595,6 +2595,59 @@ record isolation/recovery) is deferred to Phase 3 with the migration fixtures.
   - Presentation display names (step titles, Add-step menu copy) remain
     presentation-owned labels, not parser aliases.
 - Next eligible work package: 2.7A2 — Make source handling safe.
+
+### Increment 2.7A2 — Safe UTF-16 source handling (plan 2.7A2)
+
+- Status: done
+- Behavior delivered: the language layer now works in checked UTF-16 source
+  offsets end to end, fails closed on invalid boundaries and over-limit input,
+  resolves quoted literals with escapes, and reports what each recognized span
+  means plus what value it still needs.
+- Interfaces changed:
+  - `SourceSpan` is now a UTF-16 range with `length`, `isValid(in:)`, and a
+    checked `range(in:)` that rejects offsets inside a surrogate pair;
+    `String.substring(in:)` uses that conversion.
+  - `CommandTokenizer` emits UTF-16 spans (character scanning preserved).
+  - Added `CommandLimits` (2,000 characters, 16,384 UTF-16 units, 128 tokens,
+    12 actions, 8 visible suggestions, 5,000 applications).
+  - Added `CommandInput` (text, UTF-16 selection with clamping, marked-text
+    state, source generation, `GrammarLocale.english`) and `CommandEdit`
+    (validated UTF-16 replacement, applied text, resulting selection).
+  - Added `CommandLiteral` / `CommandLiteralError` / `CommandLiteralScanner`:
+    one shared scanner for double-quoted literals where `\"` is a quote and
+    `\\` is a backslash; no other escape is interpreted; unclosed and unquoted
+    inputs are typed failures.
+  - Added `CapabilityReference`, `InterpretationEvidence`, `ExpectedSlot`,
+    `TextReplacement`, `ParseClarification`, and `SourceCoverage`.
+  - `ParsedClause` gained computed `capability`, `evidence`, and
+    `expectedSlots`; `ParsedCommand` gained `coverage` and `clarifications`.
+  - `CommandParser.parse` rejects over-limit input with one correction and keeps
+    the source text; it computes coverage, adds a "Some text was not understood"
+    error when unresolved non-connector spans remain, and turns a 13th action
+    into a blocked result. Copy Text now scans its literal, resolving escapes
+    and treating an unclosed quote as `Needs input` with a clarification.
+- Tests performed:
+  - `swift test --package-path Packages/TaskOSCore` — 302 tests, 37 suites, pass
+    (was 284/36; +18 `SourceHandlingTests`). New coverage: UTF-16 span offsets
+    with emoji; combining marks and non-Latin names; curly/straight apostrophes;
+    emoji-adjacent replacements; invalid surrogate and stale range rejection;
+    `CommandInput` clamping; literal escapes, quoted punctuation, unclosed and
+    unquoted literals; Copy Text escape resolution and unclosed clarification;
+    full coverage on complete parses; unknown prefix/middle/suffix spans;
+    dangerous tails failing closed; evidence and expected slots; character,
+    token, UTF-16, and action limit boundaries; visible suggestion limit.
+  - App tests (`xcodebuild ... test -only-testing:TaskOSTests`) — TEST
+    SUCCEEDED.
+  - Debug build — BUILD SUCCEEDED.
+  - Release build — BUILD SUCCEEDED.
+- Physical checks: none (Core language/source layer; no UI or platform change).
+- Remaining defects / gaps:
+  - Quoted application names are not yet grammar (scanner exists; 2.7B1).
+  - Multi-trigger and bare-domain clarifications arrive in 2.7B1/2.7B2.
+  - `TextReplacement` is defined but not yet emitted by suggestions (2.7C).
+  - The composer still uses a SwiftUI `TextField`; the native `NSTextView`
+    editor and UTF-16 selection reporting are 2.7C2.
+- Next eligible work package: 2.7A3 — Preserve authoring state and exact time.
 
 
 

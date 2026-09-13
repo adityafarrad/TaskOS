@@ -149,6 +149,70 @@ public struct ParsedClause: Hashable, Sendable {
         }
         return nil
     }
+
+    public var capability: CapabilityReference? {
+        switch kind {
+        case .openApplication: return .action(.openApplication)
+        case .hideApplication: return .action(.hideApplication)
+        case .quitApplication: return .action(.quitApplication)
+        case .openFile: return .action(.openFile)
+        case .revealInFinder: return .action(.revealInFinder)
+        case .arrangeWindow: return .action(.arrangeWindow)
+        case .wait: return .action(.wait)
+        case .showNotification: return .action(.showNotification)
+        case .copyText: return .action(.copyText)
+        case .schedule: return .trigger(.schedule)
+        case .applicationLifecycle: return .trigger(.applicationLifecycle)
+        case .wake: return .trigger(.wake)
+        case .displayConnection: return .trigger(.displayConnection)
+        case .externalVolume: return .trigger(.externalVolume)
+        case .powerSource: return .trigger(.powerSource)
+        case .batteryThreshold: return .trigger(.batteryThreshold)
+        case .unsupported, .unrecognized: return nil
+        }
+    }
+
+    public var evidence: InterpretationEvidence? {
+        guard let capability else { return nil }
+        return InterpretationEvidence(capability: capability, span: span, ruleID: capability.stableID)
+    }
+
+    public var expectedSlots: [ExpectedSlot] {
+        switch kind {
+        case .openApplication, .hideApplication, .quitApplication:
+            return resourceNames.isEmpty ? [.application] : []
+        case .openFile, .revealInFinder:
+            return fileSelectionKind == nil ? [.file] : []
+        case .arrangeWindow:
+            var slots: [ExpectedSlot] = []
+            if (arrangeApplicationName ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                slots.append(.application)
+            }
+            if arrangePreset == nil {
+                slots.append(.preset)
+            }
+            return slots
+        case .wait:
+            guard let duration else { return [.duration] }
+            return WaitAction.allowedRange.contains(duration) ? [] : [.duration]
+        case .copyText:
+            return (copyText ?? "").isEmpty ? [.text] : []
+        case .schedule:
+            return schedule == .incomplete ? [.scheduleTime] : []
+        case .applicationLifecycle:
+            var slots: [ExpectedSlot] = []
+            if (lifecycleApplicationName ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                slots.append(.application)
+            }
+            if lifecycleEvent == nil {
+                slots.append(.triggerEvent)
+            }
+            return slots
+        case .wake, .displayConnection, .externalVolume, .powerSource, .batteryThreshold,
+             .showNotification, .unsupported, .unrecognized:
+            return []
+        }
+    }
 }
 
 public enum ParseOutcome: String, Hashable, Sendable, Codable {
@@ -183,12 +247,23 @@ public struct ParsedCommand: Hashable, Sendable {
     public let clauses: [ParsedClause]
     public let diagnostics: [ParseDiagnostic]
     public let outcome: ParseOutcome
+    public let coverage: SourceCoverage
+    public let clarifications: [ParseClarification]
 
-    public init(text: String, clauses: [ParsedClause], diagnostics: [ParseDiagnostic], outcome: ParseOutcome) {
+    public init(
+        text: String,
+        clauses: [ParsedClause],
+        diagnostics: [ParseDiagnostic],
+        outcome: ParseOutcome,
+        coverage: SourceCoverage = .empty,
+        clarifications: [ParseClarification] = []
+    ) {
         self.text = text
         self.clauses = clauses
         self.diagnostics = diagnostics
         self.outcome = outcome
+        self.coverage = coverage
+        self.clarifications = clarifications
     }
 
     public var isComplete: Bool {

@@ -105,7 +105,7 @@ public struct SuggestionEngine: Sendable {
         for token in tokens where isConnector(token) {
             start = token.span.end
         }
-        return text.substring(in: SourceSpan(start: start, end: text.count)) ?? text
+        return text.substring(in: SourceSpan(start: start, end: text.utf16.count)) ?? text
     }
 
     private func isConnector(_ token: CommandToken) -> Bool {

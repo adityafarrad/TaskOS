@@ -13,15 +13,31 @@ public struct SourceSpan: Hashable, Sendable, Codable {
     public var length: Int {
         end - start
     }
+
+    public func isValid(in text: String) -> Bool {
+        start >= 0 && end >= start && end <= text.utf16.count
+    }
+
+    public func range(in text: String) -> Range<String.Index>? {
+        guard isValid(in: text) else {
+            return nil
+        }
+        let utf16 = text.utf16
+        guard let startUTF16 = utf16.index(utf16.startIndex, offsetBy: start, limitedBy: utf16.endIndex),
+              let endUTF16 = utf16.index(utf16.startIndex, offsetBy: end, limitedBy: utf16.endIndex),
+              let lower = String.Index(startUTF16, within: text),
+              let upper = String.Index(endUTF16, within: text) else {
+            return nil
+        }
+        return lower..<upper
+    }
 }
 
 extension String {
     public func substring(in span: SourceSpan) -> String? {
-        guard span.start <= span.end, span.end <= count else {
+        guard let range = span.range(in: self) else {
             return nil
         }
-        let lower = index(startIndex, offsetBy: span.start)
-        let upper = index(startIndex, offsetBy: span.end)
-        return String(self[lower..<upper])
+        return String(self[range])
     }
 }

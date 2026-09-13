@@ -16,84 +16,94 @@ enum CommandTokenizer {
     private static let wordExtras: Set<Character> = [
         ".", "-", "_", "/", ":", "?", "=", "%", "&", "#", "@", "~", "+",
     ]
+    private static let punctuation: Set<Character> = [",", ".", ";"]
 
     static func tokenize(_ input: String) -> [CommandToken] {
         var tokens: [CommandToken] = []
-        let characters = Array(input)
-        var index = 0
+        var index = input.startIndex
+        var offset = 0
 
-        while index < characters.count {
-            let character = characters[index]
+        while index < input.endIndex {
+            let character = input[index]
 
             if character.isWhitespace {
-                index += 1
+                offset += utf16Length(character)
+                index = input.index(after: index)
                 continue
             }
 
-            if character == "," || character == "." || character == ";" {
+            if punctuation.contains(character) {
+                let length = utf16Length(character)
                 tokens.append(
                     CommandToken(
                         kind: .punctuation(String(character)),
-                        span: SourceSpan(start: index, end: index + 1),
+                        span: SourceSpan(start: offset, end: offset + length),
                         original: String(character)
                     )
                 )
-                index += 1
+                offset += length
+                index = input.index(after: index)
                 continue
             }
 
             if character.isNumber {
-                var end = index
                 var literal = ""
-                while end < characters.count, characters[end].isNumber || characters[end] == "." {
-                    literal.append(characters[end])
-                    end += 1
+                while index < input.endIndex, input[index].isNumber || input[index] == "." {
+                    literal.append(input[index])
+                    index = input.index(after: index)
                 }
+                let length = literal.utf16.count
                 tokens.append(
                     CommandToken(
                         kind: .number(Double(literal) ?? 0),
-                        span: SourceSpan(start: index, end: end),
+                        span: SourceSpan(start: offset, end: offset + length),
                         original: literal
                     )
                 )
-                index = end
+                offset += length
                 continue
             }
 
             if character.isLetter {
-                var end = index
                 var literal = ""
-                while end < characters.count {
-                    let next = characters[end]
+                while index < input.endIndex {
+                    let next = input[index]
                     if next.isLetter || next.isNumber || Self.wordExtras.contains(next) {
                         literal.append(next)
-                        end += 1
+                        index = input.index(after: index)
                     } else {
                         break
                     }
                 }
+                let length = literal.utf16.count
                 tokens.append(
                     CommandToken(
                         kind: .word(literal.lowercased()),
-                        span: SourceSpan(start: index, end: end),
+                        span: SourceSpan(start: offset, end: offset + length),
                         original: literal
                     )
                 )
-                index = end
+                offset += length
                 continue
             }
 
+            let length = utf16Length(character)
             tokens.append(
                 CommandToken(
                     kind: .punctuation(String(character)),
-                    span: SourceSpan(start: index, end: index + 1),
+                    span: SourceSpan(start: offset, end: offset + length),
                     original: String(character)
                 )
             )
-            index += 1
+            offset += length
+            index = input.index(after: index)
         }
 
         return tokens
+    }
+
+    private static func utf16Length(_ character: Character) -> Int {
+        String(character).utf16.count
     }
 }
 
@@ -105,8 +115,32 @@ public struct CommandParser: Sendable {
     }
 
     public func parse(_ text: String) -> ParsedCommand {
-        var worker = ParserWorker(tokens: CommandTokenizer.tokenize(text), text: text, language: language)
+        if text.count > CommandLimits.maximumCharacters {
+            return Self.limitFailure(text, message: "Commands must be 2,000 characters or fewer.")
+        }
+        if text.utf16.count > CommandLimits.maximumUTF16Units {
+            return Self.limitFailure(text, message: "Commands must be 16,384 UTF-16 units or fewer.")
+        }
+
+        let tokens = CommandTokenizer.tokenize(text)
+        if tokens.count > CommandLimits.maximumTokens {
+            return Self.limitFailure(text, message: "Commands must be 128 words or fewer.")
+        }
+
+        var worker = ParserWorker(tokens: tokens, text: text, language: language)
         return worker.parse()
+    }
+
+    static func limitFailure(_ text: String, message: String) -> ParsedCommand {
+        let span = SourceSpan(start: 0, end: text.utf16.count)
+        return ParsedCommand(
+            text: text,
+            clauses: [],
+            diagnostics: [.error(message, span: span)],
+            outcome: .needsInput,
+            coverage: SourceCoverage(coveredSpans: [], unresolvedSpans: [span]),
+            clarifications: [ParseClarification(span: span, question: message)]
+        )
     }
 }
 
@@ -191,12 +225,80 @@ private struct ParserWorker {
             }
         }
 
+        var clarifications: [ParseClarification] = []
+        for clause in clauses where clause.kind == .copyText {
+            guard (clause.copyText ?? "").isEmpty,
+                  let raw = text.substring(in: clause.span) else {
+                continue
+            }
+            let quoteCount = raw.filter { $0 == "\"" }.count
+            if quoteCount % 2 == 1 {
+                clarifications.append(
+                    ParseClarification(span: clause.span, question: "Close the quote to finish the text.")
+                )
+            }
+        }
+
+        let coverage = coverage(for: clauses)
+        var outcome = Self.outcome(for: clauses, diagnostics: diagnosticList)
+
+        if !coverage.isComplete {
+            diagnosticList.append(
+                .error("Some text was not understood.", span: coverage.unresolvedSpans.first)
+            )
+            if outcome == .complete {
+                outcome = .needsInput
+            }
+        }
+
+        let actionCount = clauses.filter { clause in
+            if let capability = clause.capability, case .action = capability { return true }
+            return false
+        }.count
+        if actionCount > CommandLimits.maximumActions {
+            diagnosticList.append(.error("A workflow can have at most 12 steps.", span: nil))
+            if outcome == .complete {
+                outcome = .needsInput
+            }
+        }
+
         return ParsedCommand(
             text: text,
             clauses: clauses,
             diagnostics: diagnosticList,
-            outcome: Self.outcome(for: clauses, diagnostics: diagnosticList)
+            outcome: outcome,
+            coverage: coverage,
+            clarifications: clarifications
         )
+    }
+
+    func coverage(for clauses: [ParsedClause]) -> SourceCoverage {
+        let covered = clauses.map(\.span).filter { $0.length > 0 }
+        var unresolved: [SourceSpan] = []
+
+        for token in tokens where !isConnectorToken(token) {
+            let isCovered = covered.contains { span in
+                span.start <= token.span.start && token.span.end <= span.end
+            }
+            if !isCovered {
+                unresolved.append(token.span)
+            }
+        }
+
+        return SourceCoverage(coveredSpans: covered, unresolvedSpans: Self.merge(unresolved))
+    }
+
+    private static func merge(_ spans: [SourceSpan]) -> [SourceSpan] {
+        let sorted = spans.sorted { $0.start < $1.start }
+        var result: [SourceSpan] = []
+        for span in sorted {
+            if let last = result.last, span.start <= last.end {
+                result[result.count - 1] = SourceSpan(start: last.start, end: max(last.end, span.end))
+            } else {
+                result.append(span)
+            }
+        }
+        return result
     }
 
     private static func outcome(for clauses: [ParsedClause], diagnostics: [ParseDiagnostic]) -> ParseOutcome {
@@ -773,23 +875,33 @@ private struct ParserWorker {
         }
 
         guard position < tokens.count else {
-            return ParsedClause(
-                kind: .copyText,
-                span: SourceSpan(start: startToken.span.start, end: end),
-                parameter: .copyText(""),
-                detail: nil
-            )
+            return copyClause(value: "", start: startToken.span.start, end: end)
         }
 
         let literalStart = tokens[position].span.start
         let literalEnd = consumeClauseRemainder()
-        let raw = (text.substring(in: SourceSpan(start: literalStart, end: literalEnd)) ?? "")
-            .trimmingCharacters(in: .whitespacesAndNewlines)
 
-        return ParsedClause(
+        switch CommandLiteralScanner.scan(text, at: literalStart) {
+        case .success(let literal):
+            return copyClause(
+                value: literal.value,
+                start: startToken.span.start,
+                end: max(literal.span.end, end)
+            )
+        case .failure(.unclosedQuote):
+            return copyClause(value: "", start: startToken.span.start, end: literalEnd)
+        case .failure(.notQuoted):
+            let raw = (text.substring(in: SourceSpan(start: literalStart, end: literalEnd)) ?? "")
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            return copyClause(value: Self.stripQuotes(raw), start: startToken.span.start, end: literalEnd)
+        }
+    }
+
+    private func copyClause(value: String, start: Int, end: Int) -> ParsedClause {
+        ParsedClause(
             kind: .copyText,
-            span: SourceSpan(start: startToken.span.start, end: literalEnd),
-            parameter: .copyText(Self.stripQuotes(raw)),
+            span: SourceSpan(start: start, end: end),
+            parameter: .copyText(value),
             detail: nil
         )
     }
