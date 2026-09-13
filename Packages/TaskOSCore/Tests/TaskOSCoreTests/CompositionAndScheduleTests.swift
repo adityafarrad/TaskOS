@@ -152,6 +152,47 @@ struct CompositionAndScheduleTests {
         #expect(document.blockingParseMessage?.contains("12") == true)
     }
 
+    @Test func replacingGroupedActionsPreservesTriggerAndOtherSteps() {
+        var document = ComposerDocument(
+            text: "every day at 9 am, then wait 1 second, then open Research and Notes and Safari"
+        )
+
+        let openActions = document.actions.filter { action in
+            if case .openApplication = action.draft { return true }
+            return false
+        }
+        #expect(openActions.count == 3)
+
+        document.replaceActions(
+            ids: openActions.map(\.id),
+            with: [
+                .openApplication(
+                    name: "Research and Notes",
+                    resolved: .application(bundleIdentifier: "com.example.researchnotes", label: "Research and Notes")
+                ),
+                .openApplication(
+                    name: "Safari",
+                    resolved: .application(bundleIdentifier: "com.apple.Safari", label: "Safari")
+                ),
+            ]
+        )
+
+        #expect(document.trigger == .daily(hour: 9, minute: 0))
+        #expect(document.actions.count == 3)
+        guard case .wait(let duration)? = document.actions.first?.draft else {
+            Issue.record("Expected the wait step to survive")
+            return
+        }
+        #expect(duration == 1)
+        guard case .openApplication(let mergedName, let mergedReference) = document.actions[1].draft else {
+            Issue.record("Expected the merged open step")
+            return
+        }
+        #expect(mergedName == "Research and Notes")
+        #expect(mergedReference?.identifier == "com.example.researchnotes")
+        #expect(document.makeDefinition(name: "Grouped") != nil)
+    }
+
     @Test func absoluteOneTimeSurvivesComposition() {
         let expected = Calendar.current.date(
             from: DateComponents(year: 2026, month: 9, day: 20, hour: 9, minute: 0)

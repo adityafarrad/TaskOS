@@ -3135,6 +3135,71 @@ Second run before starting 2.7C, performed at commit `0f50f73`:
   movement does not invalidate an unchanged Preview, card-only changes always
   invalidate old preparation, and typo help is explicit and bounded.
 
+### Increment 2.7C-fix — Independent audit hardening (2026-09-13)
+
+- Status: done
+- Behavior delivered:
+  - Grouping an unambiguous merged app list now rewrites only that run's actions
+    (`ComposerDocument.replaceActions(ids:with:)`) instead of replacing the whole
+    command text. Triggers, other steps, rationale, and card-only values survive
+    the rewrite, and undo no longer re-applies a destructive whole-text
+    replacement. Grouping now covers `hide` and `quit` lists as well as `open`.
+  - A snapshot above 5,000 applications refuses automatic application search
+    entirely (grammar suggestions only) instead of silently searching the first
+    5,000 records.
+  - Resource selection carries a captured `ResourceSelectionKey`: application,
+    browser, and file pickers capture the key when their configuration row
+    appears and refuse to bind when the session, node, slot, authoring revision,
+    or app snapshot revision moved.
+  - Marked-text composition no longer pushes preedit text into the document or
+    starts application/typo searches; completion and resolution resume after the
+    composition commits. Preparing a workflow is refused while marked text is
+    active.
+  - Completion acceptance uses a stored, checked UTF-16 replacement range, and
+    the old `String.prefix` count bug that could corrupt text after non-BMP
+    characters is fixed; an invalid range falls back to the current fragment.
+  - Preparation and save validity use a monotonic authoring generation so
+    edit/undo cannot reuse a previous revision identity for a different state.
+  - `ApplicationCatalogService` ignores an in-flight refresh after `reset()`.
+  - Settings exposes an explicit "Refresh App List" control, and the completion
+    key uses `CommandLanguageCatalog.currentRevision` instead of a magic `1`.
+- Interfaces changed:
+  - Core: `ComposerDocument.completionFragmentRange()`,
+    `accept(_:replacing:)`, and `replaceActions(ids:with:)`; `SuggestionEngine`
+    refuses over-cap application search; removed the dead
+    `ResourceCatalog.applicationSnapshot()` and `Suggestion.kind`;
+    `CommandLanguageCatalog.currentRevision`.
+  - App: `ComposerViewModel.applyApplicationSnapshot(_:)`,
+    `beginApplicationSelection(for:)`, `beginResourceSelection(for:slot:)`,
+    keyed `resolve(id:application:key:)` and
+    `updateWebsiteBrowser(id:browser:key:)`, keyed `chooseFile`, and the
+    monotonic `authoringGeneration`; `ApplicationCatalogService` refresh
+    generation; `NativeCommandTextView` commits only after marked text ends;
+    `StepConfigurationView` captures selection keys.
+- Tests performed:
+  - Core: `swift test --package-path Packages/TaskOSCore` — 380 tests, 43
+    suites, pass (was 377/43; +3: checked UTF-16 acceptance with emoji, invalid
+    replacement fallback, and grouped replacement preserving the trigger and
+    wait step). The over-cap test now asserts refusal instead of truncation.
+  - App tests (`xcodebuild ... test -only-testing:TaskOSTests`) — TEST
+    SUCCEEDED, including new coverage: revision and snapshot resource-selection
+    refusal, browser key refusal, merged open/hide list preserving the trigger
+    and other steps, marked text blocking preparation, and reset during
+    refresh.
+  - UI tests (`xcodebuild ... test -only-testing:TaskOSUITests`) — TEST
+    SUCCEEDED, 10/10.
+  - Debug and Release builds — BUILD SUCCEEDED.
+- Physical checks: none (Core/app behavior; the UI paths are exercised by the
+  UI tests; non-Latin IME and VoiceOver proof remains in 2.7D3).
+- Remaining defects / gaps:
+  - The miss-triggered snapshot refresh keeps its 60-second throttle (now
+    alongside the explicit refresh control) to avoid repeated directory scans
+    while typing; still an intentional deviation from the unthrottled wording in
+    WP-2.7 §7.1.
+  - Suggestions still do not surface application file-name or alias matches
+    (tracked gap).
+- Next eligible work package: 2.7D1 — Independent language corpus.
+
 
 
 

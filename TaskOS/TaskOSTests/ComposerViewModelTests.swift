@@ -58,7 +58,12 @@ struct ComposerViewModelTests {
         model.add(.openApplication(name: "an application", resolved: nil))
         let id = model.actions[0].id
 
-        model.resolve(id: id, application: ApplicationResource(bundleIdentifier: "net.whatsapp.WhatsApp", displayName: "WhatsApp"))
+        let key = model.beginApplicationSelection(for: id)
+        #expect(model.resolve(
+            id: id,
+            application: ApplicationResource(bundleIdentifier: "net.whatsapp.WhatsApp", displayName: "WhatsApp"),
+            key: key
+        ))
 
         guard case .openApplication(_, let resolved) = model.actions[0].draft else {
             Issue.record("expected open application")
@@ -138,13 +143,155 @@ struct ComposerViewModelTests {
         let model = ComposerViewModel()
         model.add(.openApplication(name: "Safari", resolved: nil))
         let id = model.actions[0].id
+        let key = model.beginApplicationSelection(for: id)
 
         model.updateFromEditor(text: "wait 1 second", edit: nil)
-        model.resolve(
+
+        #expect(!model.resolve(
             id: id,
-            application: ApplicationResource(bundleIdentifier: "com.apple.Safari", displayName: "Safari")
+            application: ApplicationResource(bundleIdentifier: "com.apple.Safari", displayName: "Safari"),
+            key: key
+        ))
+        #expect(!model.actions.contains { $0.id == id })
+    }
+
+    @Test func resourceSelectionRefusesWhenRevisionMoved() {
+        let model = ComposerViewModel()
+        model.add(.openApplication(name: "Safari", resolved: nil))
+        let id = model.actions[0].id
+        let key = model.beginApplicationSelection(for: id)
+
+        model.updateFromEditor(text: "open Safari and wait 1 second", edit: nil)
+
+        #expect(!model.resolve(
+            id: id,
+            application: ApplicationResource(bundleIdentifier: "com.apple.Safari", displayName: "Safari"),
+            key: key
+        ))
+    }
+
+    @Test func resourceSelectionRefusesWhenSnapshotMoved() {
+        let model = ComposerViewModel()
+        model.add(.openApplication(name: "Safari", resolved: nil))
+        let id = model.actions[0].id
+
+        let safari = ApplicationRecord(
+            bundleIdentifier: "com.apple.Safari",
+            displayName: "Safari",
+            fileName: "Safari"
+        )
+        model.applyApplicationSnapshot(
+            ApplicationSnapshot(revision: 1, createdAt: Date(), applications: [safari])
+        )
+        let key = model.beginApplicationSelection(for: id)
+
+        model.applyApplicationSnapshot(
+            ApplicationSnapshot(revision: 2, createdAt: Date(), applications: [safari])
         )
 
-        #expect(!model.actions.contains { $0.id == id })
+        #expect(!model.resolve(
+            id: id,
+            application: ApplicationResource(bundleIdentifier: "com.apple.Safari", displayName: "Safari"),
+            key: key
+        ))
+    }
+
+    @Test func browserSelectionRefusesWhenRevisionMoved() {
+        let model = ComposerViewModel()
+        model.updateFromEditor(text: "open https://apple.com", edit: nil)
+        let id = model.actions[0].id
+        let key = model.beginResourceSelection(for: id, slot: "browser")
+
+        model.updateFromEditor(text: "open https://apple.com and wait 1 second", edit: nil)
+
+        #expect(!model.updateWebsiteBrowser(
+            id: id,
+            browser: .application(bundleIdentifier: "com.apple.Safari", label: "Safari"),
+            key: key
+        ))
+    }
+
+    @Test func mergedOpenListPreservesTriggerAndOtherSteps() {
+        let model = ComposerViewModel()
+        model.updateFromEditor(
+            text: "every day at 9 am, then wait 1 second, then open Research and Notes and Safari",
+            edit: nil
+        )
+        model.applyApplicationSnapshot(ApplicationSnapshot(revision: 1, createdAt: Date(), applications: mergedCatalog))
+
+        #expect(model.document.trigger == .daily(hour: 9, minute: 0))
+        #expect(model.actions.count == 3)
+        guard case .wait? = model.actions.first?.draft else {
+            Issue.record("Expected the wait step to survive the grouped list")
+            return
+        }
+        guard case .openApplication(let mergedName, let mergedReference) = model.actions[1].draft else {
+            Issue.record("Expected the merged open step")
+            return
+        }
+        #expect(mergedName == "Research and Notes")
+        #expect(mergedReference?.identifier == "com.example.researchnotes")
+        guard case .openApplication(let safariName, let safariReference) = model.actions[2].draft else {
+            Issue.record("Expected the Safari step")
+            return
+        }
+        #expect(safariName == "Safari")
+        #expect(safariReference?.identifier == "com.apple.Safari")
+    }
+
+    @Test func mergedHideListIsResolvedWithoutTouchingOtherSteps() {
+        let model = ComposerViewModel()
+        model.updateFromEditor(
+            text: "every day at 9 am, then wait 1 second, then hide Research and Notes and Safari",
+            edit: nil
+        )
+        model.applyApplicationSnapshot(ApplicationSnapshot(revision: 1, createdAt: Date(), applications: mergedCatalog))
+
+        #expect(model.document.trigger == .daily(hour: 9, minute: 0))
+        #expect(model.actions.count == 3)
+        guard case .wait? = model.actions.first?.draft else {
+            Issue.record("Expected the wait step to survive the grouped list")
+            return
+        }
+        guard case .hideApplication(let mergedName, let mergedReference) = model.actions[1].draft else {
+            Issue.record("Expected the merged hide step")
+            return
+        }
+        #expect(mergedName == "Research and Notes")
+        #expect(mergedReference?.identifier == "com.example.researchnotes")
+        guard case .hideApplication(let safariName, _) = model.actions[2].draft else {
+            Issue.record("Expected the Safari step")
+            return
+        }
+        #expect(safariName == "Safari")
+    }
+
+    @Test func markedTextBlocksPreparation() {
+        let model = ComposerViewModel()
+        model.updateFromEditor(text: "wait 1 second", edit: nil)
+        model.setMarkedTextActive(true)
+
+        model.prepare()
+
+        if case .composing = model.stage {
+            // expected
+        } else {
+            Issue.record("Marked text must block preparation")
+        }
+    }
+
+    private var mergedCatalog: [ApplicationRecord] {
+        [
+            ApplicationRecord(
+                bundleIdentifier: "com.example.researchnotes",
+                displayName: "Research and Notes",
+                fileName: "Research and Notes"
+            ),
+            ApplicationRecord(
+                bundleIdentifier: "com.apple.Safari",
+                displayName: "Safari",
+                fileName: "Safari"
+            ),
+        ]
     }
 }

@@ -32,6 +32,8 @@ public enum CommandClauseRoute: Hashable, Sendable {
 }
 
 public struct CommandLanguageCatalog: Sendable {
+    public static let currentRevision = 1
+
     public struct CanonicalWording: Hashable, Sendable {
         public let standard: CanonicalTemplate
         public let variants: [String: CanonicalTemplate]

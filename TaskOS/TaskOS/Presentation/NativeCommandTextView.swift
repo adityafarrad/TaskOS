@@ -94,7 +94,14 @@ struct NativeCommandTextView: NSViewRepresentable {
         func textDidChange(_ notification: Notification) {
             guard let textView = notification.object as? NSTextView else { return }
 
-            parent.onMarkedTextChange(textView.hasMarkedText())
+            let hasMarkedText = textView.hasMarkedText()
+            parent.onMarkedTextChange(hasMarkedText)
+
+            guard !hasMarkedText else {
+                pendingEditRange = nil
+                pendingReplacement = nil
+                return
+            }
 
             let edit: CommandEdit?
             if let range = pendingEditRange, let replacement = pendingReplacement {

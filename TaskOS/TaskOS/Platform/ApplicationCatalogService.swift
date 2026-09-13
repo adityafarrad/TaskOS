@@ -12,6 +12,7 @@ actor ApplicationCatalogService {
     private var current = ApplicationSnapshot.empty
     private var refreshTask: Task<ApplicationSnapshot, Never>?
     private var revisionCounter = 0
+    private var generation = 0
 
     init(provider: any ApplicationRecordProviding) {
         self.provider = provider
@@ -28,6 +29,7 @@ actor ApplicationCatalogService {
 
         revisionCounter += 1
         let revision = revisionCounter
+        let startGeneration = generation
         let provider = self.provider
         let task = Task<ApplicationSnapshot, Never> {
             let records = await provider.installedApplicationRecords()
@@ -41,13 +43,14 @@ actor ApplicationCatalogService {
 
         let snapshot = await task.value
         refreshTask = nil
-        if snapshot.revision >= current.revision {
+        if startGeneration == generation, snapshot.revision >= current.revision {
             current = snapshot
         }
         return current
     }
 
     func reset() {
+        generation += 1
         current = .empty
         refreshTask?.cancel()
         refreshTask = nil

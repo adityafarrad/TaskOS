@@ -42,15 +42,18 @@ struct ResultValidityTests {
         #expect(suggestions.filter { $0.match == .typo }.count <= 3)
     }
 
-    @Test func typoSearchIsBoundedToApplicationCap() {
+    @Test func overCapCatalogRefusesAutomaticApplicationSearch() {
         var names = (0..<CommandLimits.maximumApplications).map { "App\($0)" }
         names.append("App\(CommandLimits.maximumApplications)")
+        let overCap = apps(names)
 
-        let withinCap = engine.suggestions(for: "open App4999", applications: apps(names))
-        #expect(withinCap.contains { $0.title == "App4999" })
+        let refused = engine.suggestions(for: "open App4999", applications: overCap)
+        #expect(!refused.contains { $0.category == .application })
+        #expect(!refused.contains { $0.match == .typo })
+        #expect(refused.contains { $0.id == "action.openApplication" })
 
-        let beyondCap = engine.suggestions(for: "open App5000", applications: apps(names))
-        #expect(!beyondCap.contains { $0.title == "App5000" })
+        let atCap = Array(overCap.prefix(CommandLimits.maximumApplications))
+        #expect(engine.suggestions(for: "open App4999", applications: atCap).contains { $0.title == "App4999" })
     }
 
     @Test func completionKeysDistinguishGenerationAndCursor() {

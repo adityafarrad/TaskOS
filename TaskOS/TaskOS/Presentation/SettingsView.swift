@@ -33,6 +33,13 @@ struct SettingsView: View {
                 )
             }
 
+            Section("Applications") {
+                Text("TaskOS currently searches \(model.applications.count) installed applications.")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                Button("Refresh App List") { model.refreshApplicationSnapshot() }
+            }
+
             Section("Automatic triggers") {
                 Toggle(
                     "Run automatic triggers",

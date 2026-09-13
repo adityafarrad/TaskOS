@@ -348,9 +348,19 @@ public struct ComposerDocument: Sendable {
         bumpRevision()
     }
 
-    public mutating func accept(_ suggestion: Suggestion) {
-        let start = trailingFragmentStart()
-        var prefix = String(text.prefix(start))
+    public func completionFragmentRange() -> SourceSpan {
+        SourceSpan(start: trailingFragmentStart(), end: text.utf16.count)
+    }
+
+    public mutating func accept(_ suggestion: Suggestion, replacing replacementSpan: SourceSpan? = nil) {
+        let span: SourceSpan
+        if let replacementSpan, replacementSpan.isValid(in: text) {
+            span = replacementSpan
+        } else {
+            span = completionFragmentRange()
+        }
+
+        var prefix = text.substring(in: SourceSpan(start: 0, end: span.start)) ?? ""
         if !prefix.isEmpty, let last = prefix.last, !last.isWhitespace {
             prefix.append(" ")
         }
@@ -386,6 +396,35 @@ public struct ComposerDocument: Sendable {
         }
         recordHistory()
         elements[index] = .action(ComposerAction(id: id, draft: draft))
+        text = renderedText()
+        bumpRevision()
+    }
+
+    public mutating func replaceActions(ids: [UUID], with drafts: [ComposerActionDraft]) {
+        guard !ids.isEmpty, !drafts.isEmpty else { return }
+
+        let idSet = Set(ids)
+        let positions = elements.indices.filter { index in
+            guard case .action(let action) = elements[index] else { return false }
+            return idSet.contains(action.id)
+        }
+        guard !positions.isEmpty else { return }
+
+        recordHistory()
+        let positionSet = Set(positions)
+        var updated: [ComposerElement] = []
+        var replaced = false
+        for index in elements.indices {
+            if positionSet.contains(index) {
+                if !replaced {
+                    updated.append(contentsOf: drafts.map { .action(ComposerAction(draft: $0)) })
+                    replaced = true
+                }
+                continue
+            }
+            updated.append(elements[index])
+        }
+        elements = updated
         text = renderedText()
         bumpRevision()
     }

@@ -5,10 +5,20 @@ struct StepConfigurationView: View {
     let action: ComposerAction
     let model: ComposerViewModel
 
+    @State private var applicationSelectionKey: ResourceSelectionKey?
+    @State private var browserSelectionKey: ResourceSelectionKey?
+
     var body: some View {
         VStack(alignment: .leading, spacing: TaskOSSpacing.md) {
             detail
         }
+        .onAppear { captureApplicationSelectionKey() }
+        .onChange(of: action.id) { _, _ in captureApplicationSelectionKey() }
+    }
+
+    private func captureApplicationSelectionKey() {
+        applicationSelectionKey = model.beginApplicationSelection(for: action.id)
+        browserSelectionKey = model.beginResourceSelection(for: action.id, slot: "browser")
     }
 
     @ViewBuilder
@@ -206,7 +216,13 @@ struct StepConfigurationView: View {
                 guard let application = model.applications.first(where: { $0.bundleIdentifier == newValue }) else {
                     return
                 }
-                model.resolve(id: action.id, application: application)
+                guard let key = applicationSelectionKey else {
+                    captureApplicationSelectionKey()
+                    return
+                }
+                if !model.resolve(id: action.id, application: application, key: key) {
+                    captureApplicationSelectionKey()
+                }
             }
         )
     }
@@ -220,13 +236,22 @@ struct StepConfigurationView: View {
                 return ""
             },
             set: { newValue in
+                guard let key = browserSelectionKey else {
+                    captureApplicationSelectionKey()
+                    return
+                }
                 if newValue.isEmpty {
-                    model.updateWebsiteBrowser(id: action.id, browser: nil)
+                    if !model.updateWebsiteBrowser(id: action.id, browser: nil, key: key) {
+                        captureApplicationSelectionKey()
+                    }
                 } else if let application = model.applications.first(where: { $0.bundleIdentifier == newValue }) {
-                    model.updateWebsiteBrowser(
-                        id: action.id,
-                        browser: .application(bundleIdentifier: application.bundleIdentifier, label: application.displayName)
+                    let browser = ResourceReference.application(
+                        bundleIdentifier: application.bundleIdentifier,
+                        label: application.displayName
                     )
+                    if !model.updateWebsiteBrowser(id: action.id, browser: browser, key: key) {
+                        captureApplicationSelectionKey()
+                    }
                 }
             }
         )

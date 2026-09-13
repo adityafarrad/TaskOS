@@ -19,12 +19,16 @@ public struct SuggestionEngine: Sendable {
         for text: String,
         applications: [ApplicationResource] = []
     ) -> [Suggestion] {
+        let searchableApplications = applications.count > CommandLimits.maximumApplications
+            ? []
+            : applications
+
         switch context(for: text) {
         case .start:
             return rankAndLimit(starters())
 
         case .openApplication(let prefix):
-            let matches = applicationSuggestions(applications, prefix: prefix)
+            let matches = applicationSuggestions(searchableApplications, prefix: prefix)
 
             if prefix.contains("."), ResourceNameHeuristics.isWebsite(prefix) {
                 let normalized = ResourceNameHeuristics.normalizedWebsiteURL(prefix)
@@ -132,7 +136,7 @@ public struct SuggestionEngine: Sendable {
         let needle = prefix.lowercased()
         var results: [Suggestion] = []
 
-        for application in applications.prefix(CommandLimits.maximumApplications) {
+        for application in applications {
             let label = application.displayName
             let haystack = label.lowercased()
 

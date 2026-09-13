@@ -69,11 +69,12 @@ final class ComposerViewModel {
     private var applicationsLoaded = false
     private var lastSnapshotAt: Date?
     private var isRefreshingSnapshot = false
-    private var isAutoRewriting = false
     private var highlightMovedByUser = false
     private let sessionID = UUID()
     private var sourceGeneration = 0
+    private var authoringGeneration = 0
     private var completionKey: CompletionKey?
+    private var completionReplacementSpan: SourceSpan?
     private var autosaveTask: Task<Void, Never>?
     private var previewResetTask: Task<Void, Never>?
     private var runMonitor: Task<Void, Never>?
@@ -598,13 +599,9 @@ final class ComposerViewModel {
         Task { [weak self] in
             guard let self else { return }
             let snapshot = await composition.loadApplicationSnapshot()
-            self.applicationSnapshot = snapshot
-            self.applications = snapshot.applications.map(\.resource)
-            self.lastSnapshotAt = Date()
+            self.applyApplicationSnapshot(snapshot)
             self.displays = await composition.loadDisplays()
             self.hardware = composition.hardwareAvailability()
-            self.refreshSuggestions()
-            self.autoResolveApplications()
             self.restoreDraftIfNeeded()
         }
     }
@@ -615,13 +612,17 @@ final class ComposerViewModel {
         Task { [weak self] in
             guard let self else { return }
             let snapshot = await composition.loadApplicationSnapshot()
-            self.applicationSnapshot = snapshot
-            self.applications = snapshot.applications.map(\.resource)
-            self.lastSnapshotAt = Date()
             self.isRefreshingSnapshot = false
-            self.autoResolveApplications()
-            self.refreshSuggestions()
+            self.applyApplicationSnapshot(snapshot)
         }
+    }
+
+    func applyApplicationSnapshot(_ snapshot: ApplicationSnapshot) {
+        applicationSnapshot = snapshot
+        applications = snapshot.applications.map(\.resource)
+        lastSnapshotAt = Date()
+        autoResolveApplications()
+        refreshSuggestions()
     }
 
     func setText(_ value: String) {
@@ -632,7 +633,7 @@ final class ComposerViewModel {
 
     func accept(_ suggestion: Suggestion) {
         guard completionKey == currentCompletionKey() else { return }
-        document.accept(suggestion)
+        document.accept(suggestion, replacing: completionReplacementSpan)
         afterEdit()
     }
 
@@ -694,6 +695,21 @@ final class ComposerViewModel {
         afterEdit()
     }
 
+    @discardableResult
+    func updateWebsiteBrowser(id: UUID, browser: ResourceReference?, key: ResourceSelectionKey) -> Bool {
+        guard key.sessionID == sessionID,
+              key.nodeID == id,
+              key.slot == "browser",
+              key.nodeRevision == currentRevision,
+              key.snapshotRevision == applicationSnapshot.revision,
+              document.actions.contains(where: { $0.id == id }) else {
+            return false
+        }
+        document.setWebsiteBrowser(id: id, browser: browser)
+        afterEdit()
+        return true
+    }
+
     func updateArrangePreset(id: UUID, preset: WindowPreset) {
         guard case .arrangeWindow(let name, let resolved, _, let display) = actionDraft(id: id) else { return }
         document.updateAction(id: id, draft: .arrangeWindow(name: name, resolved: resolved, preset: preset, display: display))
@@ -710,19 +726,29 @@ final class ComposerViewModel {
         document.actions.first { $0.id == id }?.draft
     }
 
-    func resolve(id: UUID, application: ApplicationResource) {
-        let key = ResourceSelectionKey(
+    func beginApplicationSelection(for id: UUID) -> ResourceSelectionKey {
+        beginResourceSelection(for: id, slot: "application")
+    }
+
+    func beginResourceSelection(for id: UUID, slot: String) -> ResourceSelectionKey {
+        ResourceSelectionKey(
             sessionID: sessionID,
             nodeID: id,
-            slot: "application",
+            slot: slot,
             nodeRevision: currentRevision,
             snapshotRevision: applicationSnapshot.revision
         )
+    }
+
+    @discardableResult
+    func resolve(id: UUID, application: ApplicationResource, key: ResourceSelectionKey) -> Bool {
         guard key.sessionID == sessionID,
+              key.nodeID == id,
+              key.slot == "application",
               key.nodeRevision == currentRevision,
               key.snapshotRevision == applicationSnapshot.revision,
               document.actions.contains(where: { $0.id == id }) else {
-            return
+            return false
         }
 
         document.resolveApplication(
@@ -730,6 +756,7 @@ final class ComposerViewModel {
             reference: .application(bundleIdentifier: application.bundleIdentifier, label: application.displayName)
         )
         afterEdit()
+        return true
     }
 
     func updateNotification(id: UUID, title: String, message: String) {
@@ -806,6 +833,7 @@ final class ComposerViewModel {
 
     func chooseFile(id: UUID) {
         guard let draft = actionDraft(id: id) else { return }
+        let key = beginResourceSelection(for: id, slot: "file")
 
         let panel = NSOpenPanel()
         panel.canChooseFiles = true
@@ -813,7 +841,11 @@ final class ComposerViewModel {
         panel.allowsMultipleSelection = false
         panel.canCreateDirectories = false
         guard panel.runModal() == .OK, let url = panel.url else { return }
-        guard document.actions.contains(where: { $0.id == id }) else { return }
+        guard key.sessionID == sessionID,
+              key.nodeID == id,
+              key.slot == "file",
+              key.nodeRevision == currentRevision,
+              document.actions.contains(where: { $0.id == id }) else { return }
 
         let isDirectory = (try? url.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) ?? false
         let target = FileTarget(
@@ -845,6 +877,10 @@ final class ComposerViewModel {
 
     func prepare() {
         notice = nil
+        guard !isComposingMarkedText else {
+            notice = "Finish the current input method composition first."
+            return
+        }
         guard let definition = document.makeDefinition(name: draftName, id: draftID, revision: currentRevision) else {
             notice = applicationClarification ?? document.blockingParseMessage ?? "Finish resolving every step before previewing."
             return
@@ -852,12 +888,13 @@ final class ComposerViewModel {
 
         lastDefinition = definition
         stage = .preparing
-        let key = PreparationKey(sessionID: sessionID, authoringRevision: definition.revision)
+        let key = PreparationKey(sessionID: sessionID, authoringRevision: WorkflowRevision(authoringGeneration))
 
         Task { [weak self] in
             guard let self else { return }
             let preview = await composition.preparer.prepare(definition)
-            guard key.sessionID == self.sessionID, key.authoringRevision == self.currentRevision else { return }
+            guard key.sessionID == self.sessionID,
+                  key.authoringRevision == WorkflowRevision(self.authoringGeneration) else { return }
             await composition.approvals.approve(definition)
             self.approvedRevision = definition.revision
             self.stage = .previewed(preview)
@@ -958,11 +995,12 @@ final class ComposerViewModel {
 
         let isAutomatic = autoRunEnabled && supportsAutomaticRuns
         let workflow = SavedWorkflow(definition: definition, isEnabled: isAutomatic)
-        let key = PreparationKey(sessionID: sessionID, authoringRevision: revision)
+        let key = PreparationKey(sessionID: sessionID, authoringRevision: WorkflowRevision(authoringGeneration))
 
         Task { [weak self] in
             guard let self else { return }
-            guard key.sessionID == self.sessionID, key.authoringRevision == self.currentRevision else { return }
+            guard key.sessionID == self.sessionID,
+                  key.authoringRevision == WorkflowRevision(self.authoringGeneration) else { return }
             do {
                 try await self.composition.repository.save(workflow)
                 if definition.trigger.schedule != nil {
@@ -1410,6 +1448,7 @@ final class ComposerViewModel {
 
     private func afterEdit() {
         sourceGeneration += 1
+        authoringGeneration += 1
         document.resolveSchedule(now: composition.clock.now(), calendar: .current)
         autoResolveApplications()
         refreshSuggestions()
@@ -1484,6 +1523,7 @@ final class ComposerViewModel {
         let computed = composition.suggestions.suggestions(for: document.text, applications: applications)
         guard key == currentCompletionKey() else { return }
         completionKey = key
+        completionReplacementSpan = document.completionFragmentRange()
         suggestions = computed
         highlightedSuggestion = 0
         highlightMovedByUser = false
@@ -1497,7 +1537,7 @@ final class ComposerViewModel {
             cursor: commandSelection
                 ?? SourceSpan(start: document.text.utf16.count, end: document.text.utf16.count),
             hasMarkedText: isComposingMarkedText,
-            languageRevision: 1,
+            languageRevision: CommandLanguageCatalog.currentRevision,
             snapshotRevision: applicationSnapshot.revision
         )
     }
@@ -1617,32 +1657,38 @@ final class ComposerViewModel {
         }
 
         var groupingBlocked = false
-        if !isAutoRewriting {
-            for run in openApplicationRuns() where run.count > 1 {
-                let names = run.compactMap { action -> String? in
-                    if case .openApplication(let name, _) = action.draft { return name }
-                    return nil
-                }
+        var groupingReplacements: [(ids: [UUID], drafts: [ComposerActionDraft])] = []
 
-                switch ApplicationListGrouper.group(segments: names, snapshot: snapshot) {
-                case .single(let grouping) where grouping.records.count != names.count:
-                    isAutoRewriting = true
-                    document.setText(grouping.rewrites[0])
-                    isAutoRewriting = false
-                    return
-                case .ambiguous(let groupings):
-                    groupingBlocked = true
-                    let rewrites = groupings.flatMap(\.rewrites).joined(separator: "  ")
-                    clarification = clarification ?? "That list of apps can be read more than one way. Try: \(rewrites)"
-                default:
-                    break
-                }
+        for run in applicationListRuns() where run.actions.count > 1 {
+            let names = run.names
+            guard names.count == run.actions.count else { continue }
+
+            switch ApplicationListGrouper.group(
+                segments: names,
+                actionHead: run.family.actionHead,
+                snapshot: snapshot
+            ) {
+            case .single(let grouping) where grouping.records.count != names.count:
+                groupingReplacements.append((
+                    run.actions.map(\.id),
+                    grouping.records.map { run.family.draft(for: $0) }
+                ))
+            case .ambiguous(let groupings):
+                groupingBlocked = true
+                let rewrites = groupings.flatMap(\.rewrites).joined(separator: "  ")
+                clarification = clarification ?? "That list of apps can be read more than one way. Try: \(rewrites)"
+            default:
+                break
             }
         }
 
         if groupingBlocked {
             applicationClarification = clarification
             return
+        }
+
+        for replacement in groupingReplacements {
+            document.replaceActions(ids: replacement.ids, with: replacement.drafts)
         }
 
         var resolutionMissed = false
@@ -1691,20 +1737,86 @@ final class ComposerViewModel {
         }
     }
 
-    private func openApplicationRuns() -> [[ComposerAction]] {
-        var runs: [[ComposerAction]] = []
-        var current: [ComposerAction] = []
-        for action in document.actions {
-            if case .openApplication = action.draft {
-                current.append(action)
-            } else if !current.isEmpty {
-                runs.append(current)
-                current = []
+    private enum AppListFamily: Equatable {
+        case open
+        case hide
+        case quit
+
+        var actionHead: String {
+            switch self {
+            case .open: return "open"
+            case .hide: return "hide"
+            case .quit: return "quit"
             }
         }
-        if !current.isEmpty {
-            runs.append(current)
+
+        func draft(for record: ApplicationRecord) -> ComposerActionDraft {
+            let reference = ResourceReference.application(
+                bundleIdentifier: record.bundleIdentifier,
+                label: record.displayName
+            )
+            switch self {
+            case .open: return .openApplication(name: record.displayName, resolved: reference)
+            case .hide: return .hideApplication(name: record.displayName, resolved: reference)
+            case .quit: return .quitApplication(name: record.displayName, resolved: reference)
+            }
         }
+    }
+
+    private struct ApplicationListRun {
+        let family: AppListFamily
+        let actions: [ComposerAction]
+
+        var names: [String] {
+            actions.compactMap { action in
+                switch action.draft {
+                case .openApplication(let name, _),
+                     .hideApplication(let name, _),
+                     .quitApplication(let name, _):
+                    return name
+                default:
+                    return nil
+                }
+            }
+        }
+    }
+
+    private func applicationListRuns() -> [ApplicationListRun] {
+        var runs: [ApplicationListRun] = []
+        var currentFamily: AppListFamily?
+        var current: [ComposerAction] = []
+
+        func flush() {
+            if let family = currentFamily, !current.isEmpty {
+                runs.append(ApplicationListRun(family: family, actions: current))
+            }
+            current = []
+            currentFamily = nil
+        }
+
+        for action in document.actions {
+            let family: AppListFamily?
+            switch action.draft {
+            case .openApplication: family = .open
+            case .hideApplication: family = .hide
+            case .quitApplication: family = .quit
+            default: family = nil
+            }
+
+            if let family {
+                if currentFamily == family {
+                    current.append(action)
+                } else {
+                    flush()
+                    currentFamily = family
+                    current = [action]
+                }
+            } else {
+                flush()
+            }
+        }
+
+        flush()
         return runs
     }
 

@@ -42,8 +42,4 @@ public struct Suggestion: Hashable, Sendable {
     public var replacementMeaning: String {
         "replaces the current word with \(phrase)"
     }
-
-    public var kind: SuggestionMatch {
-        match
-    }
 }

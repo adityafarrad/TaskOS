@@ -77,4 +77,17 @@ struct ApplicationCatalogServiceTests {
         await service.reset()
         #expect(await service.snapshot() == .empty)
     }
+
+    @Test func resetDuringRefreshDoesNotRepublishTheOlderSnapshot() async {
+        let provider = FakeApplicationProvider(records: [record("Safari")], delayMilliseconds: 80)
+        let service = ApplicationCatalogService(provider: provider)
+
+        async let refresh = service.refresh()
+        try? await Task.sleep(for: .milliseconds(20))
+        await service.reset()
+        let snapshot = await refresh
+
+        #expect(snapshot == .empty)
+        #expect(await service.snapshot() == .empty)
+    }
 }

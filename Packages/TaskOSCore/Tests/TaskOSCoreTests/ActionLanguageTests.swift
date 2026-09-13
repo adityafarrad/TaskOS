@@ -217,4 +217,36 @@ struct ActionLanguageTests {
         let document = ComposerDocument(text: command)
         #expect(document.rationaleText == nil)
     }
+
+    @Test func suggestionAcceptanceUsesCheckedUTF16Replacement() {
+        var document = ComposerDocument(text: "😀😀 open and No")
+        let suggestion = Suggestion(
+            id: "app.notes",
+            phrase: "Open Notes",
+            title: "Notes",
+            category: .application,
+            requiresParameter: false,
+            match: .prefix
+        )
+
+        document.accept(suggestion, replacing: document.completionFragmentRange())
+
+        #expect(document.text == "😀😀 open and Open Notes")
+    }
+
+    @Test func suggestionAcceptanceRejectsAnInvalidReplacementRange() {
+        var document = ComposerDocument(text: "open No")
+        let suggestion = Suggestion(
+            id: "app.notes",
+            phrase: "Open Notes",
+            title: "Notes",
+            category: .application,
+            requiresParameter: false,
+            match: .prefix
+        )
+
+        document.accept(suggestion, replacing: SourceSpan(start: 900, end: 901))
+
+        #expect(document.text == "Open Notes")
+    }
 }
