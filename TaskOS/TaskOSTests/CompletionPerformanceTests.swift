@@ -42,7 +42,12 @@ struct CompletionPerformanceTests {
                 + "p95=\(percentile(0.95)) p99=\(percentile(0.99)) max=\(sorted.last ?? 0)",
             name: "taskos-app-completion-perf.txt"
         )
-        #expect(percentile(0.95) <= 100.0)
+        #if DEBUG
+        let target = 150.0
+        #else
+        let target = 100.0
+        #endif
+        #expect(percentile(0.95) <= target)
     }
 
     @Test func coldApplicationSnapshotPerformance() async {

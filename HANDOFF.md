@@ -73,10 +73,10 @@ Key project facts:
   composer typing, suggestions, keyboard completion, discovery, step menu,
   settings).
 - Debug + Release builds clean, rerun 2026-09-13.
-- WP 2.7D performance (Release): parser p95 0.022 ms / p99 0.029 ms (targets
-  10 / 25); app completion p95 4.36 ms (target 100); app search p95 3.66 ms;
-  cold app snapshot 105 apps in 2.78 ms. Full protocol and method in
-  `PROGRESS.md` under 2.7D3 and 2.7D-fix.
+- WP 2.7D performance (Release): parser p95 0.025 ms / p99 0.049 ms (targets
+  10 / 25); app completion p95 4.91 ms (target 100); app search p95 4.02 ms;
+  cold app snapshot 105 apps in 2.60 ms. Full protocol and method in
+  `PROGRESS.md` under 2.7D3 and the follow-up records.
 - Physical checks: Phase 1 canonical journey; 2.1 schedule tests A–E; 2.4 all
   six event-trigger families; 2.6 attention/retention/permissions UI — all
   user-confirmed. The WP 2.7D3 owner physical pass (non-Latin IME marked text,

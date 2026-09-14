@@ -3446,6 +3446,54 @@ Second run before starting 2.7C, performed at commit `0f50f73`:
 - Remaining defects / gaps: none known. The 2.7D3 owner physical pass is still
   the only open 2.7 item.
 
+### Feature — Deterministic phrase-order normalization (2026-09-14)
+
+- Status: done
+- Behavior delivered: a bounded normalization and phrase-order layer maps
+  equivalent daily-schedule wording to the same existing typed automation with
+  no fuzzy guessing or additional capabilities:
+  - `every day` and colloquial `everyday` in the daily context.
+  - Trigger → action and action → trigger ordering, including
+    `at TIME every day ACTION`, `at TIME ACTION every day`,
+    `every day at TIME ACTION`, `ACTION every day at TIME`, and their
+    connector/comma variants.
+  - Time forms `9pm`, `9 pm`, `9:00 pm`, and `21:00`.
+  - Polite prefixes (`please`, `can you`, `could you`, `would you`,
+    `make sure`, …), case differences, and harmless punctuation.
+  - The parser now emits `timeOfDay` and `dayQualifier` schedule fragments; a
+    bounded post-parse pass merges exactly one time fragment and one day
+    qualifier when every clause between them is an action clause.
+- Fail-closed behavior preserved: two times, two day qualifiers, other schedule
+  clauses, non-action gaps, ambiguous `09:00`, a missing time, a missing day,
+  middle triggers, and unsupported qualifiers all remain unresolved and block
+  Preview/Save.
+- Interfaces changed:
+  - `ParsedSchedule` gained `.timeOfDay(hour:minute:)` and `.dayQualifier`.
+  - `CommandLanguageCatalog`: `at` and `everyday` are schedule routes;
+    `ScheduleVocabulary.everydayWord`; schedule head words updated.
+  - `CommandParser`: time/day fragment parsing, the bounded
+    `normalizedScheduleClauses` merge, and diagnostics computed after
+    normalization.
+  - `ComposerDocument`: unpaired schedule fragments map to unresolved elements.
+- Tests:
+  - New `PhraseOrderNormalizationTests`: 20 equivalent daily phrasings produce
+    the identical typed plan, a time-format table, a trigger/action ordering
+    table, and 14 ambiguous or incomplete phrasings remain blocked (parser not
+    complete and `makeDefinition` nil).
+  - Core: `swift test --package-path Packages/TaskOSCore` — 410 tests, 47
+    suites, pass.
+  - Release perf: parser p95 0.0251 ms / p99 0.0493 ms (targets ≤ 10/≤ 25);
+    search p95 4.02 ms; app completion p95 4.91 ms (target ≤ 100); cold
+    snapshot 105 apps in 2.60 ms.
+  - App tests (`xcodebuild ... test -only-testing:TaskOSTests`) — TEST
+    SUCCEEDED.
+  - UI tests — TEST SUCCEEDED, 15/15, including
+    `testColloquialDailyPhraseCreatesAStep`
+    (`at 9:00 pm open notes everyday`).
+  - Debug and Release builds — SUCCEEDED.
+- Remaining defects / gaps: none known. The 2.7D3 owner physical pass is still
+  the only open 2.7 item.
+
 
 
 

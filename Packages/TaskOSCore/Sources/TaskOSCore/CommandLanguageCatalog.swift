@@ -138,6 +138,7 @@ public struct CommandLanguageCatalog: Sendable {
     public struct ScheduleVocabulary: Hashable, Sendable {
         public let headWords: Set<String>
         public let everyWord: String
+        public let everydayWord: String
         public let onceWord: String
         public let inWord: String
         public let atWord: String
@@ -464,8 +465,10 @@ extension CommandLanguageCatalog {
             "maximize": .maximize,
             "center": .center,
             "every": .schedule,
+            "everyday": .schedule,
             "once": .schedule,
             "in": .schedule,
+            "at": .schedule,
             "when": .when,
         ],
         shared: SharedVocabulary(
@@ -520,8 +523,9 @@ extension CommandLanguageCatalog {
             ]
         ),
         schedule: ScheduleVocabulary(
-            headWords: ["every", "once", "in"],
+            headWords: ["every", "everyday", "once", "in", "at"],
             everyWord: "every",
+            everydayWord: "everyday",
             onceWord: "once",
             inWord: "in",
             atWord: "at",
@@ -832,7 +836,7 @@ extension CommandLanguageCatalog {
         ),
         .schedule: TriggerLanguage(
             id: .schedule,
-            headWords: ["every", "once", "in"],
+            headWords: ["every", "everyday", "once", "in", "at"],
             canonical: CanonicalWording(
                 "Every day at {clock}",
                 variants: [

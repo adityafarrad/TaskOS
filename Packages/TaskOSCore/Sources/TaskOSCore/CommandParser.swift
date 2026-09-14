@@ -272,7 +272,6 @@ private struct ParserWorker {
 
     mutating func parse() -> ParsedCommand {
         var clauses: [ParsedClause] = []
-        var diagnosticList: [ParseDiagnostic] = []
         var approvedSpans: [SourceSpan] = []
 
         var effectiveEnd = text.utf16.count
@@ -301,7 +300,6 @@ private struct ParserWorker {
             let start = position
             let clause = parseClause()
             clauses.append(clause)
-            diagnosticList.append(contentsOf: diagnostics(for: clause))
             skipConnectors()
             if position == start {
                 position += 1
@@ -318,6 +316,9 @@ private struct ParserWorker {
             approvedSpans.append(lastClause.span)
             clauses.removeLast()
         }
+
+        clauses = Self.normalizedScheduleClauses(clauses)
+        var diagnosticList = clauses.flatMap { diagnostics(for: $0) }
 
         var clarifications: [ParseClarification] = []
         for clause in clauses where clause.kind == .copyText {
@@ -469,6 +470,52 @@ private struct ParserWorker {
         }
     }
 
+    private static func normalizedScheduleClauses(_ clauses: [ParsedClause]) -> [ParsedClause] {
+        let timeIndices = clauses.indices.filter { index in
+            if case .schedule(.timeOfDay) = clauses[index].parameter { return true }
+            return false
+        }
+        let dayIndices = clauses.indices.filter { index in
+            if case .schedule(.dayQualifier) = clauses[index].parameter { return true }
+            return false
+        }
+        guard timeIndices.count == 1, dayIndices.count == 1 else { return clauses }
+
+        let timeIndex = timeIndices[0]
+        let dayIndex = dayIndices[0]
+        let lower = min(timeIndex, dayIndex)
+        let upper = max(timeIndex, dayIndex)
+
+        for index in (lower + 1)..<upper where !isActionClause(clauses[index]) {
+            return clauses
+        }
+
+        guard case .schedule(.timeOfDay(let hour, let minute)) = clauses[timeIndex].parameter else {
+            return clauses
+        }
+
+        let merged = ParsedClause(
+            kind: .schedule,
+            span: SourceSpan(
+                start: min(clauses[timeIndex].span.start, clauses[dayIndex].span.start),
+                end: max(clauses[timeIndex].span.end, clauses[dayIndex].span.end)
+            ),
+            parameter: .schedule(.daily(hour: hour, minute: minute)),
+            detail: nil
+        )
+
+        var result = clauses
+        result[lower] = merged
+        result.remove(at: upper)
+        return result
+    }
+
+    private static func isActionClause(_ clause: ParsedClause) -> Bool {
+        guard let capability = clause.capability else { return false }
+        if case .action = capability { return true }
+        return false
+    }
+
     private static func needsInput(_ clause: ParsedClause) -> Bool {
         switch clause.kind {
         case .openApplication:
@@ -489,7 +536,13 @@ private struct ParserWorker {
             guard let duration = clause.duration else { return true }
             return !WaitAction.allowedRange.contains(duration)
         case .schedule:
-            return clause.schedule == .incomplete
+            guard let schedule = clause.schedule else { return true }
+            switch schedule {
+            case .incomplete, .timeOfDay, .dayQualifier:
+                return true
+            default:
+                return false
+            }
         case .copyText:
             return (clause.copyText ?? "").isEmpty
         case .showNotification, .unsupported, .unrecognized:
@@ -539,10 +592,16 @@ private struct ParserWorker {
             }
             return issues
         case .schedule:
-            if clause.schedule == .incomplete {
+            switch clause.schedule {
+            case .timeOfDay:
+                return [.error("Say how often, for example every day at 9 am.", span: clause.span)]
+            case .dayQualifier:
+                return [.error("Add a time, for example every day at 9 am.", span: clause.span)]
+            case .incomplete, .none:
                 return [.error("Specify a time, for example every day at 9 am, or in 30 minutes.", span: clause.span)]
+            default:
+                return []
             }
-            return []
         case .copyText:
             if (clause.copyText ?? "").isEmpty {
                 return [.error("Copy needs the text to place on the clipboard.", span: clause.span)]
@@ -569,10 +628,6 @@ private struct ParserWorker {
         guard case .word(let word) = token.kind else {
             position += 1
             return ParsedClause(kind: .unrecognized, span: token.span, parameter: .none, detail: nil)
-        }
-
-        if word == language.schedule.atWord, let friendly = parseFriendlySchedule() {
-            return friendly
         }
 
         if let route = language.clauseRoutes[word] {
@@ -1218,40 +1273,63 @@ private struct ParserWorker {
         )
     }
 
-    private mutating func parseFriendlySchedule() -> ParsedClause? {
-        let saved = position
-        let atToken = tokens[position]
-        position += 1
+    private mutating func parseTimeOfDayFragment(startToken: CommandToken) -> ParsedClause {
+        if position < tokens.count, case .number = tokens[position].kind, let clock = parseClock() {
+            return scheduleClause(
+                .timeOfDay(hour: clock.hour, minute: clock.minute),
+                start: startToken.span.start,
+                end: clock.end
+            )
+        }
+        let end = clauseRemainderEnd(from: startToken.span.end)
+        return scheduleClause(.incomplete, start: startToken.span.start, end: end)
+    }
 
-        guard let clock = parseClock() else {
-            position = saved
-            return nil
-        }
-        guard position < tokens.count, case .word(let every) = tokens[position].kind,
-              every == language.schedule.everyWord else {
-            position = saved
-            return nil
-        }
-        position += 1
-        guard position < tokens.count, case .word(let dayWord) = tokens[position].kind,
-              language.schedule.dayWords.contains(dayWord) else {
-            position = saved
-            return nil
-        }
-        var end = tokens[position].span.end
-        position += 1
+    private mutating func parseEveryday(startToken: CommandToken) -> ParsedClause {
+        parseDailyTail(startToken: startToken, end: startToken.span.end)
+    }
 
-        if position < tokens.count, case .word(let subject) = tokens[position].kind,
-           language.schedule.optionalSubjectWords.contains(subject) {
+    private mutating func parseDailyTail(startToken: CommandToken, end startEnd: Int) -> ParsedClause {
+        var end = startEnd
+        if position < tokens.count, case .word(let word) = tokens[position].kind,
+           word == language.schedule.atWord {
             end = tokens[position].span.end
             position += 1
         }
 
-        return scheduleClause(
-            .daily(hour: clock.hour, minute: clock.minute),
-            start: atToken.span.start,
-            end: end
-        )
+        if position < tokens.count, case .number = tokens[position].kind {
+            if let clock = parseClock() {
+                end = consumeOptionalSubject(after: clock.end)
+                return scheduleClause(
+                    .daily(hour: clock.hour, minute: clock.minute),
+                    start: startToken.span.start,
+                    end: end
+                )
+            }
+            let remainder = clauseRemainderEnd(from: end)
+            return scheduleClause(.incomplete, start: startToken.span.start, end: remainder)
+        }
+
+        end = consumeOptionalSubject(after: end)
+        return scheduleClause(.dayQualifier, start: startToken.span.start, end: end)
+    }
+
+    private mutating func consumeOptionalSubject(after end: Int) -> Int {
+        guard position < tokens.count,
+              case .word(let word) = tokens[position].kind,
+              language.schedule.optionalSubjectWords.contains(word) else {
+            return end
+        }
+        let newEnd = tokens[position].span.end
+        position += 1
+        return newEnd
+    }
+
+    private mutating func clauseRemainderEnd(from fallback: Int) -> Int {
+        if position < tokens.count {
+            return consumeClauseRemainder()
+        }
+        return max(fallback, tokens.last?.span.end ?? fallback)
     }
 
     private mutating func parseSchedule() -> ParsedClause {
@@ -1262,6 +1340,14 @@ private struct ParserWorker {
         }
         position += 1
         let end = startToken.span.end
+
+        if keyword == language.schedule.atWord {
+            return parseTimeOfDayFragment(startToken: startToken)
+        }
+
+        if keyword == language.schedule.everydayWord {
+            return parseEveryday(startToken: startToken)
+        }
 
         if keyword == language.schedule.inWord {
             if let (seconds, durationEnd) = parseDurationPhrase(allowBareUnit: false) {
@@ -1421,11 +1507,7 @@ private struct ParserWorker {
         if language.schedule.dayWords.contains(word) {
             end = tokens[position].span.end
             position += 1
-            skipWord(language.schedule.atWord)
-            if let clock = parseClock() {
-                return scheduleClause(.daily(hour: clock.hour, minute: clock.minute), start: startToken.span.start, end: clock.end)
-            }
-            return scheduleClause(.incomplete, start: startToken.span.start, end: end)
+            return parseDailyTail(startToken: startToken, end: end)
         }
 
         if language.schedule.weekdayWords.contains(word) {

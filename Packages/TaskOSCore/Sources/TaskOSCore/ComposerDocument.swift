@@ -860,7 +860,7 @@ public struct ComposerDocument: Sendable {
                     } else {
                         newElements.append(.unresolved(clauseText(clause)))
                     }
-                case .incomplete, .none:
+                case .timeOfDay, .dayQualifier, .incomplete, .none:
                     newElements.append(.unresolved(clauseText(clause)))
                 }
 

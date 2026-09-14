@@ -262,6 +262,27 @@ final class TaskOSUITests: XCTestCase {
     }
 
     @MainActor
+    func testColloquialDailyPhraseCreatesAStep() throws {
+        let app = launchApp()
+        XCTAssertTrue(element(app, "editor.view").waitForExistence(timeout: 10))
+
+        let composer = composerField(app)
+        pasteComposerText(app, "at 9:00 pm open notes everyday")
+        Thread.sleep(forTimeInterval: 1.0)
+
+        XCTAssertTrue(app.staticTexts["1 step"].waitForExistence(timeout: 5))
+        let unresolved = app.staticTexts
+            .matching(
+                NSPredicate(
+                    format: "label BEGINSWITH %@ OR value BEGINSWITH %@",
+                    "Unresolved:", "Unresolved:"
+                )
+            )
+            .firstMatch
+        XCTAssertFalse(unresolved.exists)
+    }
+
+    @MainActor
     private func pasteComposerText(_ app: XCUIApplication, _ text: String) {
         let composer = composerField(app)
         composer.click()
