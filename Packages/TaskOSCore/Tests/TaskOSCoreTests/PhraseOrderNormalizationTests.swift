@@ -90,6 +90,25 @@ struct PhraseOrderNormalizationTests {
         }
     }
 
+    @Test func relativeDayOrderingsProduceTheSamePlan() {
+        for (index, text) in [
+            "today at 11:00 pm open notes",
+            "today 11:00 pm open notes",
+            "open notes today at 11:00 pm",
+            "TOday at 11pm open notes",
+        ].enumerated() {
+            guard let variantPlan = plan(for: text) else {
+                Issue.record("variant \(index) did not produce a complete plan")
+                continue
+            }
+            #expect(
+                variantPlan.trigger == .relativeDay(offset: 0, hour: 23, minute: 0),
+                "variant \(index)"
+            )
+            #expect(variantPlan.actions == ["notes"], "variant \(index)")
+        }
+    }
+
     @Test func ambiguousOrIncompletePhrasingsRemainBlocked() {
         let blocked = [
             "at 9 am open notes",
@@ -97,6 +116,10 @@ struct PhraseOrderNormalizationTests {
             "everyday open notes",
             "open notes every day",
             "open notes at 9 am",
+            "today",
+            "today at 9",
+            "today at 09:00 open notes",
+            "tomorrow every day open notes",
             "at 9 am every week open notes",
             "at 9 am open notes at 10 am every day",
             "at 9 am open notes every day every day",

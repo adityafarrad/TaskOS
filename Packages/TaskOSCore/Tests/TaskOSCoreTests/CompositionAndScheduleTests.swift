@@ -229,6 +229,31 @@ struct CompositionAndScheduleTests {
         #expect(resolved?.identifier == "com.apple.Safari")
     }
 
+    @Test func todayAndTomorrowSchedulesParse() {
+        #expect(
+            firstSchedule("today at 9:00 am, then open Safari")
+                == .relativeDate(dayOffset: 0, hour: 9, minute: 0)
+        )
+        #expect(
+            firstSchedule("tomorrow at 11 pm, then open Notes")
+                == .relativeDate(dayOffset: 1, hour: 23, minute: 0)
+        )
+        #expect(
+            firstSchedule("open Safari tomorrow at 9:00 am")
+                == .relativeDate(dayOffset: 1, hour: 9, minute: 0)
+        )
+        #expect(
+            firstSchedule("Tomorrow at 9:00 AM")
+                == .relativeDate(dayOffset: 1, hour: 9, minute: 0)
+        )
+
+        #expect(parser.parse("today at 9 am open Safari").outcome == .complete)
+        #expect(parser.parse("tomorrow at 11:00 pm open Notesnook").outcome == .complete)
+        #expect(parser.parse("today at 9 am").outcome == .complete)
+        #expect(parser.parse("today").outcome == .needsInput)
+        #expect(parser.parse("today at 9").outcome == .needsInput)
+    }
+
     @Test func absoluteOneTimeSurvivesComposition() {
         let expected = Calendar.current.date(
             from: DateComponents(year: 2026, month: 9, day: 20, hour: 9, minute: 0)

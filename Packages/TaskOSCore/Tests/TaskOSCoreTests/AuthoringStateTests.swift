@@ -259,4 +259,48 @@ struct AuthoringStateTests {
     @Test func authoringCalendarIsGregorian() {
         #expect(ComposerDocument.authoringCalendar.identifier == .gregorian)
     }
+
+    @Test func relativeDaySchedulesResolveOnceToTheExactDay() {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "UTC")!
+        let now = calendar.date(from: DateComponents(year: 2026, month: 9, day: 20, hour: 10, minute: 0))!
+
+        var document = ComposerDocument(text: "today at 11:00 pm open Notes")
+        document.resolveApplication(
+            id: document.actions[0].id,
+            reference: .application(bundleIdentifier: "com.apple.Notes", label: "Notes")
+        )
+        let todayTarget = calendar.date(
+            from: DateComponents(year: 2026, month: 9, day: 20, hour: 23, minute: 0)
+        )!
+        #expect(
+            document.triggerConfiguration(relativeTo: now, calendar: calendar)
+                == .schedule(.oneTime(todayTarget))
+        )
+
+        document.setText("tomorrow at 9:00 am open Notes")
+        let tomorrowTarget = calendar.date(
+            from: DateComponents(year: 2026, month: 9, day: 21, hour: 9, minute: 0)
+        )!
+        #expect(
+            document.triggerConfiguration(relativeTo: now, calendar: calendar)
+                == .schedule(.oneTime(tomorrowTarget))
+        )
+
+        let definition = document.makeDefinition(name: "Tomorrow", now: now, calendar: calendar)
+        #expect(definition?.trigger == .schedule(.oneTime(tomorrowTarget)))
+    }
+
+    @Test func pastDueTodayScheduleBlocksDefinition() {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "UTC")!
+        let now = calendar.date(from: DateComponents(year: 2026, month: 9, day: 20, hour: 10, minute: 0))!
+
+        var document = ComposerDocument(text: "today at 9:00 am open Notes")
+        document.resolveApplication(
+            id: document.actions[0].id,
+            reference: .application(bundleIdentifier: "com.apple.Notes", label: "Notes")
+        )
+        #expect(document.makeDefinition(name: "Past", now: now, calendar: calendar) == nil)
+    }
 }

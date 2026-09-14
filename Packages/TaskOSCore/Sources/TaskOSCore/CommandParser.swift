@@ -548,16 +548,20 @@ private struct ParserWorker {
             if case .schedule(.timeOfDay) = clauses[index].parameter { return true }
             return false
         }
-        let dayIndices = clauses.indices.filter { index in
-            if case .schedule(.dayQualifier) = clauses[index].parameter { return true }
-            return false
+        let qualifierIndices = clauses.indices.filter { index in
+            switch clauses[index].parameter {
+            case .schedule(.dayQualifier), .schedule(.dayOffset):
+                return true
+            default:
+                return false
+            }
         }
-        guard timeIndices.count == 1, dayIndices.count == 1 else { return clauses }
+        guard timeIndices.count == 1, qualifierIndices.count == 1 else { return clauses }
 
         let timeIndex = timeIndices[0]
-        let dayIndex = dayIndices[0]
-        let lower = min(timeIndex, dayIndex)
-        let upper = max(timeIndex, dayIndex)
+        let qualifierIndex = qualifierIndices[0]
+        let lower = min(timeIndex, qualifierIndex)
+        let upper = max(timeIndex, qualifierIndex)
 
         for index in (lower + 1)..<upper where !isActionClause(clauses[index]) {
             return clauses
@@ -567,13 +571,23 @@ private struct ParserWorker {
             return clauses
         }
 
+        let mergedSchedule: ParsedSchedule
+        switch clauses[qualifierIndex].parameter {
+        case .schedule(.dayQualifier):
+            mergedSchedule = .daily(hour: hour, minute: minute)
+        case .schedule(.dayOffset(let dayOffset)):
+            mergedSchedule = .relativeDate(dayOffset: dayOffset, hour: hour, minute: minute)
+        default:
+            return clauses
+        }
+
         let merged = ParsedClause(
             kind: .schedule,
             span: SourceSpan(
-                start: min(clauses[timeIndex].span.start, clauses[dayIndex].span.start),
-                end: max(clauses[timeIndex].span.end, clauses[dayIndex].span.end)
+                start: min(clauses[timeIndex].span.start, clauses[qualifierIndex].span.start),
+                end: max(clauses[timeIndex].span.end, clauses[qualifierIndex].span.end)
             ),
-            parameter: .schedule(.daily(hour: hour, minute: minute)),
+            parameter: .schedule(mergedSchedule),
             detail: nil
         )
 
@@ -611,7 +625,7 @@ private struct ParserWorker {
         case .schedule:
             guard let schedule = clause.schedule else { return true }
             switch schedule {
-            case .incomplete, .timeOfDay, .dayQualifier:
+            case .incomplete, .timeOfDay, .dayQualifier, .dayOffset:
                 return true
             default:
                 return false
@@ -668,8 +682,8 @@ private struct ParserWorker {
             switch clause.schedule {
             case .timeOfDay:
                 return [.error("Say how often, for example every day at 9 am.", span: clause.span)]
-            case .dayQualifier:
-                return [.error("Add a time, for example every day at 9 am.", span: clause.span)]
+            case .dayQualifier, .dayOffset:
+                return [.error("Add a time, for example tomorrow at 9 am.", span: clause.span)]
             case .incomplete, .none:
                 return [.error("Specify a time, for example every day at 9 am, or in 30 minutes.", span: clause.span)]
             default:
@@ -686,7 +700,12 @@ private struct ParserWorker {
             if let detail = clause.detail {
                 return [.error(detail, span: clause.span)]
             }
-            return [.warning("Could not match supported wording.", span: clause.span)]
+            let raw = text.substring(in: clause.span)?
+                .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            let message = raw.isEmpty
+                ? "Could not match supported wording."
+                : "Could not match \"\(raw)\"."
+            return [.warning(message, span: clause.span)]
         default:
             return []
         }
@@ -1362,7 +1381,15 @@ private struct ParserWorker {
         parseDailyTail(startToken: startToken, end: startToken.span.end)
     }
 
-    private mutating func parseDailyTail(startToken: CommandToken, end startEnd: Int) -> ParsedClause {
+    private mutating func parseRelativeDay(startToken: CommandToken, dayOffset: Int) -> ParsedClause {
+        parseDailyTail(startToken: startToken, end: startToken.span.end, dayOffset: dayOffset)
+    }
+
+    private mutating func parseDailyTail(
+        startToken: CommandToken,
+        end startEnd: Int,
+        dayOffset: Int? = nil
+    ) -> ParsedClause {
         var end = startEnd
         if position < tokens.count, case .word(let word) = tokens[position].kind,
            word == language.schedule.atWord {
@@ -1373,17 +1400,22 @@ private struct ParserWorker {
         if position < tokens.count, case .number = tokens[position].kind {
             if let clock = parseClock() {
                 end = consumeOptionalSubject(after: clock.end)
-                return scheduleClause(
-                    .daily(hour: clock.hour, minute: clock.minute),
-                    start: startToken.span.start,
-                    end: end
-                )
+                let schedule: ParsedSchedule
+                if let dayOffset {
+                    schedule = .relativeDate(dayOffset: dayOffset, hour: clock.hour, minute: clock.minute)
+                } else {
+                    schedule = .daily(hour: clock.hour, minute: clock.minute)
+                }
+                return scheduleClause(schedule, start: startToken.span.start, end: end)
             }
             let remainder = clauseRemainderEnd(from: end)
             return scheduleClause(.incomplete, start: startToken.span.start, end: remainder)
         }
 
         end = consumeOptionalSubject(after: end)
+        if let dayOffset {
+            return scheduleClause(.dayOffset(dayOffset), start: startToken.span.start, end: end)
+        }
         return scheduleClause(.dayQualifier, start: startToken.span.start, end: end)
     }
 
@@ -1420,6 +1452,14 @@ private struct ParserWorker {
 
         if keyword == language.schedule.everydayWord {
             return parseEveryday(startToken: startToken)
+        }
+
+        if keyword == language.schedule.todayWord {
+            return parseRelativeDay(startToken: startToken, dayOffset: 0)
+        }
+
+        if keyword == language.schedule.tomorrowWord {
+            return parseRelativeDay(startToken: startToken, dayOffset: 1)
         }
 
         if keyword == language.schedule.inWord {

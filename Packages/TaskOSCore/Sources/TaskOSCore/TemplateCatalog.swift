@@ -62,7 +62,7 @@ public extension ComposerTriggerDraft {
     var triggerID: TriggerID {
         switch self {
         case .manual: return .manual
-        case .daily, .weekdays, .interval, .relative, .once, .oneTime: return .schedule
+        case .daily, .weekdays, .interval, .relative, .once, .oneTime, .relativeDay: return .schedule
         case .applicationLifecycle: return .applicationLifecycle
         case .wake: return .wake
         case .displayConnection: return .displayConnection

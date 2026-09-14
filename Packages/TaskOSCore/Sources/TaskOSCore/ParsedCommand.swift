@@ -30,6 +30,8 @@ public enum ParsedSchedule: Hashable, Sendable {
     case absolute(year: Int, month: Int, day: Int, hour: Int, minute: Int)
     case timeOfDay(hour: Int, minute: Int)
     case dayQualifier
+    case dayOffset(Int)
+    case relativeDate(dayOffset: Int, hour: Int, minute: Int)
     case incomplete
 }
 

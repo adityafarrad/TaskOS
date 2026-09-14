@@ -143,6 +143,8 @@ public struct CommandLanguageCatalog: Sendable {
         public let inWord: String
         public let atWord: String
         public let onWord: String
+        public let todayWord: String
+        public let tomorrowWord: String
         public let dayWords: Set<String>
         public let weekdayWords: Set<String>
         public let weekendWords: Set<String>
@@ -469,6 +471,8 @@ extension CommandLanguageCatalog {
             "once": .schedule,
             "in": .schedule,
             "at": .schedule,
+            "today": .schedule,
+            "tomorrow": .schedule,
             "when": .when,
         ],
         shared: SharedVocabulary(
@@ -523,13 +527,15 @@ extension CommandLanguageCatalog {
             ]
         ),
         schedule: ScheduleVocabulary(
-            headWords: ["every", "everyday", "once", "in", "at"],
+            headWords: ["every", "everyday", "once", "in", "at", "today", "tomorrow"],
             everyWord: "every",
             everydayWord: "everyday",
             onceWord: "once",
             inWord: "in",
             atWord: "at",
             onWord: "on",
+            todayWord: "today",
+            tomorrowWord: "tomorrow",
             dayWords: ["day", "days"],
             weekdayWords: ["weekday", "weekdays"],
             weekendWords: ["weekend", "weekends"],
@@ -836,7 +842,7 @@ extension CommandLanguageCatalog {
         ),
         .schedule: TriggerLanguage(
             id: .schedule,
-            headWords: ["every", "everyday", "once", "in", "at"],
+            headWords: ["every", "everyday", "once", "in", "at", "today", "tomorrow"],
             canonical: CanonicalWording(
                 "Every day at {clock}",
                 variants: [
@@ -846,6 +852,8 @@ extension CommandLanguageCatalog {
                     "interval": "Every {interval}",
                     "relative": "In {interval}",
                     "once": "Once at {clock}",
+                    "today": "Today at {clock}",
+                    "tomorrow": "Tomorrow at {clock}",
                 ]
             ),
             examples: [

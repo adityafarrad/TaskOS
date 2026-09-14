@@ -77,6 +77,8 @@ struct IndependentLanguageCorpusTests {
             ("in 45 minutes", .relative(2700)),
             ("in 90 seconds", .relative(90)),
             ("once at 7 pm", .once(hour: 19, minute: 0)),
+            ("today at 9:00 am", .relativeDate(dayOffset: 0, hour: 9, minute: 0)),
+            ("tomorrow at 11:30 pm", .relativeDate(dayOffset: 1, hour: 23, minute: 30)),
             ("once on 2026-09-20 at 09:00", .absolute(year: 2026, month: 9, day: 20, hour: 9, minute: 0)),
             ("once on 2028-02-29 at 09:00", .absolute(year: 2028, month: 2, day: 29, hour: 9, minute: 0)),
         ]

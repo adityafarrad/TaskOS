@@ -199,6 +199,31 @@ struct ComposerViewModelTests {
         #expect(model.text == "at 9:00 am Open Notes")
     }
 
+    @Test func tomorrowScheduleIsReadyAndPastTodayBlocks() {
+        let model = ComposerViewModel()
+        model.applyApplicationSnapshot(ApplicationSnapshot(
+            revision: 1,
+            createdAt: Date(),
+            applications: [
+                ApplicationRecord(bundleIdentifier: "com.apple.Notes", displayName: "Notes", fileName: "Notes"),
+            ]
+        ))
+
+        model.updateFromEditor(text: "tomorrow at 9:00 am open Notes", edit: nil)
+        #expect(model.canPrepare)
+        #expect(model.blockingReason == nil)
+
+        model.updateFromEditor(text: "today at 12:00 am open Notes", edit: nil)
+        #expect(!model.canPrepare)
+        #expect(model.blockingReason?.contains("passed") == true)
+    }
+
+    @Test func blockingReasonSurfacesTheParserMessage() {
+        let model = ComposerViewModel()
+        model.updateFromEditor(text: "open", edit: nil)
+        #expect(model.blockingReason == "Open needs an application name.")
+    }
+
     @Test func staleResourceSelectionDoesNotBind() {
         let model = ComposerViewModel()
         model.add(.openApplication(name: "Safari", resolved: nil))

@@ -156,8 +156,9 @@ final class ComposerViewModel {
 
     var blockingReason: String? {
         if canPrepare { return nil }
-        if document.hasUnresolvedTrigger { return "Finish configuring the trigger." }
         if hasPastDueSchedule { return "The scheduled time has already passed. Choose a new time." }
+        if let message = document.blockingParseMessage { return message }
+        if document.hasUnresolvedTrigger { return "Finish configuring the trigger." }
         if document.actions.isEmpty { return "Add at least one step to review or save." }
         for (index, action) in document.actions.enumerated() {
             if let requirement = ActionPresentation.missingRequirement(for: action.draft, fileStatus: fileStatus) {
@@ -295,7 +296,7 @@ final class ComposerViewModel {
             return .powerSource
         case .batteryThreshold:
             return .batteryThreshold
-        case .daily, .weekdays, .interval, .relative, .once, .oneTime:
+        case .daily, .weekdays, .interval, .relative, .once, .oneTime, .relativeDay:
             return .schedule
         }
     }
@@ -456,7 +457,7 @@ final class ComposerViewModel {
             return .weekdays
         case .interval, .relative:
             return .interval
-        case .once, .oneTime:
+        case .once, .oneTime, .relativeDay:
             return .once
         case .daily, .manual, .applicationLifecycle, .wake, .displayConnection,
              .externalVolume, .powerSource, .batteryThreshold:
@@ -481,6 +482,9 @@ final class ComposerViewModel {
             return calendar.date(bySettingHour: hour, minute: minute, second: 0, of: base) ?? base
         case .oneTime(let date):
             return date
+        case .relativeDay(let offset, let hour, let minute):
+            let day = calendar.date(byAdding: .day, value: offset, to: base) ?? base
+            return calendar.date(bySettingHour: hour, minute: minute, second: 0, of: day) ?? base
         case .relative, .interval, .manual, .applicationLifecycle, .wake,
              .displayConnection, .externalVolume, .powerSource, .batteryThreshold:
             return calendar.date(bySettingHour: 9, minute: 0, second: 0, of: base) ?? base

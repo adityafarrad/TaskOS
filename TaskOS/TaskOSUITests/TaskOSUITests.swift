@@ -324,6 +324,42 @@ final class TaskOSUITests: XCTestCase {
     }
 
     @MainActor
+    func testTomorrowScheduleCompletes() throws {
+        let app = launchApp()
+        XCTAssertTrue(element(app, "editor.view").waitForExistence(timeout: 10))
+
+        let composer = composerField(app)
+        pasteComposerText(app, "tomorrow at 9:00 am open notes")
+        Thread.sleep(forTimeInterval: 1.0)
+
+        XCTAssertTrue(app.staticTexts["1 step"].waitForExistence(timeout: 5))
+        let unresolved = app.staticTexts
+            .matching(
+                NSPredicate(
+                    format: "label BEGINSWITH %@ OR value BEGINSWITH %@",
+                    "Unresolved:", "Unresolved:"
+                )
+            )
+            .firstMatch
+        XCTAssertFalse(unresolved.exists)
+    }
+
+    @MainActor
+    func testPastDueTodayScheduleExplainsTheProblem() throws {
+        let app = launchApp()
+        XCTAssertTrue(element(app, "editor.view").waitForExistence(timeout: 10))
+
+        let composer = composerField(app)
+        pasteComposerText(app, "today at 12:00 am open notes")
+        Thread.sleep(forTimeInterval: 1.0)
+
+        XCTAssertTrue(
+            app.staticTexts["The scheduled time has already passed. Choose a new time."]
+                .waitForExistence(timeout: 5)
+        )
+    }
+
+    @MainActor
     private func pasteComposerText(_ app: XCUIApplication, _ text: String) {
         let composer = composerField(app)
         composer.click()

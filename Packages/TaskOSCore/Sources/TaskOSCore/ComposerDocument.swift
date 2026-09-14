@@ -21,6 +21,7 @@ public enum ComposerTriggerDraft: Codable, Hashable, Sendable {
     case relative(TimeInterval)
     case once(hour: Int, minute: Int)
     case oneTime(Date)
+    case relativeDay(offset: Int, hour: Int, minute: Int)
     case applicationLifecycle(application: ResourceReference?, label: String, event: LifecycleEvent)
     case wake
     case displayConnection(event: DisplayEvent, selection: DisplaySelection)
@@ -338,7 +339,10 @@ public struct ComposerDocument: Sendable {
 
     public var blockingParseMessage: String? {
         guard parseOutcome != .complete else { return nil }
-        return diagnostics.first { $0.severity == .error }?.message
+        if let error = diagnostics.first(where: { $0.severity == .error }) {
+            return error.message
+        }
+        return diagnostics.first?.message
     }
 
     public mutating func setText(_ newText: String) {
@@ -656,6 +660,9 @@ public struct ComposerDocument: Sendable {
         case .once:
             guard let date = resolution.value.oneTimeDate else { return nil }
             return .schedule(.oneTime(date))
+        case .relativeDay:
+            guard let date = resolution.value.oneTimeDate else { return nil }
+            return .schedule(.oneTime(date))
         case .oneTime(let date):
             return .schedule(.oneTime(date))
         case .applicationLifecycle(let application, let label, let event):
@@ -697,6 +704,16 @@ public struct ComposerDocument: Sendable {
                     direction: .forward
                 )
             }
+        case .relativeDay(let offset, let hour, let minute):
+            if resolution.value.oneTimeDate == nil {
+                resolution.value.oneTimeDate = Self.relativeDayDate(
+                    offset: offset,
+                    hour: hour,
+                    minute: minute,
+                    now: now,
+                    calendar: calendar
+                )
+            }
         case .oneTime(let date):
             resolution.value.oneTimeDate = date
         case .interval:
@@ -709,6 +726,21 @@ public struct ComposerDocument: Sendable {
             resolution.value.oneTimeDate = nil
             resolution.value.intervalAnchor = nil
         }
+    }
+
+    private static func relativeDayDate(
+        offset: Int,
+        hour: Int,
+        minute: Int,
+        now: Date,
+        calendar: Calendar
+    ) -> Date? {
+        guard let dayStart = calendar.dateInterval(of: .day, for: now)?.start,
+              let day = calendar.date(byAdding: .day, value: offset, to: dayStart),
+              let target = calendar.date(bySettingHour: hour, minute: minute, second: 0, of: day) else {
+            return nil
+        }
+        return target
     }
 
     public func clearScheduleResolution() {
@@ -758,6 +790,7 @@ public struct ComposerDocument: Sendable {
              (.relative, .relative),
              (.once, .once),
              (.oneTime, .oneTime),
+             (.relativeDay, .relativeDay),
              (.applicationLifecycle, .applicationLifecycle),
              (.wake, .wake),
              (.displayConnection, .displayConnection),
@@ -915,6 +948,8 @@ public struct ComposerDocument: Sendable {
                     newTrigger = .relative(seconds)
                 case .once(let hour, let minute):
                     newTrigger = .once(hour: hour, minute: minute)
+                case .relativeDate(let dayOffset, let hour, let minute):
+                    newTrigger = .relativeDay(offset: dayOffset, hour: hour, minute: minute)
                 case .absolute(let year, let month, let day, let hour, let minute):
                     let components = DateComponents(
                         year: year,
@@ -928,7 +963,7 @@ public struct ComposerDocument: Sendable {
                     } else {
                         newElements.append(.unresolved(clauseText(clause)))
                     }
-                case .timeOfDay, .dayQualifier, .incomplete, .none:
+                case .timeOfDay, .dayQualifier, .dayOffset, .incomplete, .none:
                     newElements.append(.unresolved(clauseText(clause)))
                 }
 
@@ -1371,6 +1406,12 @@ public struct ComposerDocument: Sendable {
             return language.scheduleTemplate("once")?
                 .render(["clock": clockText(hour: hour, minute: minute)])
                 ?? "Once at \(clockText(hour: hour, minute: minute))"
+        case .relativeDay(let offset, let hour, let minute):
+            let variant = offset == 0 ? "today" : "tomorrow"
+            let label = offset == 0 ? "Today" : "Tomorrow"
+            return language.scheduleTemplate(variant)?
+                .render(["clock": clockText(hour: hour, minute: minute)])
+                ?? "\(label) at \(clockText(hour: hour, minute: minute))"
         case .oneTime(let date):
             return language.scheduleTemplate("oneTime")?
                 .render(["date": language.absoluteDateTimeText(date)])

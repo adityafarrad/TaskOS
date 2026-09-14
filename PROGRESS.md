@@ -3695,3 +3695,48 @@ Second run before starting 2.7C, performed at commit `0f50f73`:
   - Release perf: parser p95 0.0245 ms / p99 0.0429 ms; app completion p95
     5.35 ms; cold snapshot 105 apps (no target).
   - Debug and Release builds — SUCCEEDED.
+
+## Feature — Relative-day schedules and specific blocking messages (2026-09-14)
+
+- Status: done
+- Behavior delivered:
+  - `today at TIME [ACTION]`, `tomorrow at TIME [ACTION]`, the optional-`at`
+    forms (`today 11 pm open notes`), and the action-first forms
+    (`open notes today at 11:00 pm`) now parse to a one-time schedule for the
+    exact today/tomorrow instant. The instant resolves once through the
+    existing clock and Gregorian authoring calendar and is stored, so unrelated
+    edits cannot move it. Canonical rendering is `Today at 9:00 AM` /
+    `Tomorrow at 9:00 AM`.
+  - A `today` time that has already passed blocks Preview/Save with the
+    existing correction "The scheduled time has already passed. Choose a new
+    time."
+  - The composer now shows the parser's specific reason instead of only the
+    generic `Unresolved: …` row: missing values surface their message
+    ("Open needs an application name.", "Say how often, for example every day
+    at 9 am.", "Add a time, for example tomorrow at 9 am."), and unrecognized
+    text is quoted ("Could not match \"…\".").
+  - Fail-closed preserved: `today`, `today at 9`, ambiguous `today at 09:00`,
+    and conflicting qualifiers (`tomorrow every day …`) remain unresolved.
+- Interfaces changed:
+  - Catalog: `today`/`tomorrow` schedule routes and `todayWord`/`tomorrowWord`;
+    canonical variants `today`/`tomorrow`.
+  - `ParsedSchedule`: `.dayOffset(Int)` and
+    `.relativeDate(dayOffset:hour:minute:)`; the bounded phrase-order
+    normalizer merges one time fragment with one day-qualifier or day-offset
+    fragment.
+  - `ComposerTriggerDraft.relativeDay(offset:hour:minute:)` with
+    `resolveSchedule` computing the exact date; `triggerConfiguration`,
+    `render`, `triggerKind`, and `timeDate` extended.
+  - `ComposerDocument.blockingParseMessage` falls back to the first warning;
+    unrecognized diagnostics quote the unmatched text.
+  - `ComposerViewModel.blockingReason` now prefers the past-due message and the
+    parser message over the generic correction.
+- Tests:
+  - Core: `swift test --package-path Packages/TaskOSCore` — 422 tests / 47
+    suites pass (relative-day parsing/orderings, resolve-once exact dates,
+    past-due blocking, corpus schedule forms, fail-closed negatives).
+  - App tests — TEST SUCCEEDED (`tomorrowScheduleIsReadyAndPastTodayBlocks`,
+    `blockingReasonSurfacesTheParserMessage`).
+  - UI tests — TEST SUCCEEDED, 19/19 (`testTomorrowScheduleCompletes`,
+    `testPastDueTodayScheduleExplainsTheProblem`).
+  - Debug and Release builds — SUCCEEDED.
