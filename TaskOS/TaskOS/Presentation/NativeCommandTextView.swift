@@ -33,6 +33,7 @@ struct NativeCommandTextView: NSViewRepresentable {
         textView.isAutomaticDashSubstitutionEnabled = false
         textView.isAutomaticTextReplacementEnabled = false
         textView.isAutomaticSpellingCorrectionEnabled = false
+        textView.isAutomaticTextCompletionEnabled = false
         textView.isContinuousSpellCheckingEnabled = false
         textView.isGrammarCheckingEnabled = false
         textView.drawsBackground = false
@@ -49,6 +50,7 @@ struct NativeCommandTextView: NSViewRepresentable {
         scrollView.borderType = .noBorder
 
         context.coordinator.textView = textView
+        context.coordinator.lastReportedText = text
         return scrollView
     }
 
@@ -56,9 +58,13 @@ struct NativeCommandTextView: NSViewRepresentable {
         context.coordinator.parent = self
         guard let textView = scrollView.documentView as? NSTextView else { return }
 
-        if textView.string != text, !textView.hasMarkedText() {
+        let coordinator = context.coordinator
+        if textView.string != text,
+           !textView.hasMarkedText(),
+           text != coordinator.lastReportedText {
             let selection = textView.selectedRange()
             textView.string = text
+            coordinator.lastReportedText = text
             let length = (text as NSString).length
             let location = min(selection.location, length)
             textView.setSelectedRange(NSRange(location: location, length: 0))
@@ -74,6 +80,7 @@ struct NativeCommandTextView: NSViewRepresentable {
     final class Coordinator: NSObject, NSTextViewDelegate {
         var parent: NativeCommandTextView
         weak var textView: NSTextView?
+        var lastReportedText = ""
         private var pendingEditRange: NSRange?
         private var pendingReplacement: String?
 
@@ -120,6 +127,7 @@ struct NativeCommandTextView: NSViewRepresentable {
 
             pendingEditRange = nil
             pendingReplacement = nil
+            lastReportedText = textView.string
             parent.onTextChange(textView.string, edit)
         }
 

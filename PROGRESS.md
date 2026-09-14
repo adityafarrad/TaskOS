@@ -3533,6 +3533,36 @@ Second run before starting 2.7C, performed at commit `0f50f73`:
 - Remaining defects / gaps: none known. The rest of the 2.7D3 owner physical
   pass (IME, VoiceOver, real Test, permissions) is still open.
 
+### Fix 2.7D3-b — Past-due reason without steps; IME preedit safety (2026-09-14)
+
+- Status: done
+- Defects found in the owner physical pass:
+  1. A past-due one-time schedule with no steps still showed "Add at least one
+     step to review or save." because the empty-steps check ran before the
+     past-due check, hiding the schedule correction.
+  2. The non-Latin input-method journey could not be exercised: the native
+     editor re-synced its text from the model whenever the two differed, which
+     can overwrite an in-progress composition (preedit) before `hasMarkedText()`
+     reports true.
+- Fix:
+  - `ComposerViewModel.blockingReason` now checks an unresolved trigger and a
+    past-due schedule before the empty-steps case, so the past-due correction is
+    always surfaced.
+  - `NativeCommandTextView` remembers the last text it reported to the model and
+    only re-applies model text when the model changed externally; it never
+    overwrites the text view while it differs from what was last reported, so
+    input-method preedit is preserved. Inline text completion is also disabled.
+- Tests:
+  - App tests: `pastDueScheduleIsReportedEvenWithoutSteps` — TEST SUCCEEDED.
+  - Core: 410 tests, 47 suites, pass.
+  - UI tests — TEST SUCCEEDED.
+  - Release build — SUCCEEDED.
+- Physical checks: re-run H with a schedule-only command (the correction should
+  appear) and test I with a non-Latin input method (preedit should stay until the
+  composition commits, and Return should go to the input method).
+- Remaining defects / gaps: none known. If test I still shows raw Latin text, the
+  non-Latin input source may not be active for the TaskOS app.
+
 
 
 

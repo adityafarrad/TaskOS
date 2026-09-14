@@ -157,9 +157,9 @@ final class ComposerViewModel {
 
     var blockingReason: String? {
         if canPrepare { return nil }
-        if document.actions.isEmpty { return "Add at least one step to review or save." }
         if document.hasUnresolvedTrigger { return "Finish configuring the trigger." }
         if hasPastDueSchedule { return "The scheduled time has already passed. Choose a new time." }
+        if document.actions.isEmpty { return "Add at least one step to review or save." }
         for (index, action) in document.actions.enumerated() {
             if let requirement = ActionPresentation.missingRequirement(for: action.draft, fileStatus: fileStatus) {
                 return "Step \(index + 1) needs \(requirement)."

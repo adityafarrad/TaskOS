@@ -333,6 +333,14 @@ struct ComposerViewModelTests {
         #expect(model.notice?.contains("passed") == true)
     }
 
+    @Test func pastDueScheduleIsReportedEvenWithoutSteps() {
+        let model = ComposerViewModel()
+        model.updateFromEditor(text: "once on 2020-01-01 at 09:00", edit: nil)
+
+        #expect(!model.canPrepare)
+        #expect(model.blockingReason?.contains("passed") == true)
+    }
+
     @Test func editingClearsAStaleNotice() {
         let model = ComposerViewModel()
         model.updateFromEditor(
