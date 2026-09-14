@@ -229,7 +229,13 @@ struct ActionLanguageTests {
             match: .prefix
         )
 
-        document.accept(suggestion, replacing: document.completionFragmentRange())
+        document.accept(
+            suggestion,
+            replacing: document.completionReplacement(
+                upTo: document.text.utf16.count,
+                phrase: suggestion.phrase
+            )
+        )
 
         #expect(document.text == "😀😀 open and Open Notes")
     }
@@ -245,8 +251,54 @@ struct ActionLanguageTests {
             match: .prefix
         )
 
-        document.accept(suggestion, replacing: SourceSpan(start: 900, end: 901))
+        let selection = document.accept(
+            suggestion,
+            replacing: TextReplacement(span: SourceSpan(start: 900, end: 901), replacement: suggestion.phrase)
+        )
 
-        #expect(document.text == "Open Notes")
+        #expect(selection == nil)
+        #expect(document.text == "open No")
+    }
+
+    @Test func leadingAndRepeatedConnectorsFailClosed() {
+        for command in [
+            "and open Safari",
+            "then open Safari",
+            ", open Safari",
+            "; open Safari",
+            "and and open Safari",
+            "open Safari and and open Notes",
+        ] {
+            let parsed = parser.parse(command)
+            #expect(parsed.outcome != .complete, "\(command)")
+            #expect(parsed.diagnostics.contains { $0.severity == .error }, "\(command)")
+            #expect(ComposerDocument(text: command).makeDefinition(name: "Connector") == nil, "\(command)")
+        }
+    }
+
+    @Test func arrangePresetFollowsTheEditedText() {
+        var document = ComposerDocument(text: "put Safari on the left half")
+        document.setText("put Safari on the right half")
+
+        #expect(document.text == "put Safari on the right half")
+        guard case .arrangeWindow(_, _, let preset, _)? = document.actions.first?.draft else {
+            Issue.record("Expected an arrange step")
+            return
+        }
+        #expect(preset == .rightHalf)
+    }
+
+    @Test func cursorFragmentReplacementPreservesTheSuffix() {
+        var document = ComposerDocument(text: "open Safari and wait 30 seconds")
+        let fragment = document.completionFragmentRange(upTo: 20)
+
+        #expect(fragment == SourceSpan(start: 15, end: 20))
+
+        let selection = document.apply(
+            document.completionReplacement(for: fragment, phrase: "Wait 1 second")
+        )
+
+        #expect(document.text == "open Safari and Wait 1 second 30 seconds")
+        #expect(selection == SourceSpan(start: 29, end: 29))
     }
 }

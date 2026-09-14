@@ -17,6 +17,7 @@ struct CommandComposerView: View {
 
                 NativeCommandTextView(
                     text: model.text,
+                    selection: model.commandSelection,
                     isFocused: isFocused,
                     onTextChange: { value, edit in
                         model.updateFromEditor(text: value, edit: edit)

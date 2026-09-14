@@ -3601,3 +3601,62 @@ Second run before starting 2.7C, performed at commit `0f50f73`:
 
 
 
+
+## Review repairs — 2.7 acceptance fixes (2026-09-14)
+
+- Status: done. All seven findings from the independent 2.7D acceptance review
+  were confirmed by reproduction and fixed.
+- Defects fixed:
+  1. Recovered version-2 drafts now reparse the saved source and graft the saved
+     structured state back onto the parsed elements. Incomplete clauses survive
+     recovery as unresolved elements, so Preview/Save stay blocked and no
+     partial definition can be produced (`ComposerDocument.init?(snapshot:)`,
+     `restoreStructuredTrigger`). Exact one-time dates and card-only values are
+     preserved.
+  2. Editing an Arrange Window preset in the command text now adopts the newly
+     parsed preset while keeping the card-only display selection
+     (`ComposerDocument.merge`).
+  3. Leading, trailing, and repeated connectors fail closed. Connector runs are
+     validated against clause spans: leading runs, dangling runs, and repeated
+     connector words/punctuation produce errors and block completion
+     (`CommandParser.connectorRunDiagnostics`); the independent negative corpus
+     gained the corresponding cases.
+  4. Preparation and save validity now cover document replacement and name
+     changes: `newWorkflow`, `loadForEditing`, `loadTemplate`, `recoverDraft`,
+     and `updateName` bump the authoring generation, and the save task rechecks
+     the generation after repository I/O before touching session state, so a
+     stale save can no longer clear the new document's draft or overwrite its
+     saved-workflow bookkeeping (`ComposerViewModel`).
+  5. Completion is cursor/selection-aware: suggestions are computed from the
+     caret prefix (or the selection), each published suggestion carries an exact
+     `TextReplacement` and its `CompletionKey`, acceptance applies the exact
+     range, preserves any suffix, and returns the resulting caret
+     (`ComposerDocument.completionFragmentRange(upTo:)`,
+     `completionReplacement`, `apply`; `Suggestion.replacement`/
+     `completionKey`; `NativeCommandTextView` applies the model selection after
+     a programmatic replacement).
+  6. Absolute dates resolve through an explicit Gregorian calendar with the
+     current timezone (`ComposerDocument.authoringCalendar`), and an exact
+     application-resolution miss now refreshes the snapshot immediately when no
+     refresh is running (the activation check keeps its 60-second gate).
+  7. `HANDOFF.md` reflects the final 2.7 state and references the tracked
+     `HANDOFF-2.7.md`.
+- Tests performed:
+  - Core: `swift test --package-path Packages/TaskOSCore` — 417 tests, 47
+    suites, pass. New coverage: snapshot restore keeps unresolved clauses and
+    structured values; arrange preset follows edited text; leading/repeated
+    connectors fail closed; cursor fragment replacement preserves the suffix;
+    Gregorian authoring calendar.
+  - App tests (`xcodebuild ... test -only-testing:TaskOSTests`) — TEST
+    SUCCEEDED. New coverage: stale preparation cannot publish after document
+    replacement; stale save bookkeeping is not applied; mid-text suggestion
+    acceptance preserves the suffix and caret.
+  - UI tests — TEST SUCCEEDED, 15/15.
+  - Release performance (optimized Release): parser p95 0.045 ms / p99 0.069 ms
+    (targets ≤ 10 / ≤ 25); app completion p95 6.56 ms (target ≤ 100); cold
+    snapshot 105 apps in 2.89 ms.
+  - Debug and Release builds — SUCCEEDED.
+- Remaining defects / gaps: none known in the automated scope. The owner
+  physical pass recorded in the final exit gate remains valid; the repaired
+  paths (draft recovery, preset edits, connector rejection, stale async work,
+  cursor-aware completion, calendar) are covered by the new automated tests.

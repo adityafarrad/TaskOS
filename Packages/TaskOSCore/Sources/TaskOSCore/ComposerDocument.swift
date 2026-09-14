@@ -349,22 +349,45 @@ public struct ComposerDocument: Sendable {
     }
 
     public func completionFragmentRange() -> SourceSpan {
-        SourceSpan(start: trailingFragmentStart(), end: text.utf16.count)
+        completionFragmentRange(upTo: text.utf16.count)
     }
 
-    public mutating func accept(_ suggestion: Suggestion, replacing replacementSpan: SourceSpan? = nil) {
-        let span: SourceSpan
-        if let replacementSpan, replacementSpan.isValid(in: text) {
-            span = replacementSpan
-        } else {
-            span = completionFragmentRange()
-        }
+    public func completionFragmentRange(upTo caret: Int) -> SourceSpan {
+        let clamped = max(0, min(caret, text.utf16.count))
+        return SourceSpan(start: trailingFragmentStart(upTo: clamped), end: clamped)
+    }
 
-        var prefix = text.substring(in: SourceSpan(start: 0, end: span.start)) ?? ""
-        if !prefix.isEmpty, let last = prefix.last, !last.isWhitespace {
-            prefix.append(" ")
+    public func completionReplacement(upTo caret: Int, phrase: String) -> TextReplacement {
+        completionReplacement(for: completionFragmentRange(upTo: caret), phrase: phrase)
+    }
+
+    public func completionReplacement(for span: SourceSpan, phrase: String) -> TextReplacement {
+        let prefix = text.substring(in: SourceSpan(start: 0, end: span.start)) ?? ""
+        var replacement = phrase
+        if let last = prefix.last, !last.isWhitespace,
+           let first = replacement.first, !first.isWhitespace {
+            replacement = " " + replacement
         }
-        setText(prefix + suggestion.phrase)
+        return TextReplacement(span: span, replacement: replacement)
+    }
+
+    @discardableResult
+    public mutating func accept(_ suggestion: Suggestion, replacing replacement: TextReplacement? = nil) -> SourceSpan? {
+        if let replacement {
+            return apply(replacement)
+        }
+        return apply(completionReplacement(upTo: text.utf16.count, phrase: suggestion.phrase))
+    }
+
+    @discardableResult
+    public mutating func apply(_ replacement: TextReplacement) -> SourceSpan? {
+        guard replacement.span.isValid(in: text), let range = replacement.span.range(in: text) else {
+            return nil
+        }
+        let updated = text.replacingCharacters(in: range, with: replacement.replacement)
+        setText(updated)
+        let caret = replacement.span.start + replacement.replacement.utf16.count
+        return SourceSpan(start: caret, end: caret)
     }
 
     public mutating func addAction(_ draft: ComposerActionDraft) {
@@ -571,12 +594,24 @@ public struct ComposerDocument: Sendable {
         return result
     }
 
+    public static var authoringCalendar: Calendar {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = .current
+        return calendar
+    }
+
     public func makeDefinition(
         name: String,
         id: AutomationID = AutomationID(),
         revision: WorkflowRevision = WorkflowRevision(1)
     ) -> AutomationDefinition? {
-        makeDefinition(name: name, id: id, revision: revision, now: clock.now(), calendar: .current)
+        makeDefinition(
+            name: name,
+            id: id,
+            revision: revision,
+            now: clock.now(),
+            calendar: Self.authoringCalendar
+        )
     }
 
     public func makeDefinition(
@@ -584,7 +619,7 @@ public struct ComposerDocument: Sendable {
         id: AutomationID = AutomationID(),
         revision: WorkflowRevision = WorkflowRevision(1),
         now: Date,
-        calendar: Calendar = .current
+        calendar: Calendar = ComposerDocument.authoringCalendar
     ) -> AutomationDefinition? {
         resolveSchedule(now: now, calendar: calendar)
         guard !hasUnresolvedText else { return nil }
@@ -692,7 +727,7 @@ public struct ComposerDocument: Sendable {
             return nil
         }
         self.clock = clock
-        self.text = snapshot.text
+        self.text = ""
         self.trigger = snapshot.trigger
         self.elements = snapshot.nodes.map { .action(ComposerAction(id: $0.id, draft: $0.draft)) }
         self.parseOutcome = .needsInput
@@ -700,6 +735,35 @@ public struct ComposerDocument: Sendable {
         self.revision = snapshot.revision
         self.resolution.value = snapshot.resolution
         self.rationaleText = snapshot.rationaleText
+        applyText(snapshot.text)
+        restoreStructuredTrigger(from: snapshot)
+    }
+
+    private mutating func restoreStructuredTrigger(from snapshot: AuthoringSnapshot) {
+        guard Self.sameTriggerFamily(snapshot.trigger, trigger) else { return }
+        trigger = snapshot.trigger
+        resolution.value = snapshot.resolution
+    }
+
+    private static func sameTriggerFamily(_ lhs: ComposerTriggerDraft, _ rhs: ComposerTriggerDraft) -> Bool {
+        switch (lhs, rhs) {
+        case (.manual, .manual),
+             (.daily, .daily),
+             (.weekdays, .weekdays),
+             (.interval, .interval),
+             (.relative, .relative),
+             (.once, .once),
+             (.oneTime, .oneTime),
+             (.applicationLifecycle, .applicationLifecycle),
+             (.wake, .wake),
+             (.displayConnection, .displayConnection),
+             (.externalVolume, .externalVolume),
+             (.powerSource, .powerSource),
+             (.batteryThreshold, .batteryThreshold):
+            return true
+        default:
+            return false
+        }
     }
 
     private func adoptScheduleResolution(from configuration: TriggerConfiguration) {
@@ -855,7 +919,7 @@ public struct ComposerDocument: Sendable {
                         hour: hour,
                         minute: minute
                     )
-                    if let date = Calendar.current.date(from: components) {
+                    if let date = Self.authoringCalendar.date(from: components) {
                         newTrigger = .oneTime(date)
                     } else {
                         newElements.append(.unresolved(clauseText(clause)))
@@ -1147,9 +1211,9 @@ public struct ComposerDocument: Sendable {
             }
             return new
 
-        case (.arrangeWindow(let oldName, let resolved, let preset, let display), .arrangeWindow(let newName, _, _, _)):
+        case (.arrangeWindow(let oldName, let resolved, _, let display), .arrangeWindow(let newName, _, let newPreset, _)):
             if oldName.caseInsensitiveCompare(newName) == .orderedSame {
-                return .arrangeWindow(name: newName, resolved: resolved, preset: preset, display: display)
+                return .arrangeWindow(name: newName, resolved: resolved, preset: newPreset, display: display)
             }
             return new
 
@@ -1162,10 +1226,13 @@ public struct ComposerDocument: Sendable {
         text.substring(in: clause.span)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
     }
 
-    private func trailingFragmentStart() -> Int {
+    private func trailingFragmentStart(upTo end: Int? = nil) -> Int {
         let tokens = CommandTokenizer.tokenize(text)
         var start = 0
         for token in tokens {
+            if let end, token.span.end > end {
+                break
+            }
             switch token.kind {
             case .word(let word) where Self.language.shared.connectorWords.contains(word):
                 start = token.span.end

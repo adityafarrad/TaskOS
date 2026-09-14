@@ -208,4 +208,55 @@ struct AuthoringStateTests {
         #expect(document.scheduleResolution.oneTimeDate == exact)
         #expect(document.triggerConfiguration() == .schedule(.oneTime(exact)))
     }
+
+    @Test func restoredSnapshotKeepsUnresolvedClauses() {
+        var document = ComposerDocument(text: "open safari then open")
+        document.resolveApplication(
+            id: document.actions[0].id,
+            reference: .application(bundleIdentifier: "com.apple.Safari", label: "Safari")
+        )
+        #expect(document.makeDefinition(name: "Live") == nil)
+
+        guard let restored = ComposerDocument(snapshot: document.makeSnapshot()) else {
+            Issue.record("Expected a restored snapshot")
+            return
+        }
+        #expect(restored.unresolvedTexts.contains("open"))
+        #expect(restored.makeDefinition(name: "Draft") == nil)
+    }
+
+    @Test func restoredSnapshotPreservesStructuredValues() {
+        var document = ComposerDocument(text: "show a notification")
+        document.updateAction(
+            id: document.actions[0].id,
+            draft: .showNotification(title: "T", message: "kept")
+        )
+
+        guard let restored = ComposerDocument(snapshot: document.makeSnapshot()) else {
+            Issue.record("Expected a restored snapshot")
+            return
+        }
+        if case .showNotification(let title, let message)? = restored.actions.first?.draft {
+            #expect(title == "T")
+            #expect(message == "kept")
+        } else {
+            Issue.record("Expected the notification to be restored")
+        }
+    }
+
+    @Test func restoredSnapshotPreservesAnExactOneTimeDate() {
+        let exact = Date(timeIntervalSince1970: 1_800_000_123)
+        let document = ComposerDocument(trigger: .oneTime(exact), actions: [.wait(1)])
+
+        guard let restored = ComposerDocument(snapshot: document.makeSnapshot()) else {
+            Issue.record("Expected a restored snapshot")
+            return
+        }
+        #expect(restored.trigger == .oneTime(exact))
+        #expect(restored.scheduleResolution.oneTimeDate == exact)
+    }
+
+    @Test func authoringCalendarIsGregorian() {
+        #expect(ComposerDocument.authoringCalendar.identifier == .gregorian)
+    }
 }

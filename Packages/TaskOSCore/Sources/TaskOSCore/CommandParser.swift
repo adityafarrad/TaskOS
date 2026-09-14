@@ -361,6 +361,12 @@ private struct ParserWorker {
         }
 
         let coverage = coverage(for: clauses, approved: approvedSpans)
+        diagnosticList.append(
+            contentsOf: connectorRunDiagnostics(
+                clauseSpans: clauses.map(\.span),
+                approvedSpans: approvedSpans
+            )
+        )
         var outcome = Self.outcome(for: clauses, diagnostics: diagnosticList)
 
         if !coverage.isComplete {
@@ -397,6 +403,73 @@ private struct ParserWorker {
             coverage: coverage,
             clarifications: clarifications
         )
+    }
+
+    private func connectorRunDiagnostics(clauseSpans: [SourceSpan], approvedSpans: [SourceSpan]) -> [ParseDiagnostic] {
+        var diagnostics: [ParseDiagnostic] = []
+        var index = 0
+
+        while index < tokens.count {
+            guard isConnectorToken(tokens[index]) else {
+                index += 1
+                continue
+            }
+
+            var runEnd = index
+            while runEnd + 1 < tokens.count, isConnectorToken(tokens[runEnd + 1]) {
+                runEnd += 1
+            }
+            let run = Array(tokens[index...runEnd])
+
+            if let first = run.first, let last = run.last {
+                let start = first.span.start
+                let end = last.span.end
+                let isInside = (clauseSpans + approvedSpans).contains {
+                    $0.start <= start && end <= $0.end
+                }
+
+                if !isInside {
+                    let hasClauseBefore = clauseSpans.contains { $0.end <= start }
+                    let hasClauseAfter = clauseSpans.contains { $0.start >= end }
+                    if !hasClauseBefore {
+                        diagnostics.append(
+                            .error(
+                                "Remove the connector at the start of the command.",
+                                span: SourceSpan(start: start, end: end)
+                            )
+                        )
+                    } else if !hasClauseAfter {
+                        diagnostics.append(
+                            .error(
+                                "Finish the command after the connector.",
+                                span: SourceSpan(start: start, end: end)
+                            )
+                        )
+                    }
+                }
+            }
+
+            var seenWords = Set<String>()
+            var seenPunctuation = Set<String>()
+            for token in run {
+                switch token.kind {
+                case .word(let word):
+                    if !seenWords.insert(word).inserted {
+                        diagnostics.append(.error("Remove the repeated connector.", span: token.span))
+                    }
+                case .punctuation(let punctuation):
+                    if !seenPunctuation.insert(punctuation).inserted {
+                        diagnostics.append(.error("Remove the repeated connector.", span: token.span))
+                    }
+                case .number:
+                    break
+                }
+            }
+
+            index = runEnd + 1
+        }
+
+        return diagnostics
     }
 
     func coverage(for clauses: [ParsedClause], approved: [SourceSpan] = []) -> SourceCoverage {

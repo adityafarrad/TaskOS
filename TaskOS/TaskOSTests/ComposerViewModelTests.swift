@@ -139,6 +139,47 @@ struct ComposerViewModelTests {
         }
     }
 
+    @Test func preparationDoesNotPublishAfterDocumentReplacement() async {
+        let model = ComposerViewModel()
+        model.updateFromEditor(text: "wait 1 second", edit: nil)
+
+        model.prepare()
+        model.newWorkflow()
+
+        try? await Task.sleep(for: .milliseconds(250))
+
+        if case .previewed = model.stage {
+            Issue.record("A stale preparation must not publish after replacing the document")
+        }
+    }
+
+    @Test func saveDoesNotApplyStaleBookkeepingAfterDocumentReplacement() async {
+        let model = ComposerViewModel()
+        model.updateFromEditor(text: "wait 1 second", edit: nil)
+
+        model.save()
+        model.newWorkflow()
+
+        try? await Task.sleep(for: .milliseconds(400))
+
+        #expect(!model.hasUnsavedChanges)
+    }
+
+    @Test func acceptingASuggestionMidTextPreservesTheSuffix() {
+        let model = ComposerViewModel()
+        model.updateFromEditor(text: "open Safari and wait 30 seconds", edit: nil)
+        model.updateCommandSelection(SourceSpan(start: 20, end: 20))
+
+        guard let suggestion = model.visibleSuggestions.first(where: { $0.phrase == "Wait 1 second" }) else {
+            Issue.record("Expected a wait suggestion at the caret")
+            return
+        }
+        model.accept(suggestion)
+
+        #expect(model.text == "open Safari and Wait 1 second 30 seconds")
+        #expect(model.commandSelection == SourceSpan(start: 29, end: 29))
+    }
+
     @Test func staleResourceSelectionDoesNotBind() {
         let model = ComposerViewModel()
         model.add(.openApplication(name: "Safari", resolved: nil))

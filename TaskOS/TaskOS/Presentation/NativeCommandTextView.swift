@@ -4,6 +4,7 @@ import TaskOSCore
 
 struct NativeCommandTextView: NSViewRepresentable {
     let text: String
+    let selection: SourceSpan?
     let isFocused: Bool
     let onTextChange: (String, CommandEdit?) -> Void
     let onSelectionChange: (SourceSpan) -> Void
@@ -62,12 +63,16 @@ struct NativeCommandTextView: NSViewRepresentable {
         if textView.string != text,
            !textView.hasMarkedText(),
            text != coordinator.lastReportedText {
-            let selection = textView.selectedRange()
+            let previous = textView.selectedRange()
             textView.string = text
             coordinator.lastReportedText = text
             let length = (text as NSString).length
-            let location = min(selection.location, length)
-            textView.setSelectedRange(NSRange(location: location, length: 0))
+            if let selection, selection.isValid(in: text) {
+                textView.setSelectedRange(NSRange(location: selection.start, length: selection.length))
+            } else {
+                let location = min(previous.location, length)
+                textView.setSelectedRange(NSRange(location: location, length: 0))
+            }
         }
 
         if isFocused, textView.window?.firstResponder !== textView {

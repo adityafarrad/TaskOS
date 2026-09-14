@@ -74,7 +74,6 @@ final class ComposerViewModel {
     private var sourceGeneration = 0
     private var authoringGeneration = 0
     private var completionKey: CompletionKey?
-    private var completionReplacementSpan: SourceSpan?
     private var autosaveTask: Task<Void, Never>?
     private var previewResetTask: Task<Void, Never>?
     private var runMonitor: Task<Void, Never>?
@@ -642,7 +641,16 @@ final class ComposerViewModel {
 
     func accept(_ suggestion: Suggestion) {
         guard completionKey == currentCompletionKey() else { return }
-        document.accept(suggestion, replacing: completionReplacementSpan)
+        if let suggestionKey = suggestion.completionKey, suggestionKey != completionKey {
+            return
+        }
+        if let replacement = suggestion.replacement {
+            guard let selection = document.apply(replacement) else { return }
+            commandSelection = selection
+            afterEdit()
+            return
+        }
+        document.accept(suggestion)
         afterEdit()
     }
 
@@ -1026,6 +1034,10 @@ final class ComposerViewModel {
                         await self.composition.eventTriggerRegistry.unregister(definition.id)
                     }
                 }
+                let stillCurrent = key.sessionID == self.sessionID
+                    && key.authoringRevision == WorkflowRevision(self.authoringGeneration)
+                self.loadLibrary()
+                guard stillCurrent else { return }
                 self.autosaveTask?.cancel()
                 try? await self.composition.drafts.clearDraft()
                 self.editingWorkflowID = nil
@@ -1036,7 +1048,6 @@ final class ComposerViewModel {
                 self.notice = isUpdatingExisting
                     ? "Updated \"\(self.draftName)\"."
                     : "Saved \"\(self.draftName)\"."
-                self.loadLibrary()
             } catch {
                 self.notice = "Could not save: \(error.localizedDescription)"
             }
@@ -1148,6 +1159,7 @@ final class ComposerViewModel {
     }
 
     func loadTemplate(_ template: AutomationTemplate) {
+        authoringGeneration += 1
         draftID = AutomationID()
         editingWorkflowID = nil
         lastSavedSignature = nil
@@ -1163,6 +1175,7 @@ final class ComposerViewModel {
     }
 
     func newWorkflow() {
+        authoringGeneration += 1
         draftID = AutomationID()
         editingWorkflowID = nil
         lastSavedSignature = nil
@@ -1221,6 +1234,7 @@ final class ComposerViewModel {
     }
 
     func updateName(_ value: String) {
+        authoringGeneration += 1
         draftName = value
         scheduleDraftAutosave()
         previewResetTask?.cancel()
@@ -1232,6 +1246,7 @@ final class ComposerViewModel {
     }
 
     func loadForEditing(_ workflow: SavedWorkflow) {
+        authoringGeneration += 1
         draftID = workflow.id
         draftName = workflow.name
         startingRevision = workflow.definition.revision
@@ -1459,7 +1474,7 @@ final class ComposerViewModel {
         notice = nil
         sourceGeneration += 1
         authoringGeneration += 1
-        document.resolveSchedule(now: composition.clock.now(), calendar: .current)
+        document.resolveSchedule(now: composition.clock.now(), calendar: ComposerDocument.authoringCalendar)
         autoResolveApplications()
         refreshSuggestions()
         resetPreview()
@@ -1496,6 +1511,7 @@ final class ComposerViewModel {
 
     func recoverDraft() {
         guard let draft = recoverableDraft else { return }
+        authoringGeneration += 1
         recoverableDraft = nil
         draftID = draft.id
         draftName = draft.name
@@ -1530,14 +1546,41 @@ final class ComposerViewModel {
 
     private func refreshSuggestions() {
         let key = currentCompletionKey()
-        let computed = composition.suggestions.suggestions(for: document.text, applications: applications)
+        guard let context = completionContext() else {
+            completionKey = nil
+            suggestions = []
+            return
+        }
+        let computed = composition.suggestions.suggestions(for: context.query, applications: applications)
         guard key == currentCompletionKey() else { return }
         completionKey = key
-        completionReplacementSpan = document.completionFragmentRange()
-        suggestions = computed
+        suggestions = computed.map { suggestion in
+            suggestion.withReplacement(
+                document.completionReplacement(for: context.replacementSpan, phrase: suggestion.phrase),
+                key: key
+            )
+        }
         highlightedSuggestion = 0
         highlightMovedByUser = false
         suggestionsDismissed = false
+    }
+
+    private func completionContext() -> (query: String, replacementSpan: SourceSpan)? {
+        let text = document.text
+        let end = SourceSpan(start: text.utf16.count, end: text.utf16.count)
+        var target = commandSelection ?? end
+        if !target.isValid(in: text) {
+            target = end
+        }
+
+        if target.length > 0 {
+            let query = text.substring(in: SourceSpan(start: 0, end: target.start)) ?? ""
+            return (query, target)
+        }
+
+        let caret = target.start
+        let query = text.substring(in: SourceSpan(start: 0, end: caret)) ?? ""
+        return (query, document.completionFragmentRange(upTo: caret))
     }
 
     private func currentCompletionKey() -> CompletionKey {
@@ -1589,7 +1632,9 @@ final class ComposerViewModel {
     }
 
     func updateCommandSelection(_ span: SourceSpan) {
+        guard span != commandSelection else { return }
         commandSelection = span
+        refreshSuggestions()
     }
 
     func setMarkedTextActive(_ active: Bool) {
@@ -1744,7 +1789,7 @@ final class ComposerViewModel {
 
         applicationClarification = clarification
 
-        if resolutionMissed, !isRefreshingSnapshot, let last = lastSnapshotAt, Date().timeIntervalSince(last) > 60 {
+        if resolutionMissed, !isRefreshingSnapshot {
             refreshApplicationSnapshot()
         }
     }
