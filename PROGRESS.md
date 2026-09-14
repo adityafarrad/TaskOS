@@ -58,7 +58,7 @@ of this file). No 2.7 implementation has started.
 | 2.7C3 | Result validity and bounded typo help | done | Increment 2.7C3 | Completion/preparation/resource keys and rechecks; typo bounds (5/8/64, ≤3, 5,000) |
 | 2.7D1 | Independent language corpus | done | Increment 2.7D1 | Seeded 2,000-positive corpus, 114 negatives, ambiguity fixtures, literal oracle; quarter-preset round-trip fixed |
 | 2.7D2 | Integration, persistence, privacy | done | Increment 2.7D2 | Parser-free definition/preview, direct serialized-record inspection, draft v1/v2 restore, no private text in records/exports/logs |
-| 2.7D3 | Performance and physical proof | in progress | Increment 2.7D3 (automated + performance) | Targets met on Release; owner physical journeys pending |
+| 2.7D3 | Performance and physical proof | done | Increment 2.7D3 + fixes 2.7D3-a/b | Release targets met; owner physical journeys confirmed 2026-09-14; tag `wp-2.7-language` created |
 
 ### Phase 3 — Qualify, beta-test, and distribute
 
@@ -3562,6 +3562,40 @@ Second run before starting 2.7C, performed at commit `0f50f73`:
   composition commits, and Return should go to the input method).
 - Remaining defects / gaps: none known. If test I still shows raw Latin text, the
   non-Latin input source may not be active for the TaskOS app.
+
+## Work Package 2.7 final exit gate — PASSED (2026-09-14)
+
+- Contract: `WP-2.7.md`. Tag: `wp-2.7-language` (annotated).
+- Automated evidence:
+  - Core: `swift test --package-path Packages/TaskOSCore` — 410 tests, 47
+    suites, pass.
+  - App tests: `xcodebuild ... test -only-testing:TaskOSTests` — TEST SUCCEEDED.
+  - UI tests: `xcodebuild ... test -only-testing:TaskOSUITests` — TEST
+    SUCCEEDED.
+  - Debug and Release builds — BUILD SUCCEEDED.
+  - `git diff --check` — clean; source inspection shows no forbidden Core
+    imports, no logging APIs, and no AI/network/microphone/speech/wake-word
+    references.
+  - Independent corpus (2,000 generated positives, 100+ negatives, ambiguity
+    fixtures) passes with zero silent completions and zero dropped spans.
+- Performance evidence (optimized Release, Mac16,10 Apple M4 / 16 GB / macOS
+  26.6.2): parser p95 0.025 ms and p99 0.049 ms (targets ≤ 10 / ≤ 25); app
+  completion p95 4.91 ms (target ≤ 100); cold application snapshot 105 apps in
+  2.60 ms. Targets met; no target changed.
+- Privacy/persistence evidence: saved-workflow, export, and run-history data
+  contain no command source text or rationale; v1 drafts restore text and v2
+  drafts restore structured authoring state; drafts clear on Save/New/Discard.
+- Physical evidence (owner, 2026-09-14): all journeys confirmed working,
+  including the journaling sentence, completion (mouse and keyboard), duplicate
+  notification reordering, structured draft recovery, bare-domain HTTPS
+  acceptance, ambiguous app-list quoting, relative/past-due schedule behavior,
+  non-Latin input method with marked-text Return, VoiceOver, real Notes/Safari
+  Test, effect-free Preview, explicit Test/Save, and no microphone or network
+  permission request. The reported H, F, and K issues and the IME journey were
+  fixed (2.7D3-a, 2.7D3-b) and re-tested.
+- Existing saved workflows remain compatible; the saved workflow schema is
+  unchanged. No open 2.7 defect or required evidence gap remains.
+- Phase 3 qualification may now begin.
 
 
 
