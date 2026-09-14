@@ -3660,3 +3660,38 @@ Second run before starting 2.7C, performed at commit `0f50f73`:
   physical pass recorded in the final exit gate remains valid; the repaired
   paths (draft recovery, preset edits, connector rejection, stale async work,
   cursor-aware completion, calendar) are covered by the new automated tests.
+
+## Follow-up — trigger-first completion (2026-09-14)
+
+- Status: done
+- Behavior delivered: the completion fragment now begins at the trailing action
+  head as well as the trailing connector. Commands that start with a
+  schedule/trigger (`at 9:00 am open no`, `every day at 9 am open no`,
+  `please open no`) now offer app/action suggestions and accept them without
+  touching the schedule prefix. Quoted literals are skipped when locating the
+  action head, and the replacement span follows the same fragment so acceptance
+  replaces only the partial action (`at 9:00 am open no` + accept Notes →
+  `at 9:00 am Open Notes`).
+- Clarified behavior (no change required): `at 9:00 am open` is incomplete by
+  design — a bare time is not a schedule (once vs daily is ambiguous) and `open`
+  needs an app. The complete forms work:
+  `at 9:00 am open notes every day`, `open notes every day at 9:00 am`, and
+  `every day at 9:00 am open notes`. Recovered version-2 drafts that contain
+  such partial text now surface it as unresolved instead of silently dropping
+  it (2.7 acceptance repair 1).
+- Interfaces changed:
+  - `ComposerDocument.completionFragmentRange(upTo:)` considers the trailing
+    action head (`actionHeadStart`) in addition to the trailing connector
+    (`trailingFragmentStart`).
+  - `ComposerViewModel.completionContext` uses the fragment text as the query
+    so the suggestion engine sees the action fragment, not the whole prefix.
+- Tests:
+  - Core: `swift test --package-path Packages/TaskOSCore` — 418 tests / 47
+    suites pass, including `completionFragmentFollowsTheTrailingActionHead`.
+  - App tests — TEST SUCCEEDED, including
+    `triggerFirstTextOffersActionCompletions`.
+  - UI tests — TEST SUCCEEDED, 17/17, including `testDailyScheduleFirstCompletes`
+    and `testPartialScheduleActionCanBeCompleted`.
+  - Release perf: parser p95 0.0245 ms / p99 0.0429 ms; app completion p95
+    5.35 ms; cold snapshot 105 apps (no target).
+  - Debug and Release builds — SUCCEEDED.

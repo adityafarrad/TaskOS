@@ -1574,13 +1574,14 @@ final class ComposerViewModel {
         }
 
         if target.length > 0 {
-            let query = text.substring(in: SourceSpan(start: 0, end: target.start)) ?? ""
+            let fragment = document.completionFragmentRange(upTo: target.start)
+            let query = text.substring(in: fragment) ?? ""
             return (query, target)
         }
 
-        let caret = target.start
-        let query = text.substring(in: SourceSpan(start: 0, end: caret)) ?? ""
-        return (query, document.completionFragmentRange(upTo: caret))
+        let fragment = document.completionFragmentRange(upTo: target.start)
+        let query = text.substring(in: fragment) ?? ""
+        return (query, fragment)
     }
 
     private func currentCompletionKey() -> CompletionKey {

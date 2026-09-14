@@ -292,7 +292,7 @@ struct ActionLanguageTests {
         var document = ComposerDocument(text: "open Safari and wait 30 seconds")
         let fragment = document.completionFragmentRange(upTo: 20)
 
-        #expect(fragment == SourceSpan(start: 15, end: 20))
+        #expect(fragment == SourceSpan(start: 16, end: 20))
 
         let selection = document.apply(
             document.completionReplacement(for: fragment, phrase: "Wait 1 second")
@@ -300,5 +300,19 @@ struct ActionLanguageTests {
 
         #expect(document.text == "open Safari and Wait 1 second 30 seconds")
         #expect(selection == SourceSpan(start: 29, end: 29))
+    }
+
+    @Test func completionFragmentFollowsTheTrailingActionHead() {
+        let triggerFirst = ComposerDocument(text: "at 9:00 am open no")
+        let caret = triggerFirst.text.utf16.count
+        #expect(
+            triggerFirst.completionFragmentRange(upTo: caret) == SourceSpan(start: 11, end: 18)
+        )
+
+        let quoted = ComposerDocument(text: "open \"Say open\"")
+        #expect(
+            quoted.completionFragmentRange(upTo: quoted.text.utf16.count)
+                == SourceSpan(start: 0, end: quoted.text.utf16.count)
+        )
     }
 }

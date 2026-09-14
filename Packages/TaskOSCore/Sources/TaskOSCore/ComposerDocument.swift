@@ -354,7 +354,11 @@ public struct ComposerDocument: Sendable {
 
     public func completionFragmentRange(upTo caret: Int) -> SourceSpan {
         let clamped = max(0, min(caret, text.utf16.count))
-        return SourceSpan(start: trailingFragmentStart(upTo: clamped), end: clamped)
+        var start = trailingFragmentStart(upTo: clamped)
+        if let head = actionHeadStart(upTo: clamped), head > start {
+            start = head
+        }
+        return SourceSpan(start: start, end: clamped)
     }
 
     public func completionReplacement(upTo caret: Int, phrase: String) -> TextReplacement {
@@ -1243,6 +1247,46 @@ public struct ComposerDocument: Sendable {
             }
         }
         return start
+    }
+
+    private func actionHeadStart(upTo end: Int) -> Int? {
+        let tokens = CommandTokenizer.tokenize(text)
+        var result: Int?
+        var index = 0
+
+        while index < tokens.count {
+            let token = tokens[index]
+            if token.span.start >= end {
+                break
+            }
+
+            if case .punctuation(let punctuation) = token.kind, punctuation == "\"" {
+                if case .success(let literal) = CommandLiteralScanner.scan(text, at: token.span.start) {
+                    while index < tokens.count, tokens[index].span.start < literal.span.end {
+                        index += 1
+                    }
+                    continue
+                }
+            }
+
+            if case .word(let word) = token.kind, token.span.end <= end,
+               let route = Self.language.clauseRoutes[word], Self.isActionRoute(route) {
+                result = token.span.start
+            }
+            index += 1
+        }
+
+        return result
+    }
+
+    private static func isActionRoute(_ route: CommandClauseRoute) -> Bool {
+        switch route {
+        case .open, .hideApplication, .quitApplication, .reveal, .wait,
+             .notification, .copy, .arrange, .maximize, .center:
+            return true
+        case .schedule, .when:
+            return false
+        }
     }
 
     private static func render(_ element: ComposerElement) -> String {

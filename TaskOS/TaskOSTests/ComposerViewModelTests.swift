@@ -180,6 +180,25 @@ struct ComposerViewModelTests {
         #expect(model.commandSelection == SourceSpan(start: 29, end: 29))
     }
 
+    @Test func triggerFirstTextOffersActionCompletions() {
+        let model = ComposerViewModel()
+        model.applyApplicationSnapshot(ApplicationSnapshot(
+            revision: 1,
+            createdAt: Date(),
+            applications: [
+                ApplicationRecord(bundleIdentifier: "com.apple.Notes", displayName: "Notes", fileName: "Notes"),
+            ]
+        ))
+        model.updateFromEditor(text: "at 9:00 am open no", edit: nil)
+
+        guard let suggestion = model.visibleSuggestions.first(where: { $0.title == "Notes" }) else {
+            Issue.record("Expected a Notes suggestion after the trigger prefix")
+            return
+        }
+        model.accept(suggestion)
+        #expect(model.text == "at 9:00 am Open Notes")
+    }
+
     @Test func staleResourceSelectionDoesNotBind() {
         let model = ComposerViewModel()
         model.add(.openApplication(name: "Safari", resolved: nil))

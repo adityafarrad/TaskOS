@@ -283,6 +283,47 @@ final class TaskOSUITests: XCTestCase {
     }
 
     @MainActor
+    func testDailyScheduleFirstCompletes() throws {
+        let app = launchApp()
+        XCTAssertTrue(element(app, "editor.view").waitForExistence(timeout: 10))
+
+        let composer = composerField(app)
+        pasteComposerText(app, "at 9:00 am open notes everyday")
+        Thread.sleep(forTimeInterval: 1.0)
+
+        XCTAssertTrue(app.staticTexts["1 step"].waitForExistence(timeout: 5))
+        let unresolved = app.staticTexts
+            .matching(
+                NSPredicate(
+                    format: "label BEGINSWITH %@ OR value BEGINSWITH %@",
+                    "Unresolved:", "Unresolved:"
+                )
+            )
+            .firstMatch
+        XCTAssertFalse(unresolved.exists)
+    }
+
+    @MainActor
+    func testPartialScheduleActionCanBeCompleted() throws {
+        let app = launchApp()
+        XCTAssertTrue(element(app, "editor.view").waitForExistence(timeout: 10))
+
+        let composer = composerField(app)
+        pasteComposerText(app, "at 9:00 am open")
+        Thread.sleep(forTimeInterval: 0.6)
+        XCTAssertEqual(composer.value as? String, "at 9:00 am open")
+
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+        pasteboard.setString(" notes everyday", forType: .string)
+        composer.typeKey("v", modifierFlags: .command)
+        Thread.sleep(forTimeInterval: 1.0)
+
+        XCTAssertEqual(composer.value as? String, "at 9:00 am open notes everyday")
+        XCTAssertTrue(app.staticTexts["1 step"].waitForExistence(timeout: 5))
+    }
+
+    @MainActor
     private func pasteComposerText(_ app: XCUIApplication, _ text: String) {
         let composer = composerField(app)
         composer.click()
