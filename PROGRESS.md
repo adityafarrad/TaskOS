@@ -3494,6 +3494,45 @@ Second run before starting 2.7C, performed at commit `0f50f73`:
 - Remaining defects / gaps: none known. The 2.7D3 owner physical pass is still
   the only open 2.7 item.
 
+### Fix 2.7D3-a — Review preparation, stale notices, and past-due messaging (2026-09-14)
+
+- Status: done
+- Defects found in the owner physical pass:
+  1. Reviewing a workflow never prepared it. The Review button and the
+     composer's Run button only opened the popover; nothing called
+     `ComposerViewModel.prepare()`, so the popover showed
+     "Finish resolving every step before running." (or a stale message) and
+     "Run once" stayed disabled even for a fully resolved workflow.
+  2. A failed action's `notice` persisted across later edits, so a stale
+     "Finish resolving every step before saving." message kept appearing in the
+     Review popover after the command had changed.
+  3. A past-due one-time schedule blocked Save with no specific reason, and
+     `canPrepare` still reported the workflow as ready (the bottom bar showed
+     nothing while Save failed).
+- Fix:
+  - `RunReviewView` now calls `model.prepare()` when it appears, so opening
+    Review produces the preview (or the exact blocking message) and enables
+    "Run once" for a runnable revision.
+  - `ComposerViewModel.afterEdit()` clears `notice`, so stale preview/save
+    messages cannot survive an edit.
+  - `ComposerViewModel` gained `hasPastDueSchedule`; `canPrepare` now includes
+    it, `blockingReason` returns "The scheduled time has already passed. Choose
+    a new time.", and the prepare/save notices fall back to `blockingReason`
+    before their generic text.
+- Tests:
+  - App tests: `pastDueScheduleBlocksWithAReason`, `editingClearsAStaleNotice`,
+    `acceptingWebsiteSuggestionResolvesTheStep`,
+    `resolvedWorkflowCanPrepareAfterAutomaticResolution` — TEST SUCCEEDED.
+  - Core: `swift test --package-path Packages/TaskOSCore` — 410 tests, 47
+    suites, pass.
+  - UI tests — TEST SUCCEEDED.
+  - Debug and Release builds — SUCCEEDED.
+- Physical checks: re-run F (bare-domain acceptance), H (past-due schedule),
+  and K (Review) with the rebuilt Release app; these three were the reported
+  failures.
+- Remaining defects / gaps: none known. The rest of the 2.7D3 owner physical
+  pass (IME, VoiceOver, real Test, permissions) is still open.
+
 
 
 

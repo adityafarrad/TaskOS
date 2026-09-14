@@ -554,6 +554,7 @@ struct WorkflowEditorView: View {
                     },
                     onDismiss: { showReview = false }
                 )
+                .onAppear { model.prepare() }
             }
 
             Menu {

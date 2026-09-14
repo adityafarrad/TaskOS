@@ -319,6 +319,65 @@ struct ComposerViewModelTests {
         }
     }
 
+    @Test func pastDueScheduleBlocksWithAReason() {
+        let model = ComposerViewModel()
+        model.updateFromEditor(
+            text: "once on 2020-01-01 at 09:00, then show a notification",
+            edit: nil
+        )
+
+        #expect(!model.canPrepare)
+        #expect(model.blockingReason?.contains("passed") == true)
+
+        model.save()
+        #expect(model.notice?.contains("passed") == true)
+    }
+
+    @Test func editingClearsAStaleNotice() {
+        let model = ComposerViewModel()
+        model.updateFromEditor(
+            text: "once on 2020-01-01 at 09:00, then show a notification",
+            edit: nil
+        )
+        model.save()
+        #expect(model.notice != nil)
+
+        model.updateFromEditor(text: "show a notification", edit: nil)
+        #expect(model.notice == nil)
+    }
+
+    @Test func acceptingWebsiteSuggestionResolvesTheStep() {
+        let model = ComposerViewModel()
+        model.updateFromEditor(text: "open apple.com", edit: nil)
+
+        guard let website = model.visibleSuggestions.first(where: { $0.id.hasPrefix("website.") }) else {
+            Issue.record("Expected a website suggestion")
+            return
+        }
+
+        model.accept(website)
+        #expect(model.text == "Open https://apple.com")
+        #expect(model.canPrepare)
+    }
+
+    @Test func resolvedWorkflowCanPrepareAfterAutomaticResolution() {
+        let model = ComposerViewModel()
+        model.applyApplicationSnapshot(ApplicationSnapshot(
+            revision: 1,
+            createdAt: Date(),
+            applications: [
+                ApplicationRecord(bundleIdentifier: "com.apple.Notes", displayName: "Notes", fileName: "Notes"),
+            ]
+        ))
+        model.updateFromEditor(
+            text: "Open notes, then Wait 5.7 seconds, then Show a notification",
+            edit: nil
+        )
+
+        #expect(model.canPrepare)
+        #expect(model.blockingReason == nil)
+    }
+
     private var mergedCatalog: [ApplicationRecord] {
         [
             ApplicationRecord(

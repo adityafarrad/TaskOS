@@ -144,13 +144,22 @@ final class ComposerViewModel {
     }
 
     var canPrepare: Bool {
-        !document.actions.isEmpty && !hasUnresolved
+        !document.actions.isEmpty && !hasUnresolved && !hasPastDueSchedule
+    }
+
+    private var hasPastDueSchedule: Bool {
+        guard let configuration = document.triggerConfiguration(),
+              case .schedule(.oneTime(let date)) = configuration else {
+            return false
+        }
+        return date <= composition.clock.now()
     }
 
     var blockingReason: String? {
         if canPrepare { return nil }
         if document.actions.isEmpty { return "Add at least one step to review or save." }
         if document.hasUnresolvedTrigger { return "Finish configuring the trigger." }
+        if hasPastDueSchedule { return "The scheduled time has already passed. Choose a new time." }
         for (index, action) in document.actions.enumerated() {
             if let requirement = ActionPresentation.missingRequirement(for: action.draft, fileStatus: fileStatus) {
                 return "Step \(index + 1) needs \(requirement)."
@@ -882,7 +891,7 @@ final class ComposerViewModel {
             return
         }
         guard let definition = document.makeDefinition(name: draftName, id: draftID, revision: currentRevision) else {
-            notice = applicationClarification ?? document.blockingParseMessage ?? "Finish resolving every step before previewing."
+            notice = applicationClarification ?? document.blockingParseMessage ?? blockingReason ?? "Finish resolving every step before previewing."
             return
         }
 
@@ -989,7 +998,7 @@ final class ComposerViewModel {
         let revision = isUpdatingExisting ? currentRevision : WorkflowRevision(1)
 
         guard let definition = document.makeDefinition(name: draftName, id: targetID, revision: revision) else {
-            notice = applicationClarification ?? document.blockingParseMessage ?? "Finish resolving every step before saving."
+            notice = applicationClarification ?? document.blockingParseMessage ?? blockingReason ?? "Finish resolving every step before saving."
             return
         }
 
@@ -1447,6 +1456,7 @@ final class ComposerViewModel {
     }
 
     private func afterEdit() {
+        notice = nil
         sourceGeneration += 1
         authoringGeneration += 1
         document.resolveSchedule(now: composition.clock.now(), calendar: .current)
