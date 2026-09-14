@@ -193,6 +193,42 @@ struct CompositionAndScheduleTests {
         #expect(document.makeDefinition(name: "Grouped") != nil)
     }
 
+    @Test func incompleteTrailingClauseSurvivesResolution() {
+        var openDocument = ComposerDocument(text: "open safari then open")
+        openDocument.resolveApplication(
+            id: openDocument.actions[0].id,
+            reference: .application(bundleIdentifier: "com.apple.Safari", label: "Safari")
+        )
+        #expect(openDocument.text == "Open safari, then open")
+        #expect(openDocument.unresolvedTexts.contains("open"))
+        #expect(openDocument.makeDefinition(name: "Partial") == nil)
+
+        var hideDocument = ComposerDocument(text: "hide safari then hide")
+        hideDocument.resolveApplication(
+            id: hideDocument.actions[0].id,
+            reference: .application(bundleIdentifier: "com.apple.Safari", label: "Safari")
+        )
+        #expect(hideDocument.text == "Hide safari, then hide")
+        #expect(hideDocument.unresolvedTexts.contains("hide"))
+    }
+
+    @Test func quietResolutionLeavesTheTypedTextUntouched() {
+        var document = ComposerDocument(text: "open safari then open")
+        document.resolveApplication(
+            id: document.actions[0].id,
+            reference: .application(bundleIdentifier: "com.apple.Safari", label: "Safari"),
+            regenerateText: false
+        )
+
+        #expect(document.text == "open safari then open")
+        #expect(document.unresolvedTexts.contains("open"))
+        guard case .openApplication(_, let resolved)? = document.actions.first?.draft else {
+            Issue.record("Expected the resolved open step")
+            return
+        }
+        #expect(resolved?.identifier == "com.apple.Safari")
+    }
+
     @Test func absoluteOneTimeSurvivesComposition() {
         let expected = Calendar.current.date(
             from: DateComponents(year: 2026, month: 9, day: 20, hour: 9, minute: 0)

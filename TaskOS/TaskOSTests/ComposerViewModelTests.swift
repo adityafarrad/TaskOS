@@ -211,6 +211,45 @@ struct ComposerViewModelTests {
         ))
     }
 
+    @Test func automaticResolutionKeepsTheTypedTextAndPendingClause() {
+        let model = ComposerViewModel()
+        model.applyApplicationSnapshot(ApplicationSnapshot(
+            revision: 1,
+            createdAt: Date(),
+            applications: [
+                ApplicationRecord(bundleIdentifier: "com.apple.Safari", displayName: "Safari", fileName: "Safari"),
+            ]
+        ))
+        model.updateFromEditor(text: "open safari then open", edit: nil)
+
+        #expect(model.text == "open safari then open")
+        #expect(model.hasUnresolved)
+        guard case .openApplication(_, let resolved)? = model.actions.first?.draft else {
+            Issue.record("Expected an open step")
+            return
+        }
+        #expect(resolved?.identifier == "com.apple.Safari")
+    }
+
+    @Test func automaticLifecycleResolutionKeepsTheTypedText() {
+        let model = ComposerViewModel()
+        model.applyApplicationSnapshot(ApplicationSnapshot(
+            revision: 1,
+            createdAt: Date(),
+            applications: [
+                ApplicationRecord(bundleIdentifier: "com.apple.Safari", displayName: "Safari", fileName: "Safari"),
+            ]
+        ))
+        model.updateFromEditor(text: "when safari opens, then open notes", edit: nil)
+
+        #expect(model.text == "when safari opens, then open notes")
+        guard case .applicationLifecycle(let reference, _, _) = model.document.trigger else {
+            Issue.record("Expected a lifecycle trigger")
+            return
+        }
+        #expect(reference?.identifier == "com.apple.Safari")
+    }
+
     @Test func mergedOpenListPreservesTriggerAndOtherSteps() {
         let model = ComposerViewModel()
         model.updateFromEditor(

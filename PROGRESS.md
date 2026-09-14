@@ -3416,6 +3416,36 @@ Second run before starting 2.7C, performed at commit `0f50f73`:
     recorded and the final exit gate passes.
 - Remaining defects / gaps: none known in the automated scope.
 
+### Fix 2.7D2 — Typing a second action is no longer reverted (2026-09-14)
+
+- Status: done
+- Defect: typing `open safari then open` reverted to `open safari` and the
+  partial second step could not be typed. Automatic application resolution
+  called `ComposerDocument.resolveApplication`, which regenerated the whole
+  command text from materialized elements; an `open`/`hide`/`quit` clause with
+  no names yet had no element, so the trailing clause was dropped. The native
+  editor then replaced the typed text with the shortened model text. Once the
+  first action resolved, the incomplete trailing clause could also be omitted
+  silently from Preview/Save.
+- Fix:
+  - `ComposerDocument.reconcileElements` keeps an empty `open`/`hide`/`quit`
+    clause as an unresolved element, so it survives text regeneration and
+    blocks Preview/Save until completed.
+  - `ComposerDocument.resolveApplication` and `setTrigger` gained a
+    `regenerateText` parameter; automatic app/trigger resolution now updates the
+    typed node without rewriting the user's source text. Explicit card and
+    picker edits still regenerate the canonical command text.
+- Tests:
+  - Core: `incompleteTrailingClauseSurvivesResolution`,
+    `quietResolutionLeavesTheTypedTextUntouched` — 406 tests / 46 suites pass.
+  - App: `automaticResolutionKeepsTheTypedTextAndPendingClause`,
+    `automaticLifecycleResolutionKeepsTheTypedText` — TEST SUCCEEDED.
+  - UI: `testPendingSecondActionKeepsTypedText` (types `open safari then open`
+    and asserts the text is preserved) — TEST SUCCEEDED, 14/14.
+  - Debug app tests and Release build — SUCCEEDED.
+- Remaining defects / gaps: none known. The 2.7D3 owner physical pass is still
+  the only open 2.7 item.
+
 
 
 

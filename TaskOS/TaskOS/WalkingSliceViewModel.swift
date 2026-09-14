@@ -1647,7 +1647,8 @@ final class ComposerViewModel {
                         application: .application(bundleIdentifier: record.bundleIdentifier, label: record.displayName),
                         label: record.displayName,
                         event: event
-                    )
+                    ),
+                    regenerateText: false
                 )
             case .ambiguous(let matches):
                 clarification = "More than one app matches \"\(label)\": \(matches.map(\.displayName).joined(separator: ", "))."
@@ -1719,7 +1720,8 @@ final class ComposerViewModel {
             case .resolved(let record):
                 document.resolveApplication(
                     id: action.id,
-                    reference: .application(bundleIdentifier: record.bundleIdentifier, label: record.displayName)
+                    reference: .application(bundleIdentifier: record.bundleIdentifier, label: record.displayName),
+                    regenerateText: false
                 )
             case .ambiguous(let matches):
                 clarification = clarification ?? "More than one app matches \"\(name)\": \(matches.map(\.displayName).joined(separator: ", "))."

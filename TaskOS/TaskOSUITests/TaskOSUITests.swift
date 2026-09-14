@@ -250,6 +250,18 @@ final class TaskOSUITests: XCTestCase {
     }
 
     @MainActor
+    func testPendingSecondActionKeepsTypedText() throws {
+        let app = launchApp()
+        XCTAssertTrue(element(app, "editor.view").waitForExistence(timeout: 10))
+
+        let composer = composerField(app)
+        pasteComposerText(app, "open safari then open")
+        Thread.sleep(forTimeInterval: 1.0)
+
+        XCTAssertEqual(composer.value as? String, "open safari then open")
+    }
+
+    @MainActor
     private func pasteComposerText(_ app: XCUIApplication, _ text: String) {
         let composer = composerField(app)
         composer.click()

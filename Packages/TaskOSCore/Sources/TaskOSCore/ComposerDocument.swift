@@ -387,7 +387,7 @@ public struct ComposerDocument: Sendable {
         bumpRevision()
     }
 
-    public mutating func updateAction(id: UUID, draft: ComposerActionDraft) {
+    public mutating func updateAction(id: UUID, draft: ComposerActionDraft, regenerateText: Bool = true) {
         guard let index = elements.firstIndex(where: { element in
             if case .action(let action) = element { return action.id == id }
             return false
@@ -396,7 +396,9 @@ public struct ComposerDocument: Sendable {
         }
         recordHistory()
         elements[index] = .action(ComposerAction(id: id, draft: draft))
-        text = renderedText()
+        if regenerateText {
+            text = renderedText()
+        }
         bumpRevision()
     }
 
@@ -429,17 +431,21 @@ public struct ComposerDocument: Sendable {
         bumpRevision()
     }
 
-    public mutating func resolveApplication(id: UUID, reference: ResourceReference) {
+    public mutating func resolveApplication(id: UUID, reference: ResourceReference, regenerateText: Bool = true) {
         guard let action = action(id: id) else { return }
         switch action.draft {
         case .openApplication(let name, _):
-            updateAction(id: id, draft: .openApplication(name: name, resolved: reference))
+            updateAction(id: id, draft: .openApplication(name: name, resolved: reference), regenerateText: regenerateText)
         case .hideApplication(let name, _):
-            updateAction(id: id, draft: .hideApplication(name: name, resolved: reference))
+            updateAction(id: id, draft: .hideApplication(name: name, resolved: reference), regenerateText: regenerateText)
         case .quitApplication(let name, _):
-            updateAction(id: id, draft: .quitApplication(name: name, resolved: reference))
+            updateAction(id: id, draft: .quitApplication(name: name, resolved: reference), regenerateText: regenerateText)
         case .arrangeWindow(let name, _, let preset, let display):
-            updateAction(id: id, draft: .arrangeWindow(name: name, resolved: reference, preset: preset, display: display))
+            updateAction(
+                id: id,
+                draft: .arrangeWindow(name: name, resolved: reference, preset: preset, display: display),
+                regenerateText: regenerateText
+            )
         default:
             break
         }
@@ -716,12 +722,14 @@ public struct ComposerDocument: Sendable {
         }
     }
 
-    public mutating func setTrigger(_ draft: ComposerTriggerDraft) {
+    public mutating func setTrigger(_ draft: ComposerTriggerDraft, regenerateText: Bool = true) {
         guard draft != trigger else { return }
         recordHistory()
         clearScheduleResolution()
         trigger = draft
-        text = renderedText()
+        if regenerateText {
+            text = renderedText()
+        }
         bumpRevision()
     }
 
@@ -857,6 +865,9 @@ public struct ComposerDocument: Sendable {
                 }
 
             case .openApplication:
+                if clause.resourceNames.isEmpty {
+                    newElements.append(.unresolved(clauseText(clause)))
+                }
                 for name in clause.resourceNames {
                     let draft: ComposerActionDraft
                     if ResourceNameHeuristics.isWebsite(name) {
@@ -868,6 +879,9 @@ public struct ComposerDocument: Sendable {
                 }
 
             case .hideApplication:
+                if clause.resourceNames.isEmpty {
+                    newElements.append(.unresolved(clauseText(clause)))
+                }
                 for name in clause.resourceNames {
                     newElements.append(
                         .action(reusedAction(for: .hideApplication(name: name, resolved: nil), from: previousActions, consumed: &consumed))
@@ -875,6 +889,9 @@ public struct ComposerDocument: Sendable {
                 }
 
             case .quitApplication:
+                if clause.resourceNames.isEmpty {
+                    newElements.append(.unresolved(clauseText(clause)))
+                }
                 for name in clause.resourceNames {
                     newElements.append(
                         .action(reusedAction(for: .quitApplication(name: name, resolved: nil), from: previousActions, consumed: &consumed))
