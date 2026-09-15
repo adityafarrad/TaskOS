@@ -6,9 +6,10 @@ Product contract: `PLAN.md`. WP 2.7 contract: `WP-2.7.md`. Progress ledger:
 TaskOS v1 is built incrementally as bounded work packages (plan section 3 and
 4.4). The release phases are checkpoints; the numbered work packages are the
 unit of work. Work package **2.7 (deterministic language hardening)** is
-complete (final exit gate passed 2026-09-14, tag `wp-2.7-language`); the
-current work is **Phase 3.1 — complete system validation and release-blocking
-repairs**.
+complete (final exit gate passed 2026-09-14, tag `wp-2.7-language`), and
+**Phase 3.1 — complete system validation and release-blocking repairs** is
+complete (audit repairs landed 2026-09-15). The current work is **Phase 3.2 —
+physical compatibility matrix**; `HANDOFF.md` lists everything still pending.
 
 ## Per-work-package loop
 

@@ -3825,3 +3825,36 @@ Second run before starting 2.7C, performed at commit `0f50f73`:
   revocation, event storms) were not re-run in this increment; they remain
   Phase 3.2/3.3 work. The environment now runs Xcode 27.0 (27A266a) / Swift
   6.4 and all suites above were executed on it.
+
+### Phase 3.1 close-out (2026-09-15)
+
+- Status: Phase 3.1 audited scope complete. All 24 audit findings repaired, the
+  Xcode 27 test-compile regression fixed, and the automated acceptance
+  re-established: core 433 tests / 47 suites pass, app unit tests 90/90 pass,
+  UI tests 19/19 pass, Debug and Release builds succeed on Xcode 27.0 / Swift
+  6.4. The acceptance criteria that require human or physical evidence are
+  explicitly carried into 3.2–3.6 below.
+- Pending Phase 3 qualification (not 3.1):
+  - 3.2 physical compatibility matrix: macOS 14/15/26, Apple silicon and Intel,
+    laptop and desktop, single/multiple displays and scaling, external-storage
+    reconnect, battery/power transitions, permission denial/revocation,
+    login-item disablement, sleep/wake/relaunch/interrupted runs, the declared
+    app matrix, and fresh checks for the Phase 3.1 repairs (timezone travel,
+    event storms, in-flight save kill).
+  - Legacy owner-deferred checks fold into 3.2/3.3: H2-a, H2-c, I1–I3, J1–J3,
+    M3, N1–N4, N-c/N-d/N-e, P1–P3, Q1–Q2, U4, UX-1…UX-5, and the D2 manual
+    regression matrix.
+  - 3.3 usability/accessibility/performance: ≥ 8-user round, idle CPU < 1% and
+    no polling loop, idle memory < 200 MB, latency targets, keyboard/VoiceOver.
+  - 3.4 two-week beta with ≥ 10 users; no automatic content telemetry.
+  - 3.5 distribution: Developer ID signing, notarization/stapling, DMG,
+    Sparkle-signed updates, update consent/settings, notes and privacy.
+  - 3.6 freeze and release.
+- Remaining engineering gaps: stale file-bookmark refresh; multi-window Arrange
+  disambiguation UI; adapter-level interruption of hung Accessibility calls;
+  discovery deep-linking to a missing resource card; configurable retention
+  (200 events / 30 days); plan-deferred global hotkey and specific-volume card
+  selection.
+- Documentation: `HANDOFF.md` is the single current handoff;
+  `HANDOFF-2.7.md` was removed as superseded. `WP-2.7.md` remains as the
+  historical contract for the completed work package.

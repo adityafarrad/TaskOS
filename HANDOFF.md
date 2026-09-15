@@ -1,13 +1,14 @@
 # TaskOS — Handoff
 
-**Status:** Phases 0–2 complete; work package 2.7 (deterministic language
-hardening) is complete and verified. The final exit gate passed at `792156d`
-(tag `wp-2.7-language`), and the independent acceptance-review repairs are in
-`6295808`. Phase 3 not started.
-**Contract:** `PLAN.md` · **WP 2.7 contract:** `WP-2.7.md` · **Ledger:**
-`PROGRESS.md` · **Agent rules:** `AGENTS.md`
-**Repo:** `https://github.com/adityafarrad/TaskOS` (branch `main`)
-**HEAD:** `6295808` (working tree clean)
+**Status:** Phases 0–2 complete. Work package 2.7 (deterministic language
+hardening) complete (tag `wp-2.7-language`). **Phase 3.1 — complete system
+validation and release-blocking repairs — complete as of 2026-09-15**
+(24 audit findings plus the Xcode 27 test-compile regression repaired).
+**Next: Phase 3.2 — physical compatibility matrix.**
+**Contract:** `PLAN.md` · **Ledger:** `PROGRESS.md` · **Agent rules:**
+`AGENTS.md` · **Repo:** `https://github.com/adityafarrad/TaskOS` (branch `main`).
+Last repair batch: `2279262`; see `git log -1` for the current tip. Working
+tree clean; everything through `2279262` is pushed.
 
 ---
 
@@ -42,6 +43,10 @@ swift test --package-path Packages/TaskOSCore
 xcodebuild -project TaskOS/TaskOS.xcodeproj -scheme TaskOS \
   -configuration Debug test -only-testing:TaskOSTests
 
+# UI tests
+xcodebuild -project TaskOS/TaskOS.xcodeproj -scheme TaskOS \
+  -configuration Debug test -only-testing:TaskOSUITests
+
 # Debug / Release builds
 xcodebuild -project TaskOS/TaskOS.xcodeproj -scheme TaskOS -configuration Debug build
 xcodebuild -project TaskOS/TaskOS.xcodeproj -scheme TaskOS -configuration Release build
@@ -62,75 +67,119 @@ Key project facts:
   container.
 - Production persistence: SwiftData behind `AutomationRepository`,
   `RunHistoryRepository`, `DraftRepository`, `AdmissionEventRepository`.
+- The app target sets `SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor` and
+  `SWIFT_APPROACHABLE_CONCURRENCY = YES`. Test fakes that conform to app
+  protocols must account for this (see gotchas).
 - KeyboardShortcuts is **not** a dependency (global hotkey deferred).
 
 ---
 
-## 3. Current evidence
+## 3. Current evidence (2026-09-15, Xcode 27.0 / Swift 6.4)
 
-- Core: **417 tests / 47 suites pass** (includes a purity test forbidding
-  SwiftUI/AppKit/SwiftData in Core); rerun 2026-09-14 at `6295808`.
-- App tests: TEST SUCCEEDED; UI tests: **15/15 TEST SUCCEEDED** (launch, sidebar,
-  composer typing, suggestions, keyboard completion, discovery, step menu,
-  settings, pending second action, colloquial daily phrase).
-- Debug + Release builds clean, rerun 2026-09-14.
-- WP 2.7 performance (Release): parser p95 0.045 ms / p99 0.069 ms (targets
-  10 / 25); app completion p95 6.56 ms (target 100); cold app snapshot 105 apps
-  in 2.89 ms. Full protocol and method in `PROGRESS.md` under 2.7D3 and the
-  follow-up records.
-- Physical checks: the 2.7D3 owner pass is recorded as complete in the
-  `PROGRESS.md` final exit gate (journaling, completion, duplicate
-  notifications, draft recovery, bare-domain acceptance, ambiguous app lists,
-  schedules, non-Latin IME, VoiceOver, real Test, effect-free Preview, explicit
-  Test/Save, no mic/network permission). Phase 1 canonical journey; 2.1
-  schedule tests A–E; 2.4 all six event-trigger families; 2.6
-  attention/retention/permissions UI — all user-confirmed. Older pending
-  physical checks (I, J, M3, N1, P, Q, N-c/N-d/N-e, U4, UX-1…UX-5, and the D2
-  matrix) were owner-deferred to Phase 3 on 2026-09-13; the named record is in
-  `PROGRESS.md` under "Work Package 2.7 entry gate (pre-Phase 3)".
-- The independent 2.7D acceptance review was reproduced and repaired in
-  `6295808`; the seven findings and their fixes are listed in `PROGRESS.md`
-  under "Review repairs — 2.7 acceptance fixes (2026-09-14)".
+- Core: **433 tests / 47 suites pass** (`swift test --package-path
+  Packages/TaskOSCore`), including the purity test.
+- App unit tests: **90/90 pass** (`-only-testing:TaskOSTests`).
+- UI tests: **19/19 pass** (`-only-testing:TaskOSUITests`); full scheme run
+  passed 109/109.
+- Debug and Release builds succeed.
+- WP 2.7 Release performance (unchanged): parser p95 0.025–0.045 ms (target
+  ≤ 10), p99 0.049–0.069 ms (target ≤ 25); app completion p95 5.35–6.56 ms
+  (target ≤ 100); cold snapshot 105 apps 2.60–2.89 ms. Protocol in
+  `PROGRESS.md` under 2.7D3.
+- Physical evidence: the 2.7D3 owner pass is recorded in `PROGRESS.md`
+  (journaling, completion, duplicate notifications, draft recovery,
+  bare-domain acceptance, ambiguous app lists, schedules, non-Latin IME,
+  VoiceOver, real Test, effect-free Preview, explicit Test/Save, no
+  mic/network permission). No new physical pass was produced for the Phase 3.1
+  repairs — see §5.
 
 ---
 
-## 4. What is implemented
+## 4. Phase 3.1 repairs (2026-09-15)
 
-**Phase 0/1 (foundation + first workflow):** typed registry (Manual, Open App,
-Open Website, Arrange Window, Wait, Show Notification), grammar/parser + spans,
-suggestion engine, composer document with text/card sync, undo/redo, draft
-autosave, preview/approval bound to a revision, sequential execution with
-timeouts/cancel, library (search/rename/duplicate/edit/delete/run), menu-bar
-runtime, settings/permissions, launch-at-login, interrupted-run recovery,
-onboarding.
+Independent audit of `8ed8668` reported 11 High, 10 Medium, 3 Low findings.
+All were reproduced and repaired, plus an Xcode 27 test-compile regression.
 
-**Phase 2:**
-- **2.1 Scheduling:** one-time/daily/weekdays/interval triggers, next-three
-  preview, DST/time-zone policy, admission coordinator (one-at-a-time, 10-run
-  queue, 30s expiration, 10s cooldown, duplicate suppression), pause/resume,
-  cancel, session readiness, launch-time re-registration.
-- **2.2 Actions:** Hide Application, normal Quit (never force; protected apps
-  rejected), Copy Text, all window presets, specific-display selection,
-  notification editing + presenter delegate.
-- **2.3 Files:** explicit file/folder selection, Open File, Reveal in Finder,
-  durable bookmark-backed references, missing-resource repair, portable
-  JSON export/import with rebinding and disabled defaults.
-- **2.4 Events:** application launch/quit (+ lifecycle loop suppression), wake,
-  display connect/disconnect, external volume mount/unmount, power source,
-  battery threshold (two-point rearm), with discovery/availability.
-- **2.5 Templates/discovery:** twelve curated templates, template picker,
-  capability discovery sheet (examples, permissions, limitations, availability).
-- **2.6 Management:** skipped/queue event visibility, library attention/Fix,
-  expanded action-level history, retention (30 days / 1,000 runs), permission
-  settings shortcuts.
+- **Data safety:** awaited result-bearing `save()`; Save-and-Continue persists
+  before replacing; full-snapshot dirty detection; explicit persistence
+  recovery plus a visible warning instead of silent volatile storage;
+  per-record quarantine that keeps valid workflows/triggers alive; error
+  propagation before UI/runtime updates; document identity and revision rebased
+  after save; observer tokens/draft flush/teardown.
+- **Execution safety:** suppression registered before open/quit and renewed
+  after; battery monitors reset on trigger/revision change; schedules re-arm on
+  timezone/clock change; no background permission prompts (foreground Test
+  requests; enabling requires a runnable, permission-ready preview); file
+  targets reject packages/executables/scripts/aliases; bounded action timeouts
+  that do not wait for non-cooperative executors; cancellation-aware window
+  polling; validated AX casts.
+- **Privacy/limits:** run-history failures redact URLs/paths and cap length;
+  workflow deletion cascades to run history and admission events; import reads
+  off the main actor after a size precheck; export enforces the same 256 KB
+  limit atomically; name/notification fields bounded.
+- **Correctness/lifecycle:** `ComposerDocument` value semantics (no
+  `@unchecked Sendable` box); idle 5-second polling removed with
+  generation-guarded refreshes; stale resource selections retry once; history
+  ordering fixed with a dedicated error state; recursive bounded app
+  discovery; `AGENTS.md` updated.
 
-**Pre-Phase-3 hardening:** editing preserves card-only values; manual runs route
-through admission; admission events persisted; import display mapping; domain
-URL suggestion.
+Commits: `669c5f3` (Core), `9855236` (app + tests), `2279262` (docs).
 
 ---
 
-## 5. Important entry points
+## 5. What is pending
+
+### Phase 3.2 — physical compatibility matrix (next)
+Physical runs on: macOS 14, 15, and 26; Apple silicon and Intel; laptop and
+desktop; single and multiple displays with different scaling/positions;
+external-storage reconnect; battery/external-power transitions; Accessibility
+and notification permission denial/revocation; login-item disablement; sleep,
+wake, relaunch, and interrupted runs; standard and multi-window application
+behavior. Declared app matrix: Safari, Notes, Finder, TextEdit, a Chromium
+browser, and an Electron app. Include the legacy owner-deferred checks:
+H2-a, H2-c, I1–I3, J1–J3, M3, N1–N4, N-c/N-d/N-e, P1–P3, Q1–Q2, U4,
+UX-1…UX-5, and the D2 manual regression matrix, plus fresh physical checks for
+the Phase 3.1 repairs (timezone travel, permission revocation, event storms,
+sleep/wake with pending schedules, multi-display Arrange, kill/relaunch with an
+in-flight save).
+
+### Phase 3.3 — usability, accessibility, performance
+Fresh usability round with ≥ 8 representative users on the plan's task list;
+keyboard/VoiceOver operability; latency; **idle CPU < 1% averaged over 30
+minutes and no polling loop**; idle resident memory < 200 MB; main window
+interactive within two seconds on the baseline machine.
+
+### Phase 3.4 — beta
+Minimum two-week beta with ≥ 10 users; collect and classify findings; no
+automatic content telemetry.
+
+### Phase 3.5 — distribution and updates
+Developer ID signing, Hardened Runtime, notarization + stapling, DMG install
+flow, Sparkle update integration with signed HTTPS artifacts, update
+consent/settings, release notes/privacy/known-limitations/support. Test a
+genuine older signed build upgrading to the release candidate, including
+interrupted downloads and invalid signatures; do not install an update while a
+workflow is running.
+
+### Phase 3.6 — freeze and release
+Final freeze, release notes, and distribution.
+
+### Open engineering gaps (tracked, not blockers)
+- Stale file bookmark resolves but is not refreshed back into storage.
+- Multi-window Arrange ambiguity fails with a message; no disambiguation UI.
+- Whole-workflow timeout returns at the deadline, but a hung Accessibility
+  call inside an adapter is not independently interruptable.
+- Discovery sheet does not deep-link a missing resource to its card control.
+- Admission-event retention constants (200 events / 30 days) are not
+  user-configurable.
+- Plan-level deferrals: global hotkey (needs KeyboardShortcuts),
+  specific-volume card selection, full-screen/Spaces window operations.
+- Phase 0.2 autocomplete user validation and Phase 0.5 distribution access
+  remain folded into Phases 3.3/3.5.
+
+---
+
+## 6. Important entry points
 
 - Composition root: `TaskOS/TaskOS/AppComposition.swift`
 - Composer/view-model: `TaskOS/TaskOS/WalkingSliceViewModel.swift`
@@ -144,57 +193,44 @@ URL suggestion.
 - Scheduling: `ScheduleTrigger.swift`, `ScheduleRegistry.swift`
 - Parser/grammar: `CommandParser.swift`, `ParsedCommand.swift`,
   `ComposerDocument.swift`
-- Portability: `WorkflowPortability.swift`
+- Portability: `WorkflowPortability.swift`; history redaction:
+  `RunRecordRedaction.swift`
 - Repositories: `Platform/SwiftData*Repository.swift`
+- File safety: `Platform/FileTargetValidation.swift`, `FileTargetResolver.swift`
+- Permissions: `Platform/SystemPermissionStatusProvider.swift`,
+  `NotificationPermission.swift`, `AccessibilityPermission.swift`
 
 ---
 
-## 6. Deferred gaps (recorded, intentional)
+## 7. Working agreements / gotchas
 
-**Before/around Phase 3:**
-- **Legacy pending physical checks** — owner-deferred to Phase 3 on 2026-09-13;
-  the named list and reason are in the `PROGRESS.md` 2.7 entry-gate record.
-- **Gap 4 — malformed-record isolation/recovery.** `loadAll` throws for the whole
-  list if one record fails to decode; no per-record recovery UX. Deferred to
-  Phase 3 migration fixtures.
-
-**Smaller:**
-- Stale file bookmark resolves but isn't refreshed back into storage.
-- Multi-window Arrange ambiguity fails with a message; no disambiguation UI.
-- Whole-workflow timeout is between actions; a hung Accessibility call isn't
-  independently interruptable.
-- Discovery sheet doesn't deep-link a missing resource to its card control.
-- Admission-event retention constants (200 / 30 days) not user-configurable.
-
-**Plan-level deferrals:** global hotkey trigger (T2, needs KeyboardShortcuts);
-specific-volume card selection; full-screen/Spaces window operations.
-
----
-
-## 7. Next step: Phase 3
-
-Work package 2.7A–2.7D are complete: the final exit gate passed at `792156d`
-(tag `wp-2.7-language`), the owner physical journeys are recorded, and the
-independent acceptance-review findings were repaired in `6295808`. The 2.7
-handoff detail is in `HANDOFF-2.7.md`.
-
-Begin **Phase 3** (`PLAN.md`): 3.1 system validation (includes the deferred
-legacy physical checks), 3.2 physical compatibility matrix, 3.3
-usability/accessibility/performance, 3.4 beta, 3.5 distribution (Developer ID
-signing, notarization, Sparkle), 3.6 freeze.
-
----
-
-## 8. Working agreements / gotchas
-
-- **Commit** after each bounded sub-increment locally; **push + tag** only when a
-  numbered sub-phase completes, and **ask before every push** (`AGENTS.md`).
-  Work package 2.7 is the tag exception: one `wp-2.7-language` tag after the full
-  package passes.
+- **Commit** after each bounded sub-increment locally; **push and tag** only at
+  a numbered phase boundary, and **ask before every push** (`AGENTS.md`).
+- Xcode 27 note: the CLT shims can report an unaccepted license even when the
+  system plist shows agreement; `xcrun <tool>` (or the real binaries under
+  `/Applications/Xcode.app/Contents/Developer/usr/bin/`) works. Do not
+  "fix" this with `try!` or by weakening test isolation.
+- App target default isolation is `MainActor`; new app protocols consumed by
+  test doubles should be `nonisolated` (or the doubles `@MainActor`), or the
+  test target will not compile under Swift 6.4.
 - SwiftData in-memory container creation can flake on the first app-test run;
   suites are `.serialized` and a rerun usually passes.
-- Always relaunch the app after a rebuild — earlier confusion came from running a
-  stale binary.
+- Always relaunch the app after a rebuild — earlier confusion came from running
+  a stale binary.
 - macOS reports Accessibility trust slightly after the app reactivates; the UI
   re-checks ~1.2s after activation.
-- Do not add code comments unless asked.
+- Do not add code comments unless asked. `TaskOSCore` must stay free of
+  SwiftUI/AppKit/SwiftData.
+
+---
+
+## 8. Documentation map
+
+| File | Purpose | Status |
+|---|---|---|
+| `PLAN.md` | Product contract, phases, acceptance criteria | Active |
+| `PROGRESS.md` | Work-package ledger and evidence | Active |
+| `AGENTS.md` | Agent instructions and working agreements | Active |
+| `HANDOFF.md` | This document — current state and pending work | Active |
+| `WP-2.7.md` | Completed WP 2.7 contract (historical reference) | Retired |
+| `HANDOFF-2.7.md` | Superseded 2.7 handoff | **Deleted** |
