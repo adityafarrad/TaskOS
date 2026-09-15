@@ -34,11 +34,6 @@ public actor WorkflowRunner {
         }
     }
 
-    private enum RaceResult: Sendable {
-        case completed(ActionOutcome)
-        case timedOut
-    }
-
     private let clock: CoreClock
     private let executors: [ActionID: any ActionExecutor]
     private let timeouts: Timeouts
@@ -139,29 +134,69 @@ public actor WorkflowRunner {
     private func executeWithTimeout(_ action: ActionConfiguration, executor: any ActionExecutor) async -> ActionOutcome {
         let timeout = timeouts.timeout(for: action.id)
         let clock = self.clock
-
-        return await withTaskGroup(of: RaceResult.self) { group in
-            group.addTask {
-                .completed(await executor.execute(action))
-            }
-            group.addTask {
-                do {
-                    try await clock.sleep(for: .seconds(timeout))
-                } catch {
-                    return .timedOut
-                }
-                return .timedOut
-            }
-
-            let first = await group.next() ?? .timedOut
-            group.cancelAll()
-
-            switch first {
-            case .completed(let outcome):
-                return outcome
-            case .timedOut:
-                return .failed(ActionFailure(message: "Action timed out after \(timeout) seconds.", isTimedOut: true))
-            }
+        let race = OutcomeRace()
+        let work = Task {
+            let outcome = await executor.execute(action)
+            race.complete(outcome)
         }
+
+        return await withTaskCancellationHandler {
+            await withCheckedContinuation { continuation in
+                race.attach(continuation)
+                Task {
+                    do {
+                        try await clock.sleep(for: .seconds(timeout))
+                    } catch {
+                        work.cancel()
+                        race.complete(.cancelled)
+                        return
+                    }
+                    work.cancel()
+                    race.complete(
+                        .failed(ActionFailure(message: "Action timed out after \(timeout) seconds.", isTimedOut: true))
+                    )
+                }
+            }
+        } onCancel: {
+            work.cancel()
+            race.complete(.cancelled)
+        }
+    }
+}
+
+private final class OutcomeRace: @unchecked Sendable {
+    private let lock = NSLock()
+    private var continuation: CheckedContinuation<ActionOutcome, Never>?
+    private var pending: ActionOutcome?
+    private var finished = false
+
+    func attach(_ continuation: CheckedContinuation<ActionOutcome, Never>) {
+        lock.lock()
+        if let pending {
+            lock.unlock()
+            continuation.resume(returning: pending)
+            return
+        }
+        self.continuation = continuation
+        lock.unlock()
+    }
+
+    @discardableResult
+    func complete(_ outcome: ActionOutcome) -> Bool {
+        lock.lock()
+        guard !finished else {
+            lock.unlock()
+            return false
+        }
+        finished = true
+        if let continuation {
+            self.continuation = nil
+            lock.unlock()
+            continuation.resume(returning: outcome)
+        } else {
+            pending = outcome
+            lock.unlock()
+        }
+        return true
     }
 }

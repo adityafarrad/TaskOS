@@ -10,6 +10,7 @@ public protocol RunHistoryRepository: Sendable {
     func append(_ record: RunRecord) async throws
     func update(_ record: RunRecord) async throws
     func markRunningAsInterrupted() async throws
+    func deleteAll(for automationID: AutomationID) async throws
     func clear() async throws
 }
 

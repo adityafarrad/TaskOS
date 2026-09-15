@@ -195,14 +195,10 @@ public struct ComposerDocument: Sendable {
         let rationaleText: String?
     }
 
-    private final class ResolutionBox: @unchecked Sendable {
-        var value = ScheduleResolution.empty
-    }
-
     private let parser = CommandParser()
     private static let historyLimit = 100
     private static let language = CommandLanguageCatalog.standard
-    private let resolution = ResolutionBox()
+    private var resolution = ScheduleResolution.empty
 
     public let clock: CoreClock
     public private(set) var text: String
@@ -217,7 +213,7 @@ public struct ComposerDocument: Sendable {
     private var redoStack: [Snapshot] = []
 
     public var scheduleResolution: ScheduleResolution {
-        resolution.value
+        resolution
     }
 
     public init(text: String = "", clock: CoreClock = SystemClock()) {
@@ -629,10 +625,11 @@ public struct ComposerDocument: Sendable {
         now: Date,
         calendar: Calendar = ComposerDocument.authoringCalendar
     ) -> AutomationDefinition? {
-        resolveSchedule(now: now, calendar: calendar)
-        guard !hasUnresolvedText else { return nil }
-        guard let actions = resolvedActions(), !actions.isEmpty else { return nil }
-        guard let triggerConfiguration = triggerConfiguration() else { return nil }
+        var resolved = self
+        resolved.resolveSchedule(now: now, calendar: calendar)
+        guard !resolved.hasUnresolvedText else { return nil }
+        guard let actions = resolved.resolvedActions(), !actions.isEmpty else { return nil }
+        guard let triggerConfiguration = resolved.triggerConfiguration() else { return nil }
         let definition = AutomationDefinition(
             id: id,
             name: name,
@@ -652,16 +649,16 @@ public struct ComposerDocument: Sendable {
         case .weekdays(let days, let hour, let minute):
             return .schedule(.weekdays(days, hour: hour, minute: minute))
         case .interval(let seconds):
-            guard let anchor = resolution.value.intervalAnchor else { return nil }
+            guard let anchor = resolution.intervalAnchor else { return nil }
             return .schedule(.interval(every: seconds, startingAt: anchor))
         case .relative:
-            guard let date = resolution.value.oneTimeDate else { return nil }
+            guard let date = resolution.oneTimeDate else { return nil }
             return .schedule(.oneTime(date))
         case .once:
-            guard let date = resolution.value.oneTimeDate else { return nil }
+            guard let date = resolution.oneTimeDate else { return nil }
             return .schedule(.oneTime(date))
         case .relativeDay:
-            guard let date = resolution.value.oneTimeDate else { return nil }
+            guard let date = resolution.oneTimeDate else { return nil }
             return .schedule(.oneTime(date))
         case .oneTime(let date):
             return .schedule(.oneTime(date))
@@ -683,20 +680,21 @@ public struct ComposerDocument: Sendable {
     }
 
     public func triggerConfiguration(relativeTo now: Date, calendar: Calendar = .current) -> TriggerConfiguration? {
-        resolveSchedule(now: now, calendar: calendar)
-        return triggerConfiguration()
+        var resolved = self
+        resolved.resolveSchedule(now: now, calendar: calendar)
+        return resolved.triggerConfiguration()
     }
 
-    public func resolveSchedule(now: Date, calendar: Calendar) {
-        resolution.value.timeZoneIdentifier = calendar.timeZone.identifier
+    public mutating func resolveSchedule(now: Date, calendar: Calendar) {
+        resolution.timeZoneIdentifier = calendar.timeZone.identifier
         switch trigger {
         case .relative(let seconds):
-            if resolution.value.oneTimeDate == nil {
-                resolution.value.oneTimeDate = now.addingTimeInterval(seconds)
+            if resolution.oneTimeDate == nil {
+                resolution.oneTimeDate = now.addingTimeInterval(seconds)
             }
         case .once(let hour, let minute):
-            if resolution.value.oneTimeDate == nil {
-                resolution.value.oneTimeDate = calendar.nextDate(
+            if resolution.oneTimeDate == nil {
+                resolution.oneTimeDate = calendar.nextDate(
                     after: now.addingTimeInterval(-1),
                     matching: DateComponents(hour: hour, minute: minute, second: 0),
                     matchingPolicy: .nextTime,
@@ -705,8 +703,8 @@ public struct ComposerDocument: Sendable {
                 )
             }
         case .relativeDay(let offset, let hour, let minute):
-            if resolution.value.oneTimeDate == nil {
-                resolution.value.oneTimeDate = Self.relativeDayDate(
+            if resolution.oneTimeDate == nil {
+                resolution.oneTimeDate = Self.relativeDayDate(
                     offset: offset,
                     hour: hour,
                     minute: minute,
@@ -715,16 +713,16 @@ public struct ComposerDocument: Sendable {
                 )
             }
         case .oneTime(let date):
-            resolution.value.oneTimeDate = date
+            resolution.oneTimeDate = date
         case .interval:
-            if resolution.value.intervalAnchor == nil {
-                resolution.value.intervalAnchor = now
+            if resolution.intervalAnchor == nil {
+                resolution.intervalAnchor = now
             }
         case .manual, .daily, .weekdays,
              .applicationLifecycle, .wake, .displayConnection,
              .externalVolume, .powerSource, .batteryThreshold:
-            resolution.value.oneTimeDate = nil
-            resolution.value.intervalAnchor = nil
+            resolution.oneTimeDate = nil
+            resolution.intervalAnchor = nil
         }
     }
 
@@ -743,8 +741,8 @@ public struct ComposerDocument: Sendable {
         return target
     }
 
-    public func clearScheduleResolution() {
-        resolution.value = .empty
+    public mutating func clearScheduleResolution() {
+        resolution = .empty
     }
 
     public func makeSnapshot() -> AuthoringSnapshot {
@@ -752,7 +750,7 @@ public struct ComposerDocument: Sendable {
             text: text,
             trigger: trigger,
             nodes: actions.map { AuthoringNode(id: $0.id, draft: $0.draft) },
-            resolution: resolution.value,
+            resolution: resolution,
             revision: revision,
             rationaleText: rationaleText
         )
@@ -769,7 +767,7 @@ public struct ComposerDocument: Sendable {
         self.parseOutcome = .needsInput
         self.diagnostics = []
         self.revision = snapshot.revision
-        self.resolution.value = snapshot.resolution
+        self.resolution = snapshot.resolution
         self.rationaleText = snapshot.rationaleText
         applyText(snapshot.text)
         restoreStructuredTrigger(from: snapshot)
@@ -778,7 +776,7 @@ public struct ComposerDocument: Sendable {
     private mutating func restoreStructuredTrigger(from snapshot: AuthoringSnapshot) {
         guard Self.sameTriggerFamily(snapshot.trigger, trigger) else { return }
         trigger = snapshot.trigger
-        resolution.value = snapshot.resolution
+        resolution = snapshot.resolution
     }
 
     private static func sameTriggerFamily(_ lhs: ComposerTriggerDraft, _ rhs: ComposerTriggerDraft) -> Bool {
@@ -803,21 +801,21 @@ public struct ComposerDocument: Sendable {
         }
     }
 
-    private func adoptScheduleResolution(from configuration: TriggerConfiguration) {
+    private mutating func adoptScheduleResolution(from configuration: TriggerConfiguration) {
         switch configuration {
         case .schedule(.oneTime(let date)):
-            resolution.value.oneTimeDate = date
+            resolution.oneTimeDate = date
         case .schedule(.interval(_, let startingAt)):
-            resolution.value.intervalAnchor = startingAt
+            resolution.intervalAnchor = startingAt
         default:
             break
         }
     }
 
-    private func adoptScheduleResolution(from draft: ComposerTriggerDraft) {
+    private mutating func adoptScheduleResolution(from draft: ComposerTriggerDraft) {
         switch draft {
         case .oneTime(let date):
-            resolution.value.oneTimeDate = date
+            resolution.oneTimeDate = date
         default:
             break
         }
@@ -1459,6 +1457,10 @@ public struct ComposerDocument: Sendable {
         revision = revision.next()
     }
 
+    public mutating func rebaseRevision() {
+        revision = WorkflowRevision(1)
+    }
+
     private func currentSnapshot() -> Snapshot {
         Snapshot(
             text: text,
@@ -1467,7 +1469,7 @@ public struct ComposerDocument: Sendable {
             parseOutcome: parseOutcome,
             diagnostics: diagnostics,
             revision: revision,
-            resolution: resolution.value,
+            resolution: resolution,
             rationaleText: rationaleText
         )
     }
@@ -1487,7 +1489,7 @@ public struct ComposerDocument: Sendable {
         parseOutcome = snapshot.parseOutcome
         diagnostics = snapshot.diagnostics
         revision = snapshot.revision
-        resolution.value = snapshot.resolution
+        resolution = snapshot.resolution
         rationaleText = snapshot.rationaleText
     }
 }

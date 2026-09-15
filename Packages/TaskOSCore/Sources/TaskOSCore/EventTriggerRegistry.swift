@@ -16,6 +16,10 @@ public actor EventTriggerRegistry {
     public func register(_ definition: AutomationDefinition) {
         guard definition.trigger.isEventTrigger else { return }
         guard definition.validate().isValid else { return }
+        if let existing = entries[definition.id],
+           existing.trigger != definition.trigger || existing.revision != definition.revision {
+            batteryMonitors.removeValue(forKey: definition.id)
+        }
         entries[definition.id] = definition
     }
 
@@ -30,8 +34,18 @@ public actor EventTriggerRegistry {
             guard definition.validate().isValid else { continue }
             next[definition.id] = definition
         }
+
+        var nextMonitors: [AutomationID: BatteryThresholdMonitor] = [:]
+        for (id, monitor) in batteryMonitors {
+            guard let updated = next[id], let previous = entries[id] else { continue }
+            guard case .batteryThreshold(let trigger) = updated.trigger else { continue }
+            guard previous.trigger == updated.trigger, previous.revision == updated.revision else { continue }
+            guard monitor.comparator == trigger.comparator, monitor.percentage == trigger.percentage else { continue }
+            nextMonitors[id] = monitor
+        }
+
         entries = next
-        batteryMonitors = batteryMonitors.filter { next[$0.key] != nil }
+        batteryMonitors = nextMonitors
     }
 
     public func registeredCount() -> Int {

@@ -94,6 +94,10 @@ actor InMemoryRunHistoryRepository: RunHistoryRepository {    private var storag
         }
     }
 
+    func deleteAll(for automationID: AutomationID) async throws {
+        storage.removeAll { $0.automationID == automationID }
+    }
+
     func clear() async throws {
         storage.removeAll()
     }

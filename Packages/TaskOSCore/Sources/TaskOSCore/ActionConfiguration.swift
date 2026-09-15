@@ -114,6 +114,9 @@ public struct WaitAction: Codable, Hashable, Sendable {
 }
 
 public struct ShowNotificationAction: Codable, Hashable, Sendable {
+    public static let maximumTitleLength = 120
+    public static let maximumMessageLength = 2_000
+
     public var title: String
     public var message: String
 

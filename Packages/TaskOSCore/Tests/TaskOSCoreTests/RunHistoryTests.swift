@@ -92,4 +92,64 @@ struct RunHistoryTests {
         #expect(runs.contains { $0.status == .interrupted })
         #expect(runs.contains { $0.status == .succeeded })
     }
+
+    @Test func deleteAllRemovesOnlyOneAutomationsRuns() async throws {
+        let repository: any RunHistoryRepository = InMemoryRunHistoryRepository()
+        let target = AutomationID()
+        let other = AutomationID()
+        let kept = RunRecord(
+            automationID: other,
+            revision: WorkflowRevision(1),
+            automationName: "Kept",
+            status: .succeeded,
+            startedAt: Date(timeIntervalSince1970: 1),
+            finishedAt: Date(timeIntervalSince1970: 2),
+            actions: []
+        )
+        let removed = RunRecord(
+            automationID: target,
+            revision: WorkflowRevision(1),
+            automationName: "Removed",
+            status: .succeeded,
+            startedAt: Date(timeIntervalSince1970: 3),
+            finishedAt: Date(timeIntervalSince1970: 4),
+            actions: []
+        )
+        try await repository.append(kept)
+        try await repository.append(removed)
+
+        try await repository.deleteAll(for: target)
+
+        let runs = try await repository.recentRuns(limit: 10)
+        #expect(runs.map(\.automationName) == ["Kept"])
+    }
+
+    @Test func redactionRemovesLinksAndPathsFromFailures() {
+        let failure = ActionFailure(
+            message: "Could not open https://example.com/callback?token=secret in Safari: file:///Users/adityasingh/secret"
+        )
+        let record = RunRecord(
+            automationID: AutomationID(),
+            revision: WorkflowRevision(1),
+            automationName: "Leaky",
+            status: .failed,
+            startedAt: Date(timeIntervalSince1970: 1),
+            finishedAt: Date(timeIntervalSince1970: 2),
+            actions: [ActionRunRecord(index: 0, actionID: .openWebsite, outcome: .failed(failure), duration: 1)]
+        )
+
+        let sanitized = RunRecordRedaction.sanitize(record)
+        guard case .failed(let message)? = sanitized.actions.first?.outcome else {
+            Issue.record("Expected a failure outcome")
+            return
+        }
+        #expect(!message.message.contains("token=secret"))
+        #expect(!message.message.contains("/Users/adityasingh"))
+        #expect(message.message.contains("[redacted]"))
+    }
+
+    @Test func redactionTruncatesVeryLongMessages() {
+        let message = RunRecordRedaction.sanitize(message: String(repeating: "x", count: 5_000))
+        #expect(message.count == RunRecordRedaction.maximumMessageLength + 1)
+    }
 }

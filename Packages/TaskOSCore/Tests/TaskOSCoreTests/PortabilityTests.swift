@@ -135,4 +135,27 @@ struct PortabilityTests {
         }
         #expect(rejected)
     }
+
+    @Test func oversizedExportIsRejected() throws {
+        let text = String(repeating: "a", count: 25_000)
+        let action = ActionConfiguration.copyText(CopyTextAction(text: text))
+        let definition = AutomationDefinition(
+            name: "Huge",
+            trigger: .manual(ManualTrigger()),
+            actions: Array(repeating: action, count: 12)
+        )
+        #expect(throws: PortabilityError.tooLarge) {
+            _ = try WorkflowPortability.export(definition)
+        }
+    }
+
+    @Test func oversizedFileOnDiskIsRejectedBeforeParsing() throws {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try Data(count: WorkflowPortability.maximumBytes + 1).write(to: url)
+        defer { try? FileManager.default.removeItem(at: url) }
+
+        #expect(throws: PortabilityError.tooLarge) {
+            _ = try WorkflowPortability.importWorkflow(at: url)
+        }
+    }
 }

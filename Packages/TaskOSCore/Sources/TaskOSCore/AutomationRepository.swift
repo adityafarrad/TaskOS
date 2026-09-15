@@ -26,8 +26,22 @@ public struct SavedWorkflow: Hashable, Sendable, Codable, Identifiable {
 
 public protocol AutomationRepository: Sendable {
     func loadAll() async throws -> [SavedWorkflow]
+    func quarantinedIdentifiers() async -> [AutomationID]
     func save(_ workflow: SavedWorkflow) async throws
     func delete(id: AutomationID) async throws
+    func deleteAll() async throws
+}
+
+public extension AutomationRepository {
+    func quarantinedIdentifiers() async -> [AutomationID] {
+        []
+    }
+
+    func deleteAll() async throws {
+        for workflow in try await loadAll() {
+            try await delete(id: workflow.id)
+        }
+    }
 }
 
 public enum SavedWorkflowSerialization {

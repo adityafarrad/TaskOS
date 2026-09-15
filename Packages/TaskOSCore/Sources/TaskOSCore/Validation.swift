@@ -234,9 +234,13 @@ extension ShowNotificationAction {
         var issues: [ValidationIssue] = []
         if title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             issues.append(.error("Notification requires a title."))
+        } else if title.count > Self.maximumTitleLength {
+            issues.append(.error("Notification title must be at most \(Self.maximumTitleLength) characters."))
         }
         if message.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             issues.append(.warning("Notification has no message."))
+        } else if message.count > Self.maximumMessageLength {
+            issues.append(.error("Notification message must be at most \(Self.maximumMessageLength) characters."))
         }
         return ValidationResult(issues: issues)
     }

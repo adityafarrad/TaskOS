@@ -14,7 +14,21 @@ public enum WorkflowPortability {
         let portable = PortableWorkflow(definition: definition)
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.sortedKeys, .prettyPrinted]
-        return try encoder.encode(portable)
+        let data = try encoder.encode(portable)
+        guard data.count <= maximumBytes else {
+            throw PortabilityError.tooLarge
+        }
+        return data
+    }
+
+    public static func importWorkflow(at url: URL) throws -> AutomationDefinition {
+        if let values = try? url.resourceValues(forKeys: [.fileSizeKey]),
+           let size = values.fileSize,
+           size > maximumBytes {
+            throw PortabilityError.tooLarge
+        }
+        let data = try Data(contentsOf: url)
+        return try importWorkflow(data)
     }
 
     public static func importWorkflow(

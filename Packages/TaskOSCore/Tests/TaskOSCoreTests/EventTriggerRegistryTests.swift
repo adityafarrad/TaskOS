@@ -130,4 +130,64 @@ struct EventTriggerRegistryTests {
         await probe.awaitStarted(2)
         await coordinator.waitUntilIdle()
     }
+
+    @Test func reRegisteringABatteryTriggerReplacesTheMonitor() async {
+        let (clock, probe, coordinator, _, registry) = context()
+        let original = AutomationDefinition(
+            name: "Battery",
+            trigger: .batteryThreshold(BatteryThresholdTrigger(comparator: .below, percentage: 20)),
+            actions: [.showNotification(ShowNotificationAction(title: "TaskOS", message: ""))]
+        )
+        await registry.register(original)
+        _ = await registry.handle(.batteryChanged(percentage: 25))
+        let first = await registry.handle(.batteryChanged(percentage: 19))
+        #expect(first == [original.id])
+        await probe.awaitStarted(1)
+        await coordinator.waitUntilIdle()
+        clock.advance(by: .seconds(11))
+
+        let updated = AutomationDefinition(
+            id: original.id,
+            name: original.name,
+            revision: original.revision.next(),
+            trigger: .batteryThreshold(BatteryThresholdTrigger(comparator: .above, percentage: 80)),
+            actions: original.actions
+        )
+        await registry.register(updated)
+
+        #expect(await registry.handle(.batteryChanged(percentage: 79)).isEmpty)
+        let fired = await registry.handle(.batteryChanged(percentage: 85))
+        #expect(fired == [original.id])
+
+        await probe.awaitStarted(2)
+        await coordinator.waitUntilIdle()
+    }
+
+    @Test func replaceAllResetsOnlyChangedBatteryMonitors() async {
+        let (_, probe, coordinator, _, registry) = context()
+        let definition = AutomationDefinition(
+            name: "Battery",
+            trigger: .batteryThreshold(BatteryThresholdTrigger(comparator: .below, percentage: 20)),
+            actions: [.showNotification(ShowNotificationAction(title: "TaskOS", message: ""))]
+        )
+        await registry.register(definition)
+        _ = await registry.handle(.batteryChanged(percentage: 25))
+
+        let changed = AutomationDefinition(
+            id: definition.id,
+            name: definition.name,
+            revision: definition.revision.next(),
+            trigger: .batteryThreshold(BatteryThresholdTrigger(comparator: .below, percentage: 40)),
+            actions: definition.actions
+        )
+        await registry.replaceAll([changed])
+
+        #expect(await registry.handle(.batteryChanged(percentage: 35)).isEmpty)
+        #expect(await registry.handle(.batteryChanged(percentage: 45)).isEmpty)
+        let fired = await registry.handle(.batteryChanged(percentage: 38))
+        #expect(fired == [definition.id])
+
+        await probe.awaitStarted(1)
+        await coordinator.waitUntilIdle()
+    }
 }

@@ -40,6 +40,10 @@ public actor ScheduleRegistry {
         wake()
     }
 
+    public func refresh() {
+        wake()
+    }
+
     public func stop() {
         generation += 1
         task?.cancel()

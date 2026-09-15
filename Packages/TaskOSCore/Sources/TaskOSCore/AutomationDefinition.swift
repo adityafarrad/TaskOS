@@ -27,6 +27,7 @@ public struct WorkflowRevision: Hashable, Codable, Sendable, Comparable {
 public struct AutomationDefinition: Codable, Hashable, Sendable {
     public static let currentSchemaVersion = 1
     public static let maximumActionCount = 12
+    public static let maximumNameLength = 120
 
     public let schemaVersion: Int
     public let id: AutomationID
@@ -59,6 +60,8 @@ public struct AutomationDefinition: Codable, Hashable, Sendable {
 
         if name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             issues.append(.error("Workflow name is required."))
+        } else if name.count > Self.maximumNameLength {
+            issues.append(.error("Workflow name must be at most \(Self.maximumNameLength) characters."))
         }
 
         issues.append(contentsOf: trigger.validate(relativeTo: now).issues)

@@ -6,6 +6,7 @@ public protocol AdmissionEventSink: Sendable {
 
 public protocol AdmissionEventRepository: AdmissionEventSink {
     func recentEvents(limit: Int) async throws -> [AdmissionEvent]
+    func deleteAll(for automationID: AutomationID) async throws
     func clear() async throws
 }
 

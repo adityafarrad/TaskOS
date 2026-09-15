@@ -73,4 +73,19 @@ struct ComposerValuePreservationTests {
         }
         #expect(resolvedLabel == "WhatsApp", "resolved app lost after reorder + stale write; actions=\(document.actions.map(\.draft))")
     }
+
+    @Test func scheduleResolutionIsIndependentBetweenCopies() {
+        let exact = Date(timeIntervalSince1970: 5_000)
+        let original = ComposerDocument(trigger: .oneTime(exact), actions: [.wait(1)])
+        var copy = original
+
+        copy.clearScheduleResolution()
+        #expect(copy.scheduleResolution.oneTimeDate == nil)
+        #expect(original.scheduleResolution.oneTimeDate == exact)
+
+        var mutated = original
+        mutated.setTrigger(.daily(hour: 9, minute: 0))
+        #expect(mutated.scheduleResolution.oneTimeDate == nil)
+        #expect(original.scheduleResolution.oneTimeDate == exact)
+    }
 }

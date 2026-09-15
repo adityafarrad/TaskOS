@@ -158,4 +158,56 @@ struct WorkflowRunnerTests {
         #expect(record.actions[0].outcome == .cancelled)
         #expect(record.actions[1].outcome == .notExecuted)
     }
+
+    @Test func timeoutReturnsWithoutWaitingForNonCooperativeExecutor() async {
+        let clock = TestClock()
+        let flag = ReleaseFlag()
+        let blocked = FakeExecutor(id: .openApplication) { _ in
+            while !flag.isReleased {
+                try? await Task.sleep(for: .milliseconds(1))
+            }
+            return .succeeded
+        }
+        let timeouts = WorkflowRunner.Timeouts(
+            defaultAction: 10,
+            wholeWorkflow: 180,
+            maximumCumulativeWait: 60
+        )
+        let runner = WorkflowRunner(clock: clock, executors: [blocked], timeouts: timeouts)
+        let definition = AutomationDefinition(
+            name: "Ignores cancellation",
+            trigger: .manual(ManualTrigger()),
+            actions: [safariAction()]
+        )
+
+        let task = Task { await runner.run(definition) }
+        await waitForWaiter(clock)
+        clock.advance(by: .seconds(10))
+        let record = await task.value
+        flag.release()
+
+        #expect(record.status == .timedOut)
+        guard case .failed(let failure)? = record.actions.first?.outcome else {
+            Issue.record("Expected a failure outcome")
+            return
+        }
+        #expect(failure.isTimedOut)
+    }
+}
+
+private final class ReleaseFlag: @unchecked Sendable {
+    private let lock = NSLock()
+    private var released = false
+
+    func release() {
+        lock.lock()
+        released = true
+        lock.unlock()
+    }
+
+    var isReleased: Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return released
+    }
 }

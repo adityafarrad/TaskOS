@@ -40,4 +40,23 @@ struct ValidationTests {
         #expect(noMessage.isValid)
         #expect(noMessage.issues.contains { $0.severity == .warning })
     }
+
+    @Test func notificationFieldsAreBounded() {
+        let longTitle = String(repeating: "T", count: ShowNotificationAction.maximumTitleLength + 1)
+        let longMessage = String(repeating: "M", count: ShowNotificationAction.maximumMessageLength + 1)
+
+        #expect(!ShowNotificationAction(title: longTitle, message: "ok").validate().isValid)
+        #expect(!ShowNotificationAction(title: "ok", message: longMessage).validate().isValid)
+        #expect(ShowNotificationAction(title: String(repeating: "T", count: ShowNotificationAction.maximumTitleLength), message: "ok").validate().isValid)
+    }
+
+    @Test func workflowNameIsBounded() {
+        let longName = String(repeating: "n", count: AutomationDefinition.maximumNameLength + 1)
+        let definition = AutomationDefinition(
+            name: longName,
+            trigger: .manual(ManualTrigger()),
+            actions: [.wait(WaitAction(duration: 1))]
+        )
+        #expect(!definition.validate().isValid)
+    }
 }
