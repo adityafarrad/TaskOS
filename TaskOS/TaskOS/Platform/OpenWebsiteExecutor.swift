@@ -9,7 +9,7 @@ struct OpenWebsiteExecutor: ActionExecutor {
             return .failed(ActionFailure(message: "Open Website received an unsupported action."))
         }
         guard let url = URL(string: configuration.url), OpenWebsiteAction.isAbsoluteHTTPURL(configuration.url) else {
-            return .failed(ActionFailure(message: "Not a valid web address: \(configuration.url)"))
+            return .failed(ActionFailure(message: "Not a valid web address. Check the step and try again."))
         }
         return await open(url: url, browser: configuration.browser)
     }
@@ -34,11 +34,11 @@ struct OpenWebsiteExecutor: ActionExecutor {
                 }
                 return .succeeded
             } catch {
-                return .failed(ActionFailure(message: "Could not open \(url.absoluteString) in \(browser.label): \(error.localizedDescription)"))
+                return .failed(ActionFailure(message: "Could not open the link in \(browser.label)."))
             }
         }
 
         let opened = NSWorkspace.shared.open(url)
-        return opened ? .succeeded : .failed(ActionFailure(message: "Could not open \(url.absoluteString)."))
+        return opened ? .succeeded : .failed(ActionFailure(message: "Could not open the link in the default browser."))
     }
 }

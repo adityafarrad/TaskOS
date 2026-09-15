@@ -8,7 +8,7 @@ enum FileTargetStatus: Equatable {
 }
 
 enum FileTargetResolver {
-    static func url(for target: FileTarget) -> URL? {
+    nonisolated static func url(for target: FileTarget) -> URL? {
         if let bookmark = target.bookmark {
             var stale = false
             if let url = try? URL(
@@ -24,12 +24,12 @@ enum FileTargetResolver {
         return URL(fileURLWithPath: target.path)
     }
 
-    static func exists(_ target: FileTarget) -> Bool {
+    nonisolated static func exists(_ target: FileTarget) -> Bool {
         guard let url = url(for: target) else { return false }
         return FileManager.default.fileExists(atPath: url.path)
     }
 
-    static func status(_ target: FileTarget) -> FileTargetStatus {
+    nonisolated static func status(_ target: FileTarget) -> FileTargetStatus {
         guard let url = url(for: target) else { return .missing }
         guard FileManager.default.fileExists(atPath: url.path) else { return .missing }
         if !target.path.isEmpty, url.path != target.path {

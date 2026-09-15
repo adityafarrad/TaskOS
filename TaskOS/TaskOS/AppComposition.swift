@@ -10,6 +10,12 @@ struct HardwareAvailability: Sendable, Equatable {
     var hasRemovableVolume: Bool
 }
 
+enum PersistenceHealth: Sendable, Equatable {
+    case onDisk
+    case recovered(backup: URL?)
+    case volatile(reason: String)
+}
+
 @MainActor
 final class AppComposition {
     static let shared = AppComposition()
@@ -39,6 +45,7 @@ final class AppComposition {
     let admissionEvents: any AdmissionEventRepository
     let drafts: any DraftRepository
     let permissions: any PermissionStatusProvider
+    let persistenceHealth: PersistenceHealth
 
     private let catalog: WorkspaceResourceCatalog
     private let applicationCatalog: ApplicationCatalogService
@@ -48,6 +55,7 @@ final class AppComposition {
     private let displaySource: DisplayTriggerSource
     private let volumeSource: VolumeTriggerSource
     private let powerSource: PowerBatteryTriggerSource
+    private var systemChangeTokens: [NSObjectProtocol] = []
 
     init() {
         let clock = SystemClock()
@@ -55,29 +63,34 @@ final class AppComposition {
         self.applicationCatalog = ApplicationCatalogService(provider: catalog)
 
         let container: ModelContainer
+        let persistenceHealth: PersistenceHealth
         if Self.isTesting {
-            container = try! ModelContainer(
-                for: WorkflowRecord.self,
-                RunRecordEntry.self,
-                AdmissionEventRecord.self,
-                DraftRecord.self,
-                configurations: ModelConfiguration(isStoredInMemoryOnly: true)
-            )
-        } else if let onDisk = try? ModelContainer(
-            for: WorkflowRecord.self,
-            RunRecordEntry.self,
-            AdmissionEventRecord.self,
-            DraftRecord.self
-        ) {
-            container = onDisk
+            container = Self.makeContainer(inMemory: true)
+            persistenceHealth = .onDisk
         } else {
-            container = try! ModelContainer(
-                for: WorkflowRecord.self,
-                RunRecordEntry.self,
-                AdmissionEventRecord.self,
-                DraftRecord.self,
-                configurations: ModelConfiguration(isStoredInMemoryOnly: true)
-            )
+            do {
+                container = try ModelContainer(
+                    for: WorkflowRecord.self,
+                    RunRecordEntry.self,
+                    AdmissionEventRecord.self,
+                    DraftRecord.self
+                )
+                persistenceHealth = .onDisk
+            } catch {
+                let backup = Self.moveAsideDefaultStore()
+                if let recovered = try? ModelContainer(
+                    for: WorkflowRecord.self,
+                    RunRecordEntry.self,
+                    AdmissionEventRecord.self,
+                    DraftRecord.self
+                ) {
+                    container = recovered
+                    persistenceHealth = .recovered(backup: backup)
+                } else {
+                    container = Self.makeContainer(inMemory: true)
+                    persistenceHealth = .volatile(reason: error.localizedDescription)
+                }
+            }
         }
 
         let runHistory = SwiftDataRunHistoryRepository(modelContainer: container)
@@ -112,6 +125,7 @@ final class AppComposition {
             catalog: catalog,
             permissions: permissions
         )
+        self.persistenceHealth = persistenceHealth
         self.runner = runner
         let coordinator = RunCoordinator(clock: clock, eventSink: admissionEvents) { definition, id in
             try? await runHistory.append(RunRecord.starting(definition, id: id))
@@ -128,7 +142,7 @@ final class AppComposition {
         self.coordinator = coordinator
 
         var calendar = Calendar(identifier: .gregorian)
-        calendar.timeZone = .current
+        calendar.timeZone = .autoupdatingCurrent
         let scheduleCalculator = ScheduleCalculator(calendar: calendar)
         self.scheduleCalculator = scheduleCalculator
         self.scheduleRegistry = ScheduleRegistry(
@@ -149,6 +163,60 @@ final class AppComposition {
         self.powerSource = PowerBatteryTriggerSource()
 
         self.sessionObserver = SystemSessionObserver(coordinator: coordinator)
+
+        let center = NotificationCenter.default
+        let timeZoneToken = center.addObserver(
+            forName: .NSSystemTimeZoneDidChange,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task {
+                await self?.scheduleRegistry.refresh()
+            }
+        }
+        let clockToken = center.addObserver(
+            forName: .NSSystemClockDidChange,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task {
+                await self?.scheduleRegistry.refresh()
+            }
+        }
+        self.systemChangeTokens = [timeZoneToken, clockToken]
+    }
+
+    private static func makeContainer(inMemory: Bool) -> ModelContainer {
+        let configuration = inMemory ? ModelConfiguration(isStoredInMemoryOnly: true) : ModelConfiguration()
+        do {
+            return try ModelContainer(
+                for: WorkflowRecord.self,
+                RunRecordEntry.self,
+                AdmissionEventRecord.self,
+                DraftRecord.self,
+                configurations: configuration
+            )
+        } catch {
+            preconditionFailure("TaskOS could not create a data store: \(error.localizedDescription)")
+        }
+    }
+
+    private static func moveAsideDefaultStore() -> URL? {
+        let storeURL = ModelConfiguration().url
+        let fileManager = FileManager.default
+        let stamp = ISO8601DateFormatter().string(from: Date()).replacingOccurrences(of: ":", with: "-")
+        let backupBase = storeURL.deletingLastPathComponent().appendingPathComponent("TaskOS-store-backup-\(stamp).store")
+
+        var moved = false
+        for suffix in ["", "-shm", "-wal"] {
+            let source = URL(fileURLWithPath: storeURL.path + suffix)
+            guard fileManager.fileExists(atPath: source.path) else { continue }
+            let destination = URL(fileURLWithPath: backupBase.path + suffix)
+            if (try? fileManager.moveItem(at: source, to: destination)) != nil {
+                moved = true
+            }
+        }
+        return moved ? backupBase : nil
     }
 
     func loadApplications() async -> [ApplicationResource] {

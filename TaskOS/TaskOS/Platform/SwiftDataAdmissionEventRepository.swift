@@ -56,6 +56,12 @@ actor SwiftDataAdmissionEventRepository: AdmissionEventRepository {
         try modelContext.save()
     }
 
+    func deleteAll(for automationID: AutomationID) async throws {
+        let identifier = automationID.rawValue
+        try modelContext.delete(model: AdmissionEventRecord.self, where: #Predicate { $0.automationID == identifier })
+        try modelContext.save()
+    }
+
     private func prune() {
         let cutoff = Date().addingTimeInterval(-AdmissionEventRetention.maximumAge)
         if let expired = try? modelContext.fetch(

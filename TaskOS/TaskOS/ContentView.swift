@@ -57,13 +57,13 @@ struct ContentView: View {
         )
         .onPreferenceChange(AppWidthKey.self) { appWidth = $0 }
         .onAppear { model.loadApplicationsIfNeeded() }
+        .onDisappear { model.teardown() }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             model.refreshAll()
         }
-        .task {
-            while !Task.isCancelled {
-                try? await Task.sleep(for: .seconds(5))
-                model.refreshForAttention()
+        .safeAreaInset(edge: .top) {
+            if let warning = model.persistenceWarning {
+                persistenceBanner(warning)
             }
         }
         .confirmationDialog(
@@ -141,7 +141,7 @@ struct ContentView: View {
                 showReview: $showReview,
                 composerFocusToken: $composerFocusToken,
                 onRun: run,
-                onSave: { model.save() },
+                onSave: { Task { await model.save() } },
                 onImport: { requestDocumentReplacement { model.importWorkflow() } },
                 onViewHistory: { sidebarSelection = .destination(.history) }
             )
@@ -160,7 +160,7 @@ struct ContentView: View {
                 run()
             },
             cancelRun: { model.cancelCurrentRun() },
-            save: { model.save() },
+            save: { Task { await model.save() } },
             undo: { model.undo() },
             redo: { model.redo() },
             openSettings: { sidebarSelection = .destination(.settings) },
@@ -220,7 +220,22 @@ struct ContentView: View {
     }
 
     private func saveAndContinue() {
-        model.save()
-        performPendingReplace()
+        Task {
+            if await model.save() {
+                performPendingReplace()
+            } else {
+                pendingReplace = nil
+            }
+        }
+    }
+
+    private func persistenceBanner(_ warning: String) -> some View {
+        Label(warning, systemImage: "exclamationmark.triangle.fill")
+            .font(.caption)
+            .foregroundStyle(.orange)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, TaskOSSpacing.md)
+            .padding(.vertical, TaskOSSpacing.xs)
+            .background(.orange.opacity(0.12))
     }
 }

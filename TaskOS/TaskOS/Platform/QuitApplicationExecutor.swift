@@ -14,6 +14,7 @@ struct QuitApplicationExecutor: ActionExecutor {
         guard case .quitApplication(let configuration) = action else {
             return .failed(ActionFailure(message: "Quit Application received an unsupported action."))
         }
+        await suppressor?.suppress(bundleIdentifier: configuration.application.identifier)
         let outcome = await quit(
             bundleIdentifier: configuration.application.identifier,
             label: configuration.application.label

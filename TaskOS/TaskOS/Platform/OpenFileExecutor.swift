@@ -19,6 +19,9 @@ struct OpenFileExecutor: ActionExecutor {
         guard let url = FileTargetResolver.url(for: target) else {
             return .failed(ActionFailure(message: "\(target.displayName) has no valid location. Choose it again."))
         }
+        guard FileTargetValidation.isAllowed(url) else {
+            return .failed(ActionFailure(message: "TaskOS cannot open applications, installers, scripts, or executable content."))
+        }
         guard FileManager.default.fileExists(atPath: url.path) else {
             return .failed(ActionFailure(message: "\(target.displayName) was moved or deleted. Choose it again."))
         }

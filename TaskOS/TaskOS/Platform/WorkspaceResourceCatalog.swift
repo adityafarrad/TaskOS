@@ -44,43 +44,18 @@ struct WorkspaceResourceCatalog: ResourceCatalog {
     ]
 
     nonisolated func installedApplicationRecords() async -> [ApplicationRecord] {
-        let fileManager = FileManager.default
-        let directories = [
+        Self.applicationRecords(in: [
             URL(fileURLWithPath: "/Applications"),
-            URL(fileURLWithPath: "/Applications/Utilities"),
             URL(fileURLWithPath: "/System/Applications"),
-            URL(fileURLWithPath: "/System/Applications/Utilities"),
-            fileManager.homeDirectoryForCurrentUser.appendingPathComponent("Applications"),
-        ]
+            FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Applications"),
+        ])
+    }
 
+    nonisolated static func applicationRecords(in roots: [URL]) -> [ApplicationRecord] {
         var collected: [ApplicationRecord] = []
-
-        for directory in directories {
-            guard let entries = try? fileManager.contentsOfDirectory(
-                at: directory,
-                includingPropertiesForKeys: nil
-            ) else {
-                continue
-            }
-
-            for entry in entries where entry.pathExtension == "app" {
-                guard let bundle = Bundle(url: entry), let identifier = bundle.bundleIdentifier else {
-                    continue
-                }
-                let fileName = entry.deletingPathExtension().lastPathComponent
-                let displayName = (bundle.infoDictionary?["CFBundleDisplayName"] as? String)
-                    ?? (bundle.infoDictionary?["CFBundleName"] as? String)
-                    ?? fileName
-                collected.append(
-                    ApplicationRecord(
-                        bundleIdentifier: identifier,
-                        displayName: displayName,
-                        fileName: fileName,
-                        url: entry,
-                        aliases: Self.approvedAliases[identifier] ?? []
-                    )
-                )
-            }
+        for root in roots {
+            collectApplications(in: root, depth: 0, into: &collected)
+            if collected.count >= CommandLimits.maximumApplications { break }
         }
 
         var seen = Set<String>()
@@ -88,4 +63,49 @@ struct WorkspaceResourceCatalog: ResourceCatalog {
             .filter { seen.insert($0.bundleIdentifier).inserted }
             .sorted { $0.displayName.localizedCaseInsensitiveCompare($1.displayName) == .orderedAscending }
     }
+
+    private static func collectApplications(in directory: URL, depth: Int, into collected: inout [ApplicationRecord]) {
+        guard depth <= Self.maximumDiscoveryDepth, collected.count < CommandLimits.maximumApplications else { return }
+        let fileManager = FileManager.default
+        let keys: [URLResourceKey] = [.isDirectoryKey, .isPackageKey]
+        guard let entries = try? fileManager.contentsOfDirectory(
+            at: directory,
+            includingPropertiesForKeys: keys
+        ) else {
+            return
+        }
+
+        for entry in entries.sorted(by: { $0.lastPathComponent < $1.lastPathComponent }) {
+            if entry.lastPathComponent.hasPrefix(".") { continue }
+            if entry.pathExtension == "app" {
+                if let record = applicationRecord(for: entry) {
+                    collected.append(record)
+                }
+                continue
+            }
+            let values = try? entry.resourceValues(forKeys: Set(keys))
+            if values?.isDirectory == true, values?.isPackage != true {
+                collectApplications(in: entry, depth: depth + 1, into: &collected)
+            }
+        }
+    }
+
+    private static func applicationRecord(for entry: URL) -> ApplicationRecord? {
+        guard let bundle = Bundle(url: entry), let identifier = bundle.bundleIdentifier else {
+            return nil
+        }
+        let fileName = entry.deletingPathExtension().lastPathComponent
+        let displayName = (bundle.infoDictionary?["CFBundleDisplayName"] as? String)
+            ?? (bundle.infoDictionary?["CFBundleName"] as? String)
+            ?? fileName
+        return ApplicationRecord(
+            bundleIdentifier: identifier,
+            displayName: displayName,
+            fileName: fileName,
+            url: entry,
+            aliases: approvedAliases[identifier] ?? []
+        )
+    }
+
+    private static let maximumDiscoveryDepth = 3
 }

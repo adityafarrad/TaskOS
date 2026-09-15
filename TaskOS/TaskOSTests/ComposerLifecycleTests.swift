@@ -21,7 +21,7 @@ struct ComposerLifecycleTests {
 
         try await composition.drafts.saveDraft(ComposerDraft(name: "D", text: "wait 1 second"))
         model.updateFromEditor(text: "wait 1 second", edit: nil)
-        model.save()
+        await model.save()
         #expect(await waitForDraftCleared())
     }
 

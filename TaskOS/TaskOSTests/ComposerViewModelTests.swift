@@ -42,6 +42,31 @@ struct ComposerViewModelTests {
         #expect(model.hasUnsavedChanges)
     }
 
+    @Test func unresolvedTextCountsAsUnsavedChanges() {
+        let model = ComposerViewModel()
+        model.updateFromEditor(text: "do the thing", edit: nil)
+        #expect(model.hasUnsavedChanges)
+    }
+
+    @Test func savePersistsUnderTheDocumentIdentityAndRebasesRevision() async throws {
+        let model = ComposerViewModel()
+        model.updateFromEditor(text: "wait 1 second", edit: nil)
+        let identity = model.currentAutomationID
+
+        #expect(await model.save())
+        #expect(model.currentAutomationID == identity)
+        #expect(!model.hasUnsavedChanges)
+
+        let saved = try await AppComposition.shared.repository.loadAll()
+        #expect(saved.first { $0.id == identity } != nil)
+        #expect(saved.first { $0.id == identity }?.definition.revision == model.currentRevision)
+
+        model.updateFromEditor(text: "wait 2 seconds", edit: nil)
+        #expect(await model.save())
+        let reloaded = try await AppComposition.shared.repository.loadAll()
+        #expect(reloaded.first { $0.id == identity }?.definition.revision == model.currentRevision)
+    }
+
     @Test func newWorkflowClearsTheDocument() {
         let model = ComposerViewModel()
         model.add(.wait(1))
@@ -157,7 +182,7 @@ struct ComposerViewModelTests {
         let model = ComposerViewModel()
         model.updateFromEditor(text: "wait 1 second", edit: nil)
 
-        model.save()
+        await model.save()
         model.newWorkflow()
 
         try? await Task.sleep(for: .milliseconds(400))
@@ -404,7 +429,7 @@ struct ComposerViewModelTests {
         }
     }
 
-    @Test func pastDueScheduleBlocksWithAReason() {
+    @Test func pastDueScheduleBlocksWithAReason() async {
         let model = ComposerViewModel()
         model.updateFromEditor(
             text: "once on 2020-01-01 at 09:00, then show a notification",
@@ -414,7 +439,7 @@ struct ComposerViewModelTests {
         #expect(!model.canPrepare)
         #expect(model.blockingReason?.contains("passed") == true)
 
-        model.save()
+        await model.save()
         #expect(model.notice?.contains("passed") == true)
     }
 
@@ -426,13 +451,13 @@ struct ComposerViewModelTests {
         #expect(model.blockingReason?.contains("passed") == true)
     }
 
-    @Test func editingClearsAStaleNotice() {
+    @Test func editingClearsAStaleNotice() async {
         let model = ComposerViewModel()
         model.updateFromEditor(
             text: "once on 2020-01-01 at 09:00, then show a notification",
             edit: nil
         )
-        model.save()
+        await model.save()
         #expect(model.notice != nil)
 
         model.updateFromEditor(text: "show a notification", edit: nil)

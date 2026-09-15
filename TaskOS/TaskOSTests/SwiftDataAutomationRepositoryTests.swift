@@ -54,4 +54,41 @@ struct SwiftDataAutomationRepositoryTests {
         let loaded = try await repository.loadAll()
         #expect(loaded.map(\.name) == ["Newer", "Older"])
     }
+
+    @Test func oneCorruptRecordIsQuarantinedWithoutLosingValidWorkflows() async throws {
+        let container = try ModelContainer(
+            for: WorkflowRecord.self,
+            configurations: ModelConfiguration(isStoredInMemoryOnly: true)
+        )
+        let badID = AutomationID()
+        let context = ModelContext(container)
+        context.insert(
+            WorkflowRecord(
+                id: badID.rawValue,
+                name: "Bad",
+                revisionValue: 1,
+                isEnabled: false,
+                updatedAt: Date(),
+                definitionData: Data("not-json".utf8)
+            )
+        )
+        try context.save()
+
+        let repository = SwiftDataAutomationRepository(modelContainer: container)
+        try await repository.save(makeWorkflow(name: "Good", updatedAt: Date()))
+
+        let loaded = try await repository.loadAll()
+        #expect(loaded.map(\.name) == ["Good"])
+        #expect(await repository.quarantinedIdentifiers() == [badID])
+    }
+
+    @Test func deleteAllRemovesEveryWorkflow() async throws {
+        let repository: any AutomationRepository = try makeRepository()
+        try await repository.save(makeWorkflow(name: "A", updatedAt: Date()))
+        try await repository.save(makeWorkflow(name: "B", updatedAt: Date()))
+
+        try await repository.deleteAll()
+
+        #expect(try await repository.loadAll().isEmpty)
+    }
 }

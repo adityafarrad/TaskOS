@@ -93,4 +93,56 @@ struct SwiftDataRunHistoryRepositoryTests {
         #expect(runs.first { $0.automationName == "Unfinished" }?.status == .interrupted)
         #expect(runs.first { $0.automationName == "Finished" }?.status == .succeeded)
     }
+
+    @Test func deleteAllRemovesOnlyOneAutomationsRuns() async throws {
+        let repository: any RunHistoryRepository = try makeRepository()
+        let target = AutomationID()
+        let other = AutomationID()
+
+        func record(_ name: String, automationID: AutomationID, startedAt: Date) -> RunRecord {
+            RunRecord(
+                automationID: automationID,
+                revision: WorkflowRevision(1),
+                automationName: name,
+                status: .succeeded,
+                startedAt: startedAt,
+                finishedAt: startedAt.addingTimeInterval(1),
+                actions: []
+            )
+        }
+
+        try await repository.append(record("Removed", automationID: target, startedAt: Date()))
+        try await repository.append(record("Kept", automationID: other, startedAt: Date().addingTimeInterval(1)))
+
+        try await repository.deleteAll(for: target)
+
+        let runs = try await repository.recentRuns(limit: 10)
+        #expect(runs.map(\.automationName) == ["Kept"])
+    }
+
+    @Test func persistedFailuresAreRedacted() async throws {
+        let repository: any RunHistoryRepository = try makeRepository()
+        let failure = ActionFailure(
+            message: "Could not open the link in Safari: https://example.com/callback?token=secret"
+        )
+        let record = RunRecord(
+            automationID: AutomationID(),
+            revision: WorkflowRevision(1),
+            automationName: "Leaky",
+            status: .failed,
+            startedAt: Date(),
+            finishedAt: Date().addingTimeInterval(1),
+            actions: [ActionRunRecord(index: 0, actionID: .openWebsite, outcome: .failed(failure), duration: 1)]
+        )
+
+        try await repository.append(record)
+
+        let runs = try await repository.recentRuns(limit: 1)
+        guard case .failed(let message)? = runs.first?.actions.first?.outcome else {
+            Issue.record("Expected a failure outcome")
+            return
+        }
+        #expect(!message.message.contains("token=secret"))
+        #expect(message.message.contains("[redacted]"))
+    }
 }

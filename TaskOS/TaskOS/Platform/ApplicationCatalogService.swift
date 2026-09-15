@@ -1,7 +1,7 @@
 import Foundation
 import TaskOSCore
 
-protocol ApplicationRecordProviding: Sendable {
+nonisolated protocol ApplicationRecordProviding: Sendable {
     func installedApplicationRecords() async -> [ApplicationRecord]
 }
 

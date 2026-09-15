@@ -14,6 +14,7 @@ struct StepConfigurationView: View {
         }
         .onAppear { captureApplicationSelectionKey() }
         .onChange(of: action.id) { _, _ in captureApplicationSelectionKey() }
+        .onChange(of: model.currentRevision) { _, _ in captureApplicationSelectionKey() }
     }
 
     private func captureApplicationSelectionKey() {
@@ -216,12 +217,11 @@ struct StepConfigurationView: View {
                 guard let application = model.applications.first(where: { $0.bundleIdentifier == newValue }) else {
                     return
                 }
-                guard let key = applicationSelectionKey else {
-                    captureApplicationSelectionKey()
-                    return
-                }
+                let key = applicationSelectionKey ?? model.beginApplicationSelection(for: action.id)
                 if !model.resolve(id: action.id, application: application, key: key) {
-                    captureApplicationSelectionKey()
+                    let refreshed = model.beginApplicationSelection(for: action.id)
+                    applicationSelectionKey = refreshed
+                    _ = model.resolve(id: action.id, application: application, key: refreshed)
                 }
             }
         )
@@ -236,21 +236,23 @@ struct StepConfigurationView: View {
                 return ""
             },
             set: { newValue in
-                guard let key = browserSelectionKey else {
-                    captureApplicationSelectionKey()
-                    return
-                }
                 if newValue.isEmpty {
+                    let key = browserSelectionKey ?? model.beginResourceSelection(for: action.id, slot: "browser")
                     if !model.updateWebsiteBrowser(id: action.id, browser: nil, key: key) {
-                        captureApplicationSelectionKey()
+                        let refreshed = model.beginResourceSelection(for: action.id, slot: "browser")
+                        browserSelectionKey = refreshed
+                        _ = model.updateWebsiteBrowser(id: action.id, browser: nil, key: refreshed)
                     }
                 } else if let application = model.applications.first(where: { $0.bundleIdentifier == newValue }) {
                     let browser = ResourceReference.application(
                         bundleIdentifier: application.bundleIdentifier,
                         label: application.displayName
                     )
+                    let key = browserSelectionKey ?? model.beginResourceSelection(for: action.id, slot: "browser")
                     if !model.updateWebsiteBrowser(id: action.id, browser: browser, key: key) {
-                        captureApplicationSelectionKey()
+                        let refreshed = model.beginResourceSelection(for: action.id, slot: "browser")
+                        browserSelectionKey = refreshed
+                        _ = model.updateWebsiteBrowser(id: action.id, browser: browser, key: refreshed)
                     }
                 }
             }

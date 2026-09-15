@@ -30,12 +30,29 @@ final class WorkflowRecord {
 
 @ModelActor
 actor SwiftDataAutomationRepository: AutomationRepository {
+    private var quarantined: [AutomationID] = []
+
     func loadAll() async throws -> [SavedWorkflow] {
         let descriptor = FetchDescriptor<WorkflowRecord>(
             sortBy: [SortDescriptor(\.updatedAt, order: .reverse)]
         )
         let records = try modelContext.fetch(descriptor)
-        return try records.map { try SavedWorkflowSerialization.decode($0.definitionData) }
+
+        var workflows: [SavedWorkflow] = []
+        var invalid: [AutomationID] = []
+        for record in records {
+            do {
+                workflows.append(try SavedWorkflowSerialization.decode(record.definitionData))
+            } catch {
+                invalid.append(AutomationID(record.id))
+            }
+        }
+        quarantined = invalid
+        return workflows
+    }
+
+    func quarantinedIdentifiers() async -> [AutomationID] {
+        quarantined
     }
 
     func save(_ workflow: SavedWorkflow) async throws {
@@ -74,6 +91,11 @@ actor SwiftDataAutomationRepository: AutomationRepository {
         for record in try modelContext.fetch(descriptor) {
             modelContext.delete(record)
         }
+        try modelContext.save()
+    }
+
+    func deleteAll() async throws {
+        try modelContext.delete(model: WorkflowRecord.self)
         try modelContext.save()
     }
 }

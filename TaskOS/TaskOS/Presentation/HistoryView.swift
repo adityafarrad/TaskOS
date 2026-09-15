@@ -17,6 +17,10 @@ struct HistoryView: View {
             VStack(alignment: .leading, spacing: TaskOSSpacing.lg) {
                 header
 
+                if let error = model.historyError {
+                    historyErrorRow(error)
+                }
+
                 if model.history.isEmpty && model.admissionEvents.isEmpty {
                     TaskOSEmptyState(
                         systemImage: "clock.arrow.circlepath",
@@ -72,7 +76,8 @@ struct HistoryView: View {
         VStack(alignment: .leading, spacing: TaskOSSpacing.xs) {
             TaskOSSectionHeader("Skipped & queued events")
             VStack(spacing: 0) {
-                ForEach(Array(model.admissionEvents.suffix(20).reversed().enumerated()), id: \.offset) { index, event in
+                let events = Array(model.admissionEvents.prefix(20))
+                ForEach(Array(events.enumerated()), id: \.offset) { index, event in
                     HStack(spacing: TaskOSSpacing.sm) {
                         Image(systemName: "arrow.triangle.branch")
                             .font(.caption)
@@ -89,13 +94,31 @@ struct HistoryView: View {
                     .padding(.vertical, 6)
                     .padding(.horizontal, TaskOSSpacing.sm)
 
-                    if index < model.admissionEvents.suffix(20).count - 1 {
+                    if index < events.count - 1 {
                         Divider()
                     }
                 }
             }
             .taskOSCard()
         }
+    }
+
+    private func historyErrorRow(_ error: String) -> some View {
+        HStack(spacing: TaskOSSpacing.sm) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .foregroundStyle(.orange)
+            Text(error)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            Spacer()
+            Button("Try Again") {
+                model.loadHistory()
+                model.refreshRuntimeActivity()
+            }
+            .controlSize(.small)
+        }
+        .padding(TaskOSSpacing.sm)
+        .taskOSCard()
     }
 
     private func dayLabel(_ day: Date) -> String {

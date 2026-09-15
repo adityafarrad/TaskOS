@@ -13,6 +13,10 @@ struct WorkflowsLibraryView: View {
             VStack(alignment: .leading, spacing: TaskOSSpacing.lg) {
                 header
 
+                if let notice = model.libraryRecoveryNotice {
+                    recoveryRow(notice)
+                }
+
                 if model.filteredWorkflows.isEmpty {
                     emptyState
                 } else {
@@ -131,6 +135,15 @@ struct WorkflowsLibraryView: View {
             )
         }
         .frame(maxWidth: .infinity)
+    }
+
+    private func recoveryRow(_ notice: String) -> some View {
+        Label(notice, systemImage: "exclamationmark.triangle.fill")
+            .font(.caption)
+            .foregroundStyle(.orange)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(TaskOSSpacing.sm)
+            .taskOSCard()
     }
 
     private var renamePresented: Binding<Bool> {

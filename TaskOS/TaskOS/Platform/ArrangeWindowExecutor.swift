@@ -23,6 +23,7 @@ struct ArrangeWindowExecutor: ActionExecutor {
 
     @MainActor
     private func arrange(_ configuration: ArrangeWindowAction) async -> ActionOutcome {
+        guard !Task.isCancelled else { return .cancelled }
         let bundleIdentifier = configuration.application.identifier
         let label = configuration.application.label
 
@@ -33,6 +34,9 @@ struct ArrangeWindowExecutor: ActionExecutor {
         let axApplication = AXUIElementCreateApplication(running.processIdentifier)
 
         guard let window = await waitForWindow(of: axApplication) else {
+            if Task.isCancelled {
+                return .cancelled
+            }
             return .failed(ActionFailure(message: "No unambiguous window found for \(label). Make sure it is open and has a visible window."))
         }
 
@@ -71,15 +75,20 @@ struct ArrangeWindowExecutor: ActionExecutor {
     @MainActor
     private func waitForWindow(of axApplication: AXUIElement, timeout: TimeInterval = 8) async -> AXUIElement? {
         let deadline = Date().addingTimeInterval(timeout)
-        while true {
+        while !Task.isCancelled {
             if let window = targetWindow(of: axApplication) {
                 return window
             }
             if Date() >= deadline {
                 return nil
             }
-            try? await Task.sleep(for: .milliseconds(200))
+            do {
+                try await Task.sleep(for: .milliseconds(200))
+            } catch {
+                return nil
+            }
         }
+        return nil
     }
 
     @MainActor
@@ -118,14 +127,16 @@ struct ArrangeWindowExecutor: ActionExecutor {
         var sizeValue: CFTypeRef?
         guard AXUIElementCopyAttributeValue(window, kAXPositionAttribute as CFString, &positionValue) == .success,
               AXUIElementCopyAttributeValue(window, kAXSizeAttribute as CFString, &sizeValue) == .success,
-              let positionValue, let sizeValue else {
+              let positionValue, let sizeValue,
+              CFGetTypeID(positionValue) == AXValueGetTypeID(),
+              CFGetTypeID(sizeValue) == AXValueGetTypeID() else {
             return nil
         }
 
         var point = CGPoint.zero
         var size = CGSize.zero
-        guard AXValueGetValue(positionValue as! AXValue, .cgPoint, &point),
-              AXValueGetValue(sizeValue as! AXValue, .cgSize, &size) else {
+        guard AXValueGetValue(unsafeBitCast(positionValue, to: AXValue.self), .cgPoint, &point),
+              AXValueGetValue(unsafeBitCast(sizeValue, to: AXValue.self), .cgSize, &size) else {
             return nil
         }
         return WindowFrame(x: point.x, y: point.y, width: size.width, height: size.height)

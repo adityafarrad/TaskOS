@@ -35,6 +35,8 @@ final class ComposerViewModel {
     private(set) var notice: String?
     private(set) var savedWorkflows: [SavedWorkflow] = []
     private(set) var libraryError: String?
+    private(set) var libraryRecoveryNotice: String?
+    private(set) var historyError: String?
     private(set) var history: [RunRecord] = []
     private(set) var admissionEvents: [AdmissionEvent] = []
     private(set) var workflowAttention: [AutomationID: String] = [:]
@@ -58,8 +60,23 @@ final class ComposerViewModel {
     private(set) var settingsNotice: String?
     var showOnboarding = !OnboardingStore.hasCompleted && !AppComposition.isTesting
 
+    var persistenceWarning: String? {
+        switch composition.persistenceHealth {
+        case .onDisk:
+            return nil
+        case .recovered(let backup):
+            if let backup {
+                return "TaskOS recovered from a damaged data store. The previous files were saved at \(backup.path)."
+            }
+            return "TaskOS recovered from a damaged data store."
+        case .volatile(let reason):
+            return "TaskOS could not open its saved data and is using temporary storage. Changes will not survive relaunch. \(reason)"
+        }
+    }
+
     private let composition: AppComposition
     private let fileMonitor = FileSystemChangeMonitor()
+    private var notificationTokens: [NSObjectProtocol] = []
     private var draftID = AutomationID()
     private var startingRevision = WorkflowRevision(1)
     private var editingWorkflowID: AutomationID?
@@ -73,6 +90,8 @@ final class ComposerViewModel {
     private let sessionID = UUID()
     private var sourceGeneration = 0
     private var authoringGeneration = 0
+    private var libraryGeneration = 0
+    private var historyGeneration = 0
     private var completionKey: CompletionKey?
     private var autosaveTask: Task<Void, Never>?
     private var previewResetTask: Task<Void, Never>?
@@ -84,7 +103,7 @@ final class ComposerViewModel {
 
     init(composition: AppComposition = .shared) {
         self.composition = composition
-        NotificationCenter.default.addObserver(
+        let historyToken = NotificationCenter.default.addObserver(
             forName: .taskOSRunHistoryDidChange,
             object: nil,
             queue: .main
@@ -94,7 +113,7 @@ final class ComposerViewModel {
                 self?.refreshRuntimeActivity()
             }
         }
-        NotificationCenter.default.addObserver(
+        let runtimeToken = NotificationCenter.default.addObserver(
             forName: .taskOSRuntimeStateDidChange,
             object: nil,
             queue: .main
@@ -103,10 +122,31 @@ final class ComposerViewModel {
                 self?.refreshRuntimeActivity()
             }
         }
+        let terminateToken = NotificationCenter.default.addObserver(
+            forName: NSApplication.willTerminateNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in
+                self?.flushDraft()
+            }
+        }
+        notificationTokens = [historyToken, runtimeToken, terminateToken]
         fileMonitor.onChange = { [weak self] in
             self?.refreshFileStatus()
             self?.loadLibrary()
         }
+    }
+
+    func teardown() {
+        for token in notificationTokens {
+            NotificationCenter.default.removeObserver(token)
+        }
+        notificationTokens = []
+        fileMonitor.stop()
+        autosaveTask?.cancel()
+        previewResetTask?.cancel()
+        runMonitor?.cancel()
     }
 
     private static func watchedDirectories(for workflows: [SavedWorkflow]) -> Set<String> {
@@ -222,7 +262,7 @@ final class ComposerViewModel {
         if let lastSavedSignature {
             return currentSignature != lastSavedSignature
         }
-        return !document.actions.isEmpty
+        return hasDraftContent || draftName != "Untitled" || autoRunEnabled
     }
 
     private var hasDraftContent: Bool {
@@ -232,17 +272,20 @@ final class ComposerViewModel {
     }
 
     var editorLifecycleState: EditorLifecycleState {
-        if hasUnsavedChanges {
-            return .unsaved
-        }
-        if lastSavedSignature != nil {
+        if let lastSavedSignature {
+            if currentSignature != lastSavedSignature {
+                return .unsaved
+            }
             if supportsAutomaticRuns {
                 let enabled = activeWorkflow?.isEnabled ?? autoRunEnabled
                 return .savedAutomatic(enabled: enabled, paused: enabled && automaticTriggersPaused)
             }
             return .savedManual
         }
-        return hasDraftContent ? .draft : .empty
+        if !document.actions.isEmpty {
+            return .unsaved
+        }
+        return hasDraftContent || draftName != "Untitled" ? .draft : .empty
     }
 
     func nextRunDate(for workflow: SavedWorkflow) -> Date? {
@@ -820,7 +863,7 @@ final class ComposerViewModel {
 
         do {
             let data = try WorkflowPortability.export(workflow.definition)
-            try data.write(to: url)
+            try data.write(to: url, options: .atomic)
             notice = "Exported \"\(workflow.name)\"."
         } catch {
             notice = "Could not export: \(error.localizedDescription)"
@@ -834,21 +877,21 @@ final class ComposerViewModel {
         panel.allowsMultipleSelection = false
         guard panel.runModal() == .OK, let url = panel.url else { return }
 
-        do {
-            let data = try Data(contentsOf: url)
-            let definition = try WorkflowPortability.importWorkflow(data)
-            let imported = SavedWorkflow(definition: definition, isEnabled: false)
-
-            Task { [weak self] in
-                guard let self else { return }
-                try? await self.composition.repository.save(imported)
+        Task { [weak self] in
+            guard let self else { return }
+            do {
+                let definition = try await Task.detached {
+                    try WorkflowPortability.importWorkflow(at: url)
+                }.value
+                let imported = SavedWorkflow(definition: definition, isEnabled: false)
+                try await self.composition.repository.save(imported)
                 self.loadLibrary()
                 self.loadForEditing(imported)
                 self.autoRunEnabled = false
                 self.notice = "Imported \"\(imported.name)\". Choose the exact local resources, then save. It will not run automatically."
+            } catch {
+                self.notice = "Could not import this workflow: \(error.localizedDescription)"
             }
-        } catch {
-            notice = "Could not import this workflow: \(error.localizedDescription)"
         }
     }
 
@@ -867,6 +910,11 @@ final class ComposerViewModel {
               key.slot == "file",
               key.nodeRevision == currentRevision,
               document.actions.contains(where: { $0.id == id }) else { return }
+
+        guard FileTargetValidation.isAllowed(url) else {
+            notice = "TaskOS cannot open applications, installers, scripts, or executable content."
+            return
+        }
 
         let isDirectory = (try? url.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) ?? false
         let target = FileTarget(
@@ -931,6 +979,7 @@ final class ComposerViewModel {
 
         Task { [weak self] in
             guard let self else { return }
+            await self.requestForegroundPermissions(for: definition)
             guard let record = await self.composition.coordinator.submitAndWait(definition, source: .manual) else {
                 self.stage = .composing
                 self.runningName = nil
@@ -943,6 +992,17 @@ final class ComposerViewModel {
         }
     }
 
+    private func requestForegroundPermissions(for definition: AutomationDefinition) async {
+        let permissions = Set(definition.actions.flatMap(\.requiredPermissions))
+        if permissions.contains(.notifications) {
+            _ = await NotificationPermission.request()
+        }
+        if permissions.contains(.accessibility), !AccessibilityPermission.isGranted {
+            AccessibilityPermission.request()
+        }
+        refreshPermissions()
+    }
+
     func requestAccessibilityPermission() {
         AccessibilityPermission.request()
         notice = "If TaskOS is listed in System Settings, turn it on, then run Preview again."
@@ -950,15 +1010,23 @@ final class ComposerViewModel {
 
     func loadLibrary() {
         NotificationCenter.default.post(name: .taskOSWorkflowLibraryDidChange, object: nil)
+        libraryGeneration += 1
+        let generation = libraryGeneration
         Task { [weak self] in
             guard let self else { return }
             do {
                 let workflows = try await self.composition.repository.loadAll()
+                let quarantined = await self.composition.repository.quarantinedIdentifiers()
+                guard generation == self.libraryGeneration else { return }
                 self.savedWorkflows = workflows
                 self.libraryError = nil
+                self.libraryRecoveryNotice = quarantined.isEmpty
+                    ? nil
+                    : "\(quarantined.count) saved workflow\(quarantined.count == 1 ? "" : "s") could not be read and were skipped. The original records were kept for recovery."
                 self.workflowAttention = await self.computeAttention(for: workflows)
                 self.updateWatchedDirectories()
             } catch {
+                guard generation == self.libraryGeneration else { return }
                 self.libraryError = "Could not load saved workflows: \(error.localizedDescription)"
             }
         }
@@ -993,69 +1061,60 @@ final class ComposerViewModel {
         return attention
     }
 
-    func save() {
+    @discardableResult
+    func save() async -> Bool {
         notice = nil
-        let signature = currentSignature
         let isUpdatingExisting = editingWorkflowID != nil || lastSavedID != nil
-
-        let targetID: AutomationID
-        if let editingWorkflowID {
-            targetID = editingWorkflowID
-        } else if let lastSavedID {
-            targetID = lastSavedID
-        } else {
-            targetID = AutomationID()
-        }
-
+        let targetID = currentID
         let revision = isUpdatingExisting ? currentRevision : WorkflowRevision(1)
 
         guard let definition = document.makeDefinition(name: draftName, id: targetID, revision: revision) else {
             notice = applicationClarification ?? document.blockingParseMessage ?? blockingReason ?? "Finish resolving every step before saving."
-            return
+            return false
         }
 
         let isAutomatic = autoRunEnabled && supportsAutomaticRuns
         let workflow = SavedWorkflow(definition: definition, isEnabled: isAutomatic)
         let key = PreparationKey(sessionID: sessionID, authoringRevision: WorkflowRevision(authoringGeneration))
 
-        Task { [weak self] in
-            guard let self else { return }
-            guard key.sessionID == self.sessionID,
-                  key.authoringRevision == WorkflowRevision(self.authoringGeneration) else { return }
-            do {
-                try await self.composition.repository.save(workflow)
-                if definition.trigger.schedule != nil {
-                    if isAutomatic {
-                        await self.composition.scheduleRegistry.register(definition)
-                    } else {
-                        await self.composition.scheduleRegistry.unregister(definition.id)
-                    }
-                }
-                if definition.trigger.isEventTrigger {
-                    if isAutomatic {
-                        await self.composition.eventTriggerRegistry.register(definition)
-                    } else {
-                        await self.composition.eventTriggerRegistry.unregister(definition.id)
-                    }
-                }
-                let stillCurrent = key.sessionID == self.sessionID
-                    && key.authoringRevision == WorkflowRevision(self.authoringGeneration)
-                self.loadLibrary()
-                guard stillCurrent else { return }
-                self.autosaveTask?.cancel()
-                try? await self.composition.drafts.clearDraft()
-                self.editingWorkflowID = nil
-                self.recoverableDraft = nil
-                self.lastSavedSignature = signature
-                self.lastSavedID = targetID
-                self.startingRevision = revision
-                self.notice = isUpdatingExisting
-                    ? "Updated \"\(self.draftName)\"."
-                    : "Saved \"\(self.draftName)\"."
-            } catch {
-                self.notice = "Could not save: \(error.localizedDescription)"
+        do {
+            try await composition.repository.save(workflow)
+        } catch {
+            notice = "Could not save: \(error.localizedDescription)"
+            return false
+        }
+
+        if definition.trigger.schedule != nil {
+            if isAutomatic {
+                await composition.scheduleRegistry.register(definition)
+            } else {
+                await composition.scheduleRegistry.unregister(definition.id)
             }
         }
+        if definition.trigger.isEventTrigger {
+            if isAutomatic {
+                await composition.eventTriggerRegistry.register(definition)
+            } else {
+                await composition.eventTriggerRegistry.unregister(definition.id)
+            }
+        }
+
+        let stillCurrent = key.sessionID == sessionID
+            && key.authoringRevision == WorkflowRevision(authoringGeneration)
+        loadLibrary()
+        guard stillCurrent else { return true }
+
+        autosaveTask?.cancel()
+        try? await composition.drafts.clearDraft()
+        editingWorkflowID = nil
+        recoverableDraft = nil
+        draftID = targetID
+        lastSavedID = targetID
+        startingRevision = revision
+        document.rebaseRevision()
+        lastSavedSignature = currentSignature
+        notice = isUpdatingExisting ? "Updated \"\(draftName)\"." : "Saved \"\(draftName)\"."
+        return true
     }
 
     func completeOnboarding() {
@@ -1101,19 +1160,28 @@ final class ComposerViewModel {
     func clearHistory() {
         Task { [weak self] in
             guard let self else { return }
-            try? await self.composition.runHistory.clear()
-            try? await self.composition.admissionEvents.clear()
-            self.history = []
-            self.admissionEvents = []
-            self.settingsNotice = "Run history cleared."
+            do {
+                try await self.composition.runHistory.clear()
+                try await self.composition.admissionEvents.clear()
+                self.history = []
+                self.admissionEvents = []
+                self.historyError = nil
+                self.settingsNotice = "Run history cleared."
+            } catch {
+                self.settingsNotice = "Could not clear run history: \(error.localizedDescription)"
+            }
         }
     }
 
     func clearAllWorkflows() {
         Task { [weak self] in
             guard let self else { return }
-            for workflow in self.savedWorkflows {
-                try? await self.composition.repository.delete(id: workflow.id)
+            do {
+                try await self.composition.repository.deleteAll()
+            } catch {
+                self.settingsNotice = "Could not delete saved workflows: \(error.localizedDescription)"
+                self.loadLibrary()
+                return
             }
             await self.composition.scheduleRegistry.replaceAll([])
             await self.composition.eventTriggerRegistry.replaceAll([])
@@ -1200,22 +1268,11 @@ final class ComposerViewModel {
     }
 
     private var currentSignature: String {
-        let actions = document.resolvedActions() ?? []
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.sortedKeys]
-        let payload = (try? encoder.encode(actions)).map { String(decoding: $0, as: UTF8.self) } ?? document.text
-        return "\(draftName)|\(triggerSignature)|\(autoRunEnabled)|\(payload)"
-    }
-
-    private var triggerSignature: String {
-        let now = composition.clock.now()
-        guard let configuration = document.triggerConfiguration(relativeTo: now) else {
-            return String(describing: document.trigger)
-        }
-        let encoder = JSONEncoder()
-        encoder.outputFormatting = [.sortedKeys]
-        return (try? encoder.encode(configuration)).map { String(decoding: $0, as: UTF8.self) }
-            ?? String(describing: configuration)
+        let payload = (try? encoder.encode(document.makeSnapshot())).map { String(decoding: $0, as: UTF8.self) }
+            ?? document.text
+        return "\(draftName)|\(autoRunEnabled)|\(payload)"
     }
 
     func runSaved(_ workflow: SavedWorkflow) {
@@ -1279,12 +1336,18 @@ final class ComposerViewModel {
     }
 
     func loadHistory() {
+        historyGeneration += 1
+        let generation = historyGeneration
         Task { [weak self] in
             guard let self else { return }
             do {
-                self.history = try await self.composition.runHistory.recentRuns(limit: 50)
+                let runs = try await self.composition.runHistory.recentRuns(limit: 50)
+                guard generation == self.historyGeneration else { return }
+                self.history = runs
+                self.historyError = nil
             } catch {
-                self.libraryError = "Could not load run history: \(error.localizedDescription)"
+                guard generation == self.historyGeneration else { return }
+                self.historyError = "Could not load run history: \(error.localizedDescription)"
             }
         }
     }
@@ -1315,11 +1378,6 @@ final class ComposerViewModel {
         loadLibrary()
     }
 
-    func refreshForAttention() {
-        refreshPermissions()
-        loadLibrary()
-    }
-
     func setAutomaticTriggersPaused(_ paused: Bool) {
         Task { [weak self] in
             guard let self else { return }
@@ -1344,7 +1402,11 @@ final class ComposerViewModel {
                     self.runningName = status.currentName
                 }
             }
-            self.admissionEvents = (try? await self.composition.admissionEvents.recentEvents(limit: 50)) ?? []
+            do {
+                self.admissionEvents = try await self.composition.admissionEvents.recentEvents(limit: 50)
+            } catch {
+                self.historyError = "Could not load trigger history: \(error.localizedDescription)"
+            }
         }
     }
 
@@ -1368,7 +1430,19 @@ final class ComposerViewModel {
         let wasEditing = editingWorkflowID == workflow.id
         Task { [weak self] in
             guard let self else { return }
-            try? await self.composition.repository.delete(id: workflow.id)
+            do {
+                try await self.composition.repository.delete(id: workflow.id)
+            } catch {
+                self.notice = "Could not delete \"\(workflow.name)\": \(error.localizedDescription)"
+                self.loadLibrary()
+                return
+            }
+            do {
+                try await self.composition.runHistory.deleteAll(for: workflow.id)
+                try await self.composition.admissionEvents.deleteAll(for: workflow.id)
+            } catch {
+                self.notice = "Deleted \"\(workflow.name)\", but its history could not be removed."
+            }
             await self.composition.scheduleRegistry.unregister(workflow.id)
             await self.composition.eventTriggerRegistry.unregister(workflow.id)
             if wasEditing {
@@ -1381,17 +1455,39 @@ final class ComposerViewModel {
     func setEnabled(_ workflow: SavedWorkflow, enabled: Bool) {
         let trigger = workflow.definition.trigger
         guard trigger.schedule != nil || trigger.isEventTrigger else { return }
-        var updated = workflow
-        updated.isEnabled = enabled
-        updated.updatedAt = Date()
-
-        if editingWorkflowID == workflow.id {
-            autoRunEnabled = enabled
-        }
 
         Task { [weak self] in
             guard let self else { return }
-            try? await self.composition.repository.save(updated)
+
+            if enabled {
+                let preview = await self.composition.preparer.prepare(workflow.definition)
+                guard preview.isRunnable else {
+                    self.notice = "This workflow still needs attention before it can run automatically."
+                    self.loadLibrary()
+                    return
+                }
+                if preview.actions.contains(where: { $0.status == .needsPermission }) {
+                    self.notice = "Test this workflow once to grant its permissions before enabling automatic runs."
+                    self.loadLibrary()
+                    return
+                }
+            }
+
+            var updated = workflow
+            updated.isEnabled = enabled
+            updated.updatedAt = Date()
+
+            do {
+                try await self.composition.repository.save(updated)
+            } catch {
+                self.notice = "Could not \(enabled ? "enable" : "disable") \"\(workflow.name)\": \(error.localizedDescription)"
+                self.loadLibrary()
+                return
+            }
+
+            if self.editingWorkflowID == workflow.id {
+                self.autoRunEnabled = enabled
+            }
             if trigger.schedule != nil {
                 if updated.isEnabled {
                     await self.composition.scheduleRegistry.register(updated.definition)
@@ -1445,14 +1541,19 @@ final class ComposerViewModel {
         )
         let updated = SavedWorkflow(definition: renamed, isEnabled: workflow.isEnabled, updatedAt: Date())
 
-        if editingWorkflowID == workflow.id {
-            draftName = trimmed
-        }
-
         Task { [weak self] in
             guard let self else { return }
-            try? await self.composition.repository.save(updated)
-            self.loadLibrary()
+            do {
+                try await self.composition.repository.save(updated)
+                if self.editingWorkflowID == workflow.id {
+                    self.draftName = trimmed
+                    self.lastSavedSignature = self.currentSignature
+                }
+                self.loadLibrary()
+            } catch {
+                self.notice = "Could not rename \"\(workflow.name)\": \(error.localizedDescription)"
+                self.loadLibrary()
+            }
         }
     }
 
@@ -1468,8 +1569,12 @@ final class ComposerViewModel {
 
         Task { [weak self] in
             guard let self else { return }
-            try? await self.composition.repository.save(copy)
-            self.notice = "Duplicated \"\(workflow.name)\"."
+            do {
+                try await self.composition.repository.save(copy)
+                self.notice = "Duplicated \"\(workflow.name)\"."
+            } catch {
+                self.notice = "Could not duplicate \"\(workflow.name)\": \(error.localizedDescription)"
+            }
             self.loadLibrary()
         }
     }
@@ -1496,6 +1601,17 @@ final class ComposerViewModel {
         autosaveTask = Task { [weak self] in
             try? await Task.sleep(for: .milliseconds(400))
             guard !Task.isCancelled else { return }
+            try? await self?.composition.drafts.saveDraft(draft)
+        }
+    }
+
+    func flushDraft() {
+        autosaveTask?.cancel()
+        guard currentSignature != lastSavedSignature else { return }
+        guard hasDraftContent || draftName != "Untitled" else { return }
+        let payload = ComposerDraft.encode(snapshot: document.makeSnapshot())
+        let draft = ComposerDraft(id: currentID, name: draftName, text: document.text, payload: payload)
+        Task { [weak self] in
             try? await self?.composition.drafts.saveDraft(draft)
         }
     }

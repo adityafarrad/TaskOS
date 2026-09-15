@@ -14,6 +14,7 @@ struct OpenApplicationExecutor: ActionExecutor {
         guard case .openApplication(let configuration) = action else {
             return .failed(ActionFailure(message: "Open Application received an unsupported action."))
         }
+        await suppressor?.suppress(bundleIdentifier: configuration.application.identifier)
         let outcome = await open(
             bundleIdentifier: configuration.application.identifier,
             label: configuration.application.label
@@ -47,7 +48,7 @@ struct OpenApplicationExecutor: ActionExecutor {
             }
             return .succeeded
         } catch {
-            return .failed(ActionFailure(message: "Could not open \(label): \(error.localizedDescription)"))
+            return .failed(ActionFailure(message: "Could not open \(label)."))
         }
     }
 }

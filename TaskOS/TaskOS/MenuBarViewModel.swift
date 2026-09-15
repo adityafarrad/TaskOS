@@ -16,13 +16,14 @@ final class MenuBarViewModel {
     private(set) var libraryError: String?
 
     private let composition: AppComposition
+    private var libraryToken: NSObjectProtocol?
 
     private init(composition: AppComposition = .shared) {
         self.composition = composition
         load()
         refreshStatus()
         recoverInterruptedRuns()
-        NotificationCenter.default.addObserver(
+        libraryToken = NotificationCenter.default.addObserver(
             forName: .taskOSWorkflowLibraryDidChange,
             object: nil,
             queue: .main

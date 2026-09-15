@@ -52,7 +52,7 @@ actor SwiftDataRunHistoryRepository: RunHistoryRepository {
             status: record.status.rawValue,
             startedAt: record.startedAt,
             actionCount: record.actions.count,
-            payload: try RunRecordSerialization.encode(record)
+            payload: try RunRecordSerialization.encode(RunRecordRedaction.sanitize(record))
         )
         modelContext.insert(entry)
         try modelContext.save()
@@ -66,7 +66,7 @@ actor SwiftDataRunHistoryRepository: RunHistoryRepository {
             entry.status = record.status.rawValue
             entry.startedAt = record.startedAt
             entry.actionCount = record.actions.count
-            entry.payload = try RunRecordSerialization.encode(record)
+            entry.payload = try RunRecordSerialization.encode(RunRecordRedaction.sanitize(record))
             try modelContext.save()
         } else {
             try await append(record)
@@ -90,6 +90,12 @@ actor SwiftDataRunHistoryRepository: RunHistoryRepository {
 
     func clear() async throws {
         try modelContext.delete(model: RunRecordEntry.self)
+        try modelContext.save()
+    }
+
+    func deleteAll(for automationID: AutomationID) async throws {
+        let identifier = automationID.rawValue
+        try modelContext.delete(model: RunRecordEntry.self, where: #Predicate { $0.automationID == identifier })
         try modelContext.save()
     }
 
