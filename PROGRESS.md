@@ -3740,3 +3740,88 @@ Second run before starting 2.7C, performed at commit `0f50f73`:
   - UI tests — TEST SUCCEEDED, 19/19 (`testTomorrowScheduleCompletes`,
     `testPastDueTodayScheduleExplainsTheProblem`).
   - Debug and Release builds — SUCCEEDED.
+
+## Phase 3.1 — audit repairs (2026-09-15)
+
+- Status: done for the audited scope. The independent audit's 24 findings
+  (11 High, 10 Medium, 3 Low) were reproduced against `8ed8668` and repaired,
+  plus the Xcode 27 test-compile regression found while re-verifying the audit
+  evidence.
+- Prerequisite repair: `ApplicationRecordProviding` is now `nonisolated`, so
+  the `TaskOSTests` target compiles under Xcode 27 (Swift 6.4) with the app
+  target's `SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor`; the full app suite is
+  runnable again.
+- Data safety and persistence:
+  1. `save()` is now async and result-bearing. `Save and Continue` awaits
+     durable persistence before replacing the document and keeps the editor on
+     failure.
+  2. Dirty detection uses the complete authoring snapshot (source text,
+     unresolved clauses, trigger, actions, rationale, revision, name, enabled
+     state); unresolved text now prompts and drafts flush on window close /
+     termination.
+  3. On-disk store failure attempts an explicit recovery (store files moved to
+     `TaskOS-store-backup-<timestamp>.store`) and otherwise surfaces a
+     persistent in-app warning instead of silently using volatile storage;
+     `try!` is gone from store creation.
+  4. `loadAll()` decodes records independently, quarantines invalid records,
+     and keeps valid workflows and trigger registrations active; the library
+     shows a recovery notice.
+  5. Save/import/delete/enable/rename/duplicate/clear paths propagate typed
+     errors; runtime registries and UI only update after durable success.
+  6. New saves persist under the active document identity and rebase the
+     in-memory revision after save, so Test runs, approvals, history, and edits
+     share one identity and revision.
+- Execution safety:
+  7. Lifecycle suppression is registered before the open/quit request and
+     renewed through the settling window.
+  8. Battery monitor state is discarded whenever the trigger or revision
+     changes (register and replaceAll).
+  9. Schedules re-arm on `NSSystemTimeZoneDidChange` / `NSSystemClockDidChange`
+     and the calculator uses the autoupdating timezone.
+  10. Background execution never requests notification authorization; the
+      executor reports needs-permission failure, Test requests permissions in
+      the foreground, and enabling automatic runs requires a runnable,
+      permission-ready preview.
+  11. File targets are validated at selection and immediately before open:
+      packages/application bundles, executable content, scripts, alias/symlink
+      targets, and rejected extensions are refused.
+  12. Action timeouts no longer wait for non-cooperative executors, and window
+      polling is cancellation-aware with safe AX value conversion.
+- Privacy and limits:
+  13. Website/application failure messages no longer include URLs, query
+      strings, paths, or platform error text; the run-history repository
+      additionally redacts links and home paths and caps message length.
+  14. Deleting a workflow removes its run history and admission events, so the
+      confirmation promise is true.
+  15. Import checks file size before reading and reads/parses off the main
+      actor; export enforces the same 256 KB limit with atomic writes; name and
+      notification fields are bounded so TaskOS cannot export what it refuses
+      to import.
+- Correctness and lifecycle:
+  16. `ComposerDocument` resolution state is a true value property (the
+      `@unchecked Sendable` box is gone).
+  17. The idle 5-second polling loop is removed; library/history loads are
+      generation-guarded and driven by notifications and activation.
+  18. Stale resource selections retry once with a refreshed key instead of
+      dropping the user's choice.
+  19. History shows the newest admission events first and has a dedicated
+      error state with retry.
+  20. Installed-app discovery walks application folders recursively (bounded
+      depth, package-aware, deduplicated), so vendor subfolder apps resolve.
+  21. `AGENTS.md` points at Phase 3.1 instead of the completed WP 2.7.
+- Tests:
+  - Core: `swift test --package-path Packages/TaskOSCore` — 433 tests / 47
+    suites, pass (new: copy-independent resolution, battery monitor reset,
+    non-cooperative timeout, redaction, export/import bounds, field caps,
+    per-automation history deletion).
+  - App unit tests (`xcodebuild ... test -only-testing:TaskOSTests`) —
+    TEST SUCCEEDED, 90 tests (77 before; new: dirty/unresolved text, save
+    identity and revision rebasing, corrupt-record quarantine, transactional
+    delete-all, redacted persistence, file-target validation, nested app
+    discovery).
+  - UI tests — TEST SUCCEEDED, 19/19.
+  - Debug and Release builds — SUCCEEDED.
+- Evidence limits: physical journeys (sleep/wake, timezone travel, permission
+  revocation, event storms) were not re-run in this increment; they remain
+  Phase 3.2/3.3 work. The environment now runs Xcode 27.0 (27A266a) / Swift
+  6.4 and all suites above were executed on it.
